@@ -103,6 +103,7 @@ impl Transform2D {
     /// Перемножение с другим преобразованием (композиция преобразований).
     pub fn multiply(&self, other: &Self) -> Self {
         // TODO в прошлый раз работало некорреткно!!!
+        // PS Вадим: Вроде бы это должно быть правильно
         todo!("Текущая реализации умножения 2D преобразований некорретна!");
         // [a, d, 0]
         // [b, e, 0]
@@ -143,11 +144,11 @@ impl Transform2D {
 
         Self {
             a: self.e * inv_det,
-            b: -self.d * inv_det,
-            c: (self.d * self.f - self.c * self.e) * inv_det,
-            d: -self.b * inv_det,
+            b: -self.b * inv_det,
+            c: (self.b * self.f - self.c * self.e) * inv_det,
+            d: -self.d * inv_det,
             e: self.a * inv_det,
-            f: (self.c * self.b - self.a * self.f) * inv_det,
+            f: (self.c * self.d - self.a * self.f) * inv_det,
         }
     }
 
