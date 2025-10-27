@@ -31,15 +31,12 @@ impl Model3 {
     }
     /// Создание тетраэдра со сторонами единичной длины.
     pub fn tetrahedron() -> Self {
-        // Координаты правильного тетраэдра с длиной ребра = 1
-        let a = 1.0 / (2.0 * (2.0 as f32).sqrt());
-        let b = 1.0 / (6.0 as f32).sqrt();
-
+        // Упрощенные координаты для лучшей видимости
         let vertexes = vec![
-            Point3::new(0.0, 0.0, b),                      // Верхняя вершина
-            Point3::new(2.0 * a, 0.0, -a),                 // Нижняя вершина 1
-            Point3::new(-a, (3.0 as f32).sqrt() * a, -a),  // Нижняя вершина 2
-            Point3::new(-a, (-3.0 as f32).sqrt() * a, -a), // Нижняя вершина 3
+            Point3::new(0.0, 0.0, 0.8),    // Верхняя вершина
+            Point3::new(0.8, -0.5, -0.5),  // Нижняя вершина 1
+            Point3::new(-0.8, -0.5, -0.5), // Нижняя вершина 2
+            Point3::new(0.0, 0.8, -0.5),   // Нижняя вершина 3
         ];
 
         let polygons = vec![
@@ -49,9 +46,7 @@ impl Model3 {
             Polygon3::triangle(1, 3, 2), // Основание
         ];
 
-        let origin = Point3::new(0.0, 0.0, 0.0);
-
-        Model3::new(origin, vertexes, polygons)
+        Model3::new(Point3::new(0.0, 0.0, 0.0), vertexes, polygons)
     }
 
     /// Создание гексаэдра со сторонами единичной длины.
@@ -156,6 +151,7 @@ impl Model3 {
     }
 
     /// Нарисовать модель.
+    /// Нарисовать модель.
     pub fn draw(&self, painter: &mut Painter, style: &RenderStyle) {
         // Преобразуем 3D точки в 2D с помощью простой ортографической проекции
         let projected_points: Vec<egui::Pos2> = self
@@ -194,7 +190,6 @@ impl Model3 {
             }
         }
 
-        // Рисуем вершины
         for &point in &projected_points {
             painter.circle_filled(point, style.vertex_radius, style.vertex_color);
         }
