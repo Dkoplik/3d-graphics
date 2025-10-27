@@ -57,14 +57,20 @@ impl AthenianApp {
 
                     // Выбор многогранников
                     ui.label("Polyhedra:");
-                    if ui.button("Tetrahedron").clicked() {
+                    if ui.button("тетраэдр").clicked() {
                         self.add_tetrahedron();
                     }
-                    if ui.button("Hexahedron").clicked() {
+                    if ui.button("гексаэдр").clicked() {
                         self.add_hexahedron();
                     }
-                    if ui.button("Octahedron").clicked() {
+                    if ui.button("октаэдр").clicked() {
                         self.add_octahedron();
+                    }
+                    if ui.button("икосаэдр").clicked() {
+                        self.add_icosahedron();
+                    }
+                    if ui.button("додекаэдр").clicked() {
+                        self.add_dodecahedron();
                     }
 
                     ui.separator();

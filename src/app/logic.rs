@@ -366,8 +366,8 @@ fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Ve
 
 #[derive(Default)]
 pub enum Instrument {
-    #[default]
     SetPoint,
+    #[default]
     Move3D,
     Rotate3D,
     Scale3D,
