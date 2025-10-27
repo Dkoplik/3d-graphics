@@ -24,16 +24,10 @@ impl AthenianApp {
         (response, painter)
     }
 
-    /// Очистить холст от моделей.
-    pub fn clear_canvas(&mut self) {
-        self.scene.models.clear();
-        self.selected_3d_model_index = None;
-    }
-
     /// Нарисовать холст.
     pub fn draw_canvas(&mut self, painter: &mut Painter) {
         let style = g3d::RenderStyle::default();
-        self.scene.render(self.camera.clone(), painter, &style); // Добавить .clone()
+        self.scene.render(self.camera.clone(), painter, &style);
     }
 }
 
@@ -47,6 +41,7 @@ impl AthenianApp {
         self.handle_click(response);
         self.handle_drag(response);
     }
+
     /// Установить первую точку оси.
     pub fn set_axis_point1(&mut self, pos: egui::Pos2) {
         // Преобразуем экранные координаты в 3D координаты на плоскости z=0
@@ -74,6 +69,7 @@ impl AthenianApp {
             self.axis_point2.x, self.axis_point2.y, self.axis_point2.z
         );
     }
+
     /// Обработать клики по холсту.
     fn handle_click(&mut self, response: &Response) {
         if response.clicked_by(egui::PointerButton::Primary) {
@@ -81,7 +77,12 @@ impl AthenianApp {
                 match &self.instrument {
                     Instrument::SetAxisPoint1 => self.set_axis_point1(pos),
                     Instrument::SetAxisPoint2 => self.set_axis_point2(pos),
-                    _ => self.select_3d_model(pos),
+                    _ => {
+                        // Если есть фигура на сцене, автоматически выбираем её
+                        if !self.scene.models.is_empty() {
+                            self.selected_3d_model_index = Some(0);
+                        }
+                    }
                 }
             }
         }
@@ -109,11 +110,12 @@ impl AthenianApp {
 
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
-        if let Some(index) = self.selected_3d_model_index {
+        // Если есть фигура на сцене, применяем преобразования сразу
+        if !self.scene.models.is_empty() {
             match &self.instrument {
-                Instrument::Move3D => self.move_3d_model(index, start, end),
-                Instrument::Rotate3D => self.rotate_3d_model(index, start, end),
-                Instrument::Scale3D => self.scale_3d_model(index, start, end),
+                Instrument::Move3D => self.move_3d_model(start, end),
+                Instrument::Rotate3D => self.rotate_3d_model(start, end),
+                Instrument::Scale3D => self.scale_3d_model(start, end),
                 _ => {}
             }
         }
@@ -125,85 +127,68 @@ impl AthenianApp {
 // --------------------------------------------------
 
 impl AthenianApp {
-    /// Выбрать 3D модель в указанной точке.
-    fn select_3d_model(&mut self, pos: egui::Pos2) {
-        // Преобразуем экранные координаты в нормализованные [-1, 1]
-        let screen_x = (pos.x / self.painter_width) * 2.0 - 1.0;
-        let screen_y = 1.0 - (pos.y / self.painter_height) * 2.0;
+    /// Переместить 3D модель (применяется сразу к выбранной фигуре)
+    fn move_3d_model(&mut self, start: egui::Pos2, end: egui::Pos2) {
+        if let Some(_) = self.get_selected_model() {
+            let delta_x = (end.x - start.x) / self.painter_width * 4.0;
+            let delta_y = (end.y - start.y) / self.painter_height * 4.0;
 
-        // Получаем луч из камеры
-        let ray = self.camera.screen_point_to_ray(screen_x, screen_y);
-
-        // Простая проверка пересечения - выбираем ближайшую модель
-        let mut closest_index = None;
-        let mut closest_distance = f32::MAX;
-
-        for (i, model) in self.scene.models.iter().enumerate() {
-            let world_model = model.clone().to_world_coordinates();
-
-            // Используем публичный метод для получения центра
-            let center = world_model.get_origin();
-
-            let distance_to_ray = distance_point_to_line(center, ray.origin, ray.direction);
-
-            if distance_to_ray < 0.5 && distance_to_ray < closest_distance {
-                closest_index = Some(i);
-                closest_distance = distance_to_ray;
+            let translation = Transform3D::translation(delta_x, -delta_y, 0.0);
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(translation);
             }
         }
-
-        self.selected_3d_model_index = closest_index;
     }
 
-    /// Переместить 3D модель.
-    fn move_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
-        let delta_x = (end.x - start.x) / self.painter_width * 5.0;
-        let delta_y = (end.y - start.y) / self.painter_height * 5.0;
+    /// Повернуть 3D модель (применяется сразу к выбранной фигуре)
+    fn rotate_3d_model(&mut self, start: egui::Pos2, end: egui::Pos2) {
+        if let Some(model) = self.get_selected_model() {
+            let delta_x = (end.x - start.x) / self.painter_width * std::f32::consts::PI;
+            let delta_y = (end.y - start.y) / self.painter_height * std::f32::consts::PI;
 
-        let translation = Transform3D::translation(delta_x, -delta_y, 0.0);
-        self.scene.models[index].apply_transform(translation);
+            let center = model.get_origin();
+
+            // Вращение вокруг осей
+            let rotation_x = Transform3D::rotation_around_line(
+                Line3::new(center, Vec3::new(1.0, 0.0, 0.0)),
+                delta_y,
+            );
+            let rotation_y = Transform3D::rotation_around_line(
+                Line3::new(center, Vec3::new(0.0, 1.0, 0.0)),
+                delta_x,
+            );
+
+            let combined_rotation = rotation_x.multiply(rotation_y);
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(combined_rotation);
+            }
+        }
     }
 
-    /// Повернуть 3D модель.
-    fn rotate_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
-        let delta_x = (end.x - start.x) / self.painter_width * std::f32::consts::PI;
-        let delta_y = (end.y - start.y) / self.painter_height * std::f32::consts::PI;
+    /// Масштабировать 3D модель (применяется сразу к выбранной фигуре)
+    fn scale_3d_model(&mut self, start: egui::Pos2, end: egui::Pos2) {
+        if let Some(model) = self.get_selected_model() {
+            let delta = ((end.x - start.x) + (end.y - start.y))
+                / (self.painter_width + self.painter_height);
+            let scale_factor = 1.0 + delta * 2.0;
 
-        let model = &self.scene.models[index];
-        let center = model.get_origin();
+            let center = model.get_origin();
+            let scale = Transform3D::scale_relative_to_point(
+                center,
+                scale_factor,
+                scale_factor,
+                scale_factor,
+            );
 
-        // Вращение вокруг осей
-        let rotation_x = Transform3D::rotation_around_line(
-            Line3::new(center, Vec3::new(1.0, 0.0, 0.0)),
-            delta_y,
-        );
-        let rotation_y = Transform3D::rotation_around_line(
-            Line3::new(center, Vec3::new(0.0, 1.0, 0.0)),
-            delta_x,
-        );
-
-        let combined_rotation = rotation_x.multiply(rotation_y);
-        self.scene.models[index].apply_transform(combined_rotation);
-    }
-
-    /// Масштабировать 3D модель.
-    fn scale_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
-        let delta =
-            ((end.x - start.x) + (end.y - start.y)) / (self.painter_width + self.painter_height);
-        let scale_factor = 1.0 + delta * 2.0;
-
-        let model = &self.scene.models[index];
-        let center = model.get_origin();
-
-        let scale =
-            Transform3D::scale_relative_to_point(center, scale_factor, scale_factor, scale_factor);
-        self.scene.models[index].apply_transform(scale);
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(scale);
+            }
+        }
     }
 
     /// Применить отражение относительно выбранной плоскости.
     pub fn apply_reflection(&mut self, plane_type: ReflectionPlane) {
-        if let Some(index) = self.selected_3d_model_index {
-            let model = &self.scene.models[index];
+        if let Some(model) = self.get_selected_model() {
             let center = model.get_origin();
 
             let reflection = match plane_type {
@@ -217,25 +202,27 @@ impl AthenianApp {
                 .multiply(reflection)
                 .multiply(Transform3D::translation(center.x, center.y, center.z));
 
-            self.scene.models[index].apply_transform(transform);
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(transform);
+            }
         }
     }
 
     /// Масштабировать относительно центра
     pub fn scale_around_center(&mut self, scale_x: f32, scale_y: f32, scale_z: f32) {
-        if let Some(index) = self.selected_3d_model_index {
-            let model = &self.scene.models[index];
+        if let Some(model) = self.get_selected_model() {
             let center = model.get_origin();
 
             let scale = Transform3D::scale_relative_to_point(center, scale_x, scale_y, scale_z);
-            self.scene.models[index].apply_transform(scale);
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(scale);
+            }
         }
     }
 
     /// Повернуть вокруг оси через центр
     pub fn rotate_around_center_axis(&mut self, axis: CenterAxis, angle_degrees: f32) {
-        if let Some(index) = self.selected_3d_model_index {
-            let model = &self.scene.models[index];
+        if let Some(model) = self.get_selected_model() {
             let center = model.get_origin();
             let angle_rad = angle_degrees.to_radians();
 
@@ -247,29 +234,41 @@ impl AthenianApp {
 
             let rotation =
                 Transform3D::rotation_around_line(Line3::new(center, axis_vector), angle_rad);
-            self.scene.models[index].apply_transform(rotation);
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(rotation);
+            }
         }
     }
 
-    // Простые методы для добавления многогранников
+    // Простые методы для добавления многогранников (заменяют текущую фигуру)
     pub fn add_tetrahedron(&mut self) {
-        self.scene.add_model(Model3::tetrahedron());
+        let mut tetrahedron = Model3::tetrahedron();
+        self.center_model_position(&mut tetrahedron);
+        self.set_model(tetrahedron);
     }
 
     pub fn add_hexahedron(&mut self) {
-        self.scene.add_model(Model3::hexahedron());
+        let mut hexahedron = Model3::hexahedron();
+        self.center_model_position(&mut hexahedron);
+        self.set_model(hexahedron);
     }
 
     pub fn add_octahedron(&mut self) {
-        self.scene.add_model(Model3::octahedron());
+        let mut octahedron = Model3::octahedron();
+        self.center_model_position(&mut octahedron);
+        self.set_model(octahedron);
     }
 
     pub fn add_icosahedron(&mut self) {
-        self.scene.add_model(Model3::icosahedron());
+        let mut icosahedron = Model3::icosahedron();
+        self.center_model_position(&mut icosahedron);
+        self.set_model(icosahedron);
     }
 
     pub fn add_dodecahedron(&mut self) {
-        self.scene.add_model(Model3::dodecahedron());
+        let mut dodecahedron = Model3::dodecahedron();
+        self.center_model_position(&mut dodecahedron);
+        self.set_model(dodecahedron);
     }
 
     /// Установить перспективную проекцию

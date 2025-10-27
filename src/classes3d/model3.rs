@@ -52,9 +52,7 @@ impl Model3 {
             Polygon3::triangle(1, 3, 2),
         ];
 
-        let origin = Point3::new(0.0, 0.0, 0.0);
-
-        Model3::new(origin, vertexes, polygons)
+        Model3::new(Point3::new(0.0, 0.0, 0.0), vertexes, polygons)
     }
 
     /// Создание гексаэдра со сторонами единичной длины.
@@ -276,6 +274,7 @@ pub fn dodecahedron() -> Self {
     }
 
     /// Нарисовать модель.
+    /// Нарисовать модель.
     pub fn draw(&self, painter: &mut Painter, style: &RenderStyle) {
         // Преобразуем 3D точки в 2D с помощью простой ортографической проекции
         let projected_points: Vec<egui::Pos2> = self
@@ -314,7 +313,6 @@ pub fn dodecahedron() -> Self {
             }
         }
 
-        // Рисуем вершины
         for &point in &projected_points {
             painter.circle_filled(point, style.vertex_radius, style.vertex_color);
         }

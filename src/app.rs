@@ -30,11 +30,46 @@ pub struct AthenianApp {
 }
 
 impl AthenianApp {
-    /// Инициализация приложения.
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         // белая тема
         cc.egui_ctx.set_theme(egui::Theme::Light);
         Self::default()
+    }
+    /// Добавить фигуру (заменяет текущую)
+    pub fn set_model(&mut self, model: g3d::Model3) {
+        self.scene.models.clear();
+        self.scene.models.push(model);
+        self.selected_3d_model_index = Some(0); // Автоматически выбираем добавленную фигуру
+    }
+
+    /// Получить текущую выбранную модель (мутабельно)
+    pub fn get_selected_model_mut(&mut self) -> Option<&mut g3d::Model3> {
+        self.selected_3d_model_index
+            .and_then(|index| self.scene.models.get_mut(index))
+    }
+
+    /// Получить текущую выбранную модель
+    pub fn get_selected_model(&self) -> Option<&g3d::Model3> {
+        self.selected_3d_model_index
+            .and_then(|index| self.scene.models.get(index))
+    }
+
+    /// Очистить холст от моделей.
+    pub fn clear_canvas(&mut self) {
+        self.scene.models.clear();
+        self.selected_3d_model_index = None;
+    }
+
+    /// Центрировать позицию модели
+    pub fn center_model_position(&self, model: &mut g3d::Model3) {
+        model.set_origin(g3d::Point3::new(0.0, 0.0, 0.0));
+    }
+
+    /// Центрировать текущую фигуру на холсте
+    pub fn center_model(&mut self) {
+        if let Some(model) = self.get_selected_model_mut() {
+            model.set_origin(g3d::Point3::new(0.0, 0.0, 0.0));
+        }
     }
 }
 
