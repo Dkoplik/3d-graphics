@@ -38,29 +38,29 @@ impl AthenianApp {
 
     /// Нарисовать текущий якорь.
     fn draw_anchor(&self, painter: &Painter) {
-        if let Some(anchor) = self.selected_polygon_anchor {
-            painter.circle_filled(anchor, 5.0, Color32::RED);
-        }
+        // if let Some(anchor) = self.selected_polygon_anchor {
+        //     painter.circle_filled(anchor, 5.0, Color32::RED);
+        // }
     }
 
     /// Нарисовать выбранную точку.
     fn draw_point(&self, painter: &Painter) {
-        if let Some(anchor) = self.selected_point {
-            painter.circle_filled(anchor, 5.0, Color32::GREEN);
-        }
+        // if let Some(anchor) = self.selected_point {
+        //     painter.circle_filled(anchor, 5.0, Color32::GREEN);
+        // }
     }
 
     /// Нарисовать холст.
     pub fn draw_canvas(&mut self, painter: &Painter) {
-        for i in 0..self.polygons.len() {
-            if self.selected_polygon_index.is_some() && i == self.selected_polygon_index.unwrap() {
-                self.polygons[i].draw(&painter, &PolygonStyle::selected(), self.selected_point);
-            } else {
-                self.polygons[i].draw(&painter, &PolygonStyle::standard(), self.selected_point);
-            }
-        }
-        self.draw_anchor(painter);
-        self.draw_point(painter);
+        // for i in 0..self.polygons.len() {
+        //     if self.selected_polygon_index.is_some() && i == self.selected_polygon_index.unwrap() {
+        //         self.polygons[i].draw(&painter, &PolygonStyle::selected(), self.selected_point);
+        //     } else {
+        //         self.polygons[i].draw(&painter, &PolygonStyle::standard(), self.selected_point);
+        //     }
+        // }
+        // self.draw_anchor(painter);
+        // self.draw_point(painter);
     }
 }
 
@@ -80,9 +80,6 @@ impl AthenianApp {
         if response.clicked_by(egui::PointerButton::Primary) {
             let pos = response.hover_pos().unwrap();
             match &self.instrument {
-                Instrument::AddVertex => self.add_vertex_to_selected_polygon(pos),
-                Instrument::Select => self.select_polygon(pos),
-                Instrument::SetAnchor => self.change_anchor(pos),
                 Instrument::SetPoint => self.change_point(pos),
                 _ => self.handle_3d_click(pos),
             }
@@ -104,10 +101,6 @@ impl AthenianApp {
             && let Some(drag_cur) = response.hover_pos()
         {
             match &self.instrument {
-                Instrument::Drag => self.drag_selected_polygon(drag_start, drag_cur),
-                Instrument::Rotate => self.rotate_selected_polygon(drag_start, drag_cur),
-                Instrument::Scale => self.scale_selected_polygon(drag_start, drag_cur),
-                // 3D инструменты
                 _ => self.handle_3d_drag(drag_start, drag_cur),
             }
         }
@@ -134,111 +127,111 @@ impl AthenianApp {
 impl AthenianApp {
     /// Добавить новую вершину к текущему полигону.
     fn add_vertex_to_selected_polygon(&mut self, pos: Pos2) {
-        if let Some(index) = self.selected_polygon_index {
-            let polygon = &mut self.polygons[index];
-            polygon.add_vertex_pos(pos);
-        }
-        // Новый полигон
-        else {
-            let polygon = Polygon::from_pos(pos);
-            self.polygons.push(polygon);
-            self.selected_polygon_index = Some(self.polygons.len() - 1);
-        }
+        // if let Some(index) = self.selected_polygon_index {
+        //     let polygon = &mut self.polygons[index];
+        //     polygon.add_vertex_pos(pos);
+        // }
+        // // Новый полигон
+        // else {
+        //     let polygon = Polygon::from_pos(pos);
+        //     self.polygons.push(polygon);
+        //     self.selected_polygon_index = Some(self.polygons.len() - 1);
+        // }
     }
 
     /// Выбрать полигон в указанной точке.
     fn select_polygon(&mut self, pos: Pos2) {
-        // обнулить прошлый якорь
-        self.selected_polygon_anchor = None;
+        // // обнулить прошлый якорь
+        // self.selected_polygon_anchor = None;
 
-        for i in 0..self.polygons.len() {
-            if self.polygons[i].contains_pos(pos) {
-                self.selected_polygon_index = Some(i);
-                return;
-            }
-        }
-        self.selected_polygon_index = None;
+        // for i in 0..self.polygons.len() {
+        //     if self.polygons[i].contains_pos(pos) {
+        //         self.selected_polygon_index = Some(i);
+        //         return;
+        //     }
+        // }
+        // self.selected_polygon_index = None;
     }
 
     /// Выбрать якорь для операций над полигоном.
     fn change_anchor(&mut self, pos: Pos2) {
-        self.selected_polygon_anchor = Some(pos);
+        // self.selected_polygon_anchor = Some(pos);
     }
 
     /// Выбрать точку для проверки положения относительно ребёр.
     fn change_point(&mut self, pos: Pos2) {
-        self.selected_point = Some(pos);
+        // self.selected_point = Some(pos);
     }
 
     /// Переместить выбранный полигон параллельно координатным осям.
     fn drag_selected_polygon(&mut self, start: Pos2, end: Pos2) {
-        if let Some(index) = self.selected_polygon_index {
-            let delta = end - start;
-            let polygon = &mut self.polygons[index];
-            polygon.apply_transform(Transform2D::translation(delta.x, delta.y));
+        // if let Some(index) = self.selected_polygon_index {
+        //     let delta = end - start;
+        //     let polygon = &mut self.polygons[index];
+        //     polygon.apply_transform(Transform2D::translation(delta.x, delta.y));
 
-            #[cfg(debug_assertions)]
-            println!("drag with start {:#?} end {:#?}", start, end);
-        }
+        //     #[cfg(debug_assertions)]
+        //     println!("drag with start {:#?} end {:#?}", start, end);
+        // }
     }
 
     /// Повернуть выбранный полигон через вектор смещения.
     fn rotate_selected_polygon(&mut self, start: Pos2, end: Pos2) {
-        if let Some(index) = self.selected_polygon_index {
-            let polygon = &mut self.polygons[index];
+        // if let Some(index) = self.selected_polygon_index {
+        //     let polygon = &mut self.polygons[index];
 
-            // Задан якорь для вращения
-            if let Some(anchor) = self.selected_polygon_anchor {
-                let angle = calculate_rotation_angle(anchor, start, end);
-                polygon.apply_transform(Transform2D::rotation_around_pos(angle, anchor));
+        //     // Задан якорь для вращения
+        //     if let Some(anchor) = self.selected_polygon_anchor {
+        //         let angle = calculate_rotation_angle(anchor, start, end);
+        //         polygon.apply_transform(Transform2D::rotation_around_pos(angle, anchor));
 
-                #[cfg(debug_assertions)]
-                println!("rotate relative to {:#?} with angle {:#?}", anchor, angle);
-            }
-            // Просто повернуть относительно центра
-            else {
-                let center = polygon.get_center();
-                let angle = calculate_rotation_angle(center, start, end);
-                polygon.apply_transform(Transform2D::rotation_around_pos(angle, center));
+        //         #[cfg(debug_assertions)]
+        //         println!("rotate relative to {:#?} with angle {:#?}", anchor, angle);
+        //     }
+        //     // Просто повернуть относительно центра
+        //     else {
+        //         let center = polygon.get_center();
+        //         let angle = calculate_rotation_angle(center, start, end);
+        //         polygon.apply_transform(Transform2D::rotation_around_pos(angle, center));
 
-                #[cfg(debug_assertions)]
-                println!(
-                    "rotate relative to center {:#?} with angle {:#?}",
-                    center, angle
-                );
-            }
-        }
+        //         #[cfg(debug_assertions)]
+        //         println!(
+        //             "rotate relative to center {:#?} with angle {:#?}",
+        //             center, angle
+        //         );
+        //     }
+        // }
     }
 
     /// Изменить размер полигона через вектор смещения.
     fn scale_selected_polygon(&mut self, start: Pos2, end: Pos2) {
-        if let Some(index) = self.selected_polygon_index {
-            let polygon = &mut self.polygons[index];
+        // if let Some(index) = self.selected_polygon_index {
+        //     let polygon = &mut self.polygons[index];
 
-            // Задан якорь для изменения размера
-            if let Some(anchor) = self.selected_polygon_anchor {
-                let (sx, sy) = calculate_scale(anchor, start, end);
-                polygon.apply_transform(Transform2D::scaling_around_pos(sx, sy, anchor));
+        //     // Задан якорь для изменения размера
+        //     if let Some(anchor) = self.selected_polygon_anchor {
+        //         let (sx, sy) = calculate_scale(anchor, start, end);
+        //         polygon.apply_transform(Transform2D::scaling_around_pos(sx, sy, anchor));
 
-                #[cfg(debug_assertions)]
-                println!(
-                    "scale relative to {:#?} with scale x:{} y:{}",
-                    anchor, sx, sy
-                );
-            }
-            // Просто растянуть относительно центра
-            else {
-                let center = polygon.get_center();
-                let (sx, sy) = calculate_scale(center, start, end);
-                polygon.apply_transform(Transform2D::scaling_around_pos(sx, sy, center));
+        //         #[cfg(debug_assertions)]
+        //         println!(
+        //             "scale relative to {:#?} with scale x:{} y:{}",
+        //             anchor, sx, sy
+        //         );
+        //     }
+        //     // Просто растянуть относительно центра
+        //     else {
+        //         let center = polygon.get_center();
+        //         let (sx, sy) = calculate_scale(center, start, end);
+        //         polygon.apply_transform(Transform2D::scaling_around_pos(sx, sy, center));
 
-                #[cfg(debug_assertions)]
-                println!(
-                    "scale relative to center {:#?} with scale x:{} y:{}",
-                    center, sx, sy
-                );
-            }
-        }
+        //         #[cfg(debug_assertions)]
+        //         println!(
+        //             "scale relative to center {:#?} with scale x:{} y:{}",
+        //             center, sx, sy
+        //         );
+        //     }
+        // }
     }
 
 
@@ -306,15 +299,7 @@ impl AthenianApp {
 #[derive(Default)]
 pub enum Instrument {
     #[default]
-    AddVertex,
-    Select,
-    SetAnchor,
     SetPoint,
-    Drag,
-    Rotate,
-    Scale,
-    // 3D инструменты
-    Select3D,
     Move3D,
     Rotate3D,
     Scale3D,
@@ -329,15 +314,7 @@ pub enum Instrument {
 impl ToString for Instrument {
     fn to_string(&self) -> String {
         match self {
-            Self::AddVertex => String::from("добавить вершину"),
-            Self::Select => String::from("выбрать полигон"),
-            Self::SetAnchor => String::from("изменить якорь полигона"),
             Self::SetPoint => String::from("изменить точку"),
-            Self::Drag => String::from("перетащить полигон"),
-            Self::Rotate => String::from("повернуть полигон"),
-            Self::Scale => String::from("изменить размер полигона"),
-            // 3D инструменты
-            Self::Select3D => String::from("выбрать 3D модель"),
             Self::Move3D => String::from("переместить 3D модель"),
             Self::Rotate3D => String::from("повернуть 3D модель"),
             Self::Scale3D => String::from("масштабировать 3D модель"),

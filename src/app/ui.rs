@@ -71,10 +71,6 @@ impl AthenianApp {
 
                     ui.label("3D Tools:");
 
-                    if ui.button("3D Select").clicked() {
-                        self.instrument = crate::app::logic::Instrument::Select3D;
-                    }
-
                     if ui.button("3D Move").clicked() {
                         self.instrument = crate::app::logic::Instrument::Move3D;
                     }
@@ -111,36 +107,8 @@ impl AthenianApp {
                         self.instrument = crate::app::logic::Instrument::SetAxisPoint2;
                     }
 
-                    ui.separator();
-
-                    ui.label("2D Tools:");
-
-                    if ui.button("Add Vertex").clicked() {
-                        self.instrument = crate::app::logic::Instrument::AddVertex;
-                    }
-
-                    if ui.button("Select").clicked() {
-                        self.instrument = crate::app::logic::Instrument::Select;
-                    }
-
-                    if ui.button("Set Anchor").clicked() {
-                        self.instrument = crate::app::logic::Instrument::SetAnchor;
-                    }
-
                     if ui.button("Set Point").clicked() {
                         self.instrument = crate::app::logic::Instrument::SetPoint;
-                    }
-
-                    if ui.button("Drag").clicked() {
-                        self.instrument = crate::app::logic::Instrument::Drag;
-                    }
-
-                    if ui.button("Rotate").clicked() {
-                        self.instrument = crate::app::logic::Instrument::Rotate;
-                    }
-
-                    if ui.button("Scale").clicked() {
-                        self.instrument = crate::app::logic::Instrument::Scale;
                     }
                 });
             });
