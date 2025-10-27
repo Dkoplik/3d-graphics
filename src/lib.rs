@@ -63,7 +63,7 @@ pub struct Model3 {
 #[derive(Debug, Clone)]
 pub struct Scene {
     /// Модели на сцене.
-    models: Vec<Model3>,
+    pub models: Vec<Model3>,
 }
 
 /// Камера в 3-х мерном пространстве.

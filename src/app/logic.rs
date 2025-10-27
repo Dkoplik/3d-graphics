@@ -1,6 +1,7 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
-use g3d::Model3;
+use g3d::{Model3, Transform3D, Point3, Vec3, Transformable3};
+
 
 // --------------------------------------------------
 // Обработка области рисования (холст)
@@ -287,12 +288,54 @@ impl AthenianApp {
         self.scene.add_model(Model3::octahedron());
     }
 
+    /// Установить перспективную проекцию
     pub fn set_perspective_projection(&mut self) {
-        // self.use_orthographic = false;
+        self.current_projection = Projection::Perspective;
+        // Используем стандартную перспективную проекцию камеры
+        self.camera.set_projection(
+            std::f32::consts::PI / 3.0, // 60 degrees FOV
+            self.painter_width / self.painter_height,
+            0.1,
+            100.0
+        );
     }
 
-    pub fn set_axonometric_projection(&mut self) {
-        // self.use_orthographic = true;
+    /// Установить изометрическую проекцию
+    pub fn set_isometric_projection(&mut self) {
+        self.current_projection = Projection::Isometric;
+        let isometric_transform = Transform3D::isometric();
+        self.apply_projection_transform(isometric_transform);
+    }
+
+    /// Установить диметрическую проекцию
+    pub fn set_dimetric_projection(&mut self) {
+        self.current_projection = Projection::Dimetric;
+        // Стандартные углы для диметрической проекции
+        let dimetric_transform = Transform3D::dimetric(20.0, 30.0, 0.5);
+        self.apply_projection_transform(dimetric_transform);
+    }
+
+    /// Установить триметрическую проекцию
+    pub fn set_trimetric_projection(&mut self) {
+        self.current_projection = Projection::Trimetric;
+        // Произвольные углы для триметрической проекции
+        let trimetric_transform = Transform3D::trimetric(15.0, 25.0, 1.0, 0.7, 0.9);
+        self.apply_projection_transform(trimetric_transform);
+    }
+
+    /// Применить матрицу проекции ко всем моделям на сцене
+    fn apply_projection_transform(&mut self, projection: Transform3D) {
+        // Для аксонометрических проекций устанавливаем камеру
+        self.camera.position = Point3::new(0.0, 0.0, 5.0);
+        self.camera.direction = Vec3::new(0.0, 0.0, -1.0);
+        self.camera.up = Vec3::new(0.0, 1.0, 0.0);
+        
+        // Применяем проекцию ко всем моделям на сцене
+        for i in 0..self.scene.models.len() {
+            let model = self.scene.models[i].clone();
+            let transformed_model = model.transform(projection);
+            self.scene.models[i] = transformed_model;
+        }
     }
 }
 
@@ -366,4 +409,28 @@ fn calculate_scale(center: Pos2, start: Pos2, end: Pos2) -> (f32, f32) {
     };
 
     (scale_x, scale_y)
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum Projection {
+    #[default]
+    Perspective,
+    Isometric,
+    Dimetric,
+    Trimetric,
+    Cabinet,
+    Cavalier,
+}
+
+impl ToString for Projection {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Perspective => "Perspective".to_string(),
+            Self::Isometric => "Isometric".to_string(),
+            Self::Dimetric => "Dimetric".to_string(),
+            Self::Trimetric => "Trimetric".to_string(),
+            Self::Cabinet => "Cabinet".to_string(),
+            Self::Cavalier => "Cavalier".to_string(),
+        }
+    }
 }

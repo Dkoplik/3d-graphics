@@ -6,9 +6,8 @@ pub mod ui;
 // --------------------------------------------------
 
 /// Приложение-демонстрация аффинных преобразований.
-#[derive(Default)]
 pub struct AthenianApp {
-    scene: g3d::Scene,
+    pub scene: g3d::Scene,
 
     /// Текущий инструмент
     instrument: logic::Instrument,
@@ -19,6 +18,15 @@ pub struct AthenianApp {
     // Размеры холста
     painter_width: f32,
     painter_height: f32,
+
+    // 3D поля
+    pub camera: g3d::Camera3,
+    pub selected_3d_model_index: Option<usize>,
+    pub current_projection: crate::app::logic::Projection,
+
+    // Поля для осей вращения
+    axis_point1: g3d::Point3,
+    axis_point2: g3d::Point3,
 }
 
 impl AthenianApp {
@@ -27,5 +35,22 @@ impl AthenianApp {
         // белая тема
         cc.egui_ctx.set_theme(egui::Theme::Light);
         Self::default()
+    }
+}
+
+impl Default for AthenianApp {
+    fn default() -> Self {
+        Self {
+            scene: Default::default(),
+            instrument: Default::default(),
+            drag_prev_pos: Default::default(),
+            painter_width: Default::default(),
+            painter_height: Default::default(),
+            camera: Default::default(),
+            selected_3d_model_index: Default::default(),
+            current_projection: Default::default(),
+            axis_point1: g3d::Point3::new(0.0, 0.0, 0.0),
+            axis_point2: g3d::Point3::new(1.0, 0.0, 0.0),
+        }
     }
 }

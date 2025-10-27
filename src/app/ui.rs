@@ -16,7 +16,7 @@ impl eframe::App for AthenianApp {
 
 impl AthenianApp {
     /// Показать верхную панель приложения.
-    fn show_top_panel(&self, ctx: &egui::Context) {
+    fn show_top_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("menu_bar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.menu_button("File", |ui| {
@@ -26,17 +26,17 @@ impl AthenianApp {
                 });
 
                 ui.menu_button("Projection", |ui| {
-                    if ui.button("isometric").clicked() {
-                        // self.set_perspective_projection();
+                    if ui.button("Perspective").clicked() {
+                        self.set_perspective_projection();
                     }
-                    if ui.button("dimetric").clicked() {
-                        // self.set_axonometric_projection();
+                    if ui.button("Isometric").clicked() {
+                        self.set_isometric_projection();
                     }
-                    if ui.button("trimetric").clicked() {
-                        // self.set_axonometric_projection();
+                    if ui.button("Dimetric").clicked() {
+                        self.set_dimetric_projection();
                     }
-                    if ui.button("Axonometric").clicked() {
-                        // self.set_axonometric_projection();
+                    if ui.button("Trimetric").clicked() {
+                        self.set_trimetric_projection();
                     }
                 });
             });
@@ -119,6 +119,8 @@ impl AthenianApp {
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("инструмент: {}", self.instrument.to_string()));
+                ui.separator();
+                ui.label(format!("Projection: {}", self.current_projection.to_string()));
                 ui.separator();
                 ui.label(format!("размер холста: {:.1} x {:.1}", self.painter_width, self.painter_height));
             });
