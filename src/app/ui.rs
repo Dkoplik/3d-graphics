@@ -10,7 +10,7 @@ impl eframe::App for AthenianApp {
         self.show_top_panel(ctx);
         self.show_left_panel(ctx);
         self.show_bottom_panel(ctx);
-        self.show_cental_panel(ctx);
+        self.show_central_panel(ctx);
     }
 }
 
@@ -26,8 +26,17 @@ impl AthenianApp {
                 });
 
                 ui.menu_button("Projection", |ui| {
-                    if ui.button("Quit").clicked() {
-                        ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                    if ui.button("isometric").clicked() {
+                        // self.set_perspective_projection();
+                    }
+                    if ui.button("dimetric").clicked() {
+                        // self.set_axonometric_projection();
+                    }
+                    if ui.button("trimetric").clicked() {
+                        // self.set_axonometric_projection();
+                    }
+                    if ui.button("Axonometric").clicked() {
+                        // self.set_axonometric_projection();
                     }
                 });
             });
@@ -46,13 +55,71 @@ impl AthenianApp {
 
                     ui.separator();
 
-                    ui.label("Инструменты:");
+                    // Выбор многогранников
+                    ui.label("Polyhedra:");
+                    if ui.button("Tetrahedron").clicked() {
+                        self.add_tetrahedron();
+                    }
+                    if ui.button("Hexahedron").clicked() {
+                        self.add_hexahedron();
+                    }
+                    if ui.button("Octahedron").clicked() {
+                        self.add_octahedron();
+                    }
+
+                    ui.separator();
+
+                    ui.label("3D Tools:");
+
+                    if ui.button("3D Select").clicked() {
+                        self.instrument = crate::app::logic::Instrument::Select3D;
+                    }
+
+                    if ui.button("3D Move").clicked() {
+                        self.instrument = crate::app::logic::Instrument::Move3D;
+                    }
+
+                    if ui.button("3D Rotate").clicked() {
+                        self.instrument = crate::app::logic::Instrument::Rotate3D;
+                    }
+
+                    if ui.button("3D Scale").clicked() {
+                        self.instrument = crate::app::logic::Instrument::Scale3D;
+                    }
+
+                    if ui.button("Reflect XY").clicked() {
+                        self.instrument = crate::app::logic::Instrument::ReflectXY;
+                    }
+
+                    if ui.button("Reflect XZ").clicked() {
+                        self.instrument = crate::app::logic::Instrument::ReflectXZ;
+                    }
+
+                    if ui.button("Reflect YZ").clicked() {
+                        self.instrument = crate::app::logic::Instrument::ReflectYZ;
+                    }
+
+                    if ui.button("Rotate Around Axis").clicked() {
+                        self.instrument = crate::app::logic::Instrument::RotateAroundAxis;
+                    }
+
+                    if ui.button("Set Axis Point 1").clicked() {
+                        self.instrument = crate::app::logic::Instrument::SetAxisPoint1;
+                    }
+
+                    if ui.button("Set Axis Point 2").clicked() {
+                        self.instrument = crate::app::logic::Instrument::SetAxisPoint2;
+                    }
+
+                    ui.separator();
+
+                    ui.label("2D Tools:");
 
                     if ui.button("Add Vertex").clicked() {
                         self.instrument = crate::app::logic::Instrument::AddVertex;
                     }
 
-                    if ui.button("Select Polygon").clicked() {
+                    if ui.button("Select").clicked() {
                         self.instrument = crate::app::logic::Instrument::Select;
                     }
 
@@ -64,15 +131,15 @@ impl AthenianApp {
                         self.instrument = crate::app::logic::Instrument::SetPoint;
                     }
 
-                    if ui.button("Drag Polygon").clicked() {
+                    if ui.button("Drag").clicked() {
                         self.instrument = crate::app::logic::Instrument::Drag;
                     }
 
-                    if ui.button("Rotate Polygon").clicked() {
+                    if ui.button("Rotate").clicked() {
                         self.instrument = crate::app::logic::Instrument::Rotate;
                     }
 
-                    if ui.button("Scale Polygon").clicked() {
+                    if ui.button("Scale").clicked() {
                         self.instrument = crate::app::logic::Instrument::Scale;
                     }
                 });
@@ -84,16 +151,14 @@ impl AthenianApp {
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("инструмент: {}", self.instrument.to_string()));
-
                 ui.separator();
-
                 ui.label(format!("размер холста: {:.1} x {:.1}", self.painter_width, self.painter_height));
             });
         });
     }
 
     /// Показать центральную (основную) панель приложения.
-    fn show_cental_panel(&mut self, ctx: &egui::Context) {
+    fn show_central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::Resize::default()
                 .default_size(egui::Vec2 {x: 900.0, y: 600.0})

@@ -1,5 +1,6 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
+use g3d::Model3;
 
 // --------------------------------------------------
 // Обработка области рисования (холст)
@@ -32,10 +33,7 @@ impl AthenianApp {
 
     /// Очистить холст от полигонов.
     pub fn clear_canvas(&mut self) {
-        self.polygons.clear();
-        self.selected_polygon_index = None;
-        self.selected_polygon_anchor = None;
-        self.selected_point = None;
+// TODO
     }
 
     /// Нарисовать текущий якорь.
@@ -86,7 +84,7 @@ impl AthenianApp {
                 Instrument::Select => self.select_polygon(pos),
                 Instrument::SetAnchor => self.change_anchor(pos),
                 Instrument::SetPoint => self.change_point(pos),
-                _ => (),
+                _ => self.handle_3d_click(pos),
             }
         }
     }
@@ -109,12 +107,24 @@ impl AthenianApp {
                 Instrument::Drag => self.drag_selected_polygon(drag_start, drag_cur),
                 Instrument::Rotate => self.rotate_selected_polygon(drag_start, drag_cur),
                 Instrument::Scale => self.scale_selected_polygon(drag_start, drag_cur),
-                _ => (),
+                // 3D инструменты
+                _ => self.handle_3d_drag(drag_start, drag_cur),
             }
         }
 
         self.drag_prev_pos = response.hover_pos();
     }
+
+    /// Обработать клики по холсту для 3D.
+    fn handle_3d_click(&mut self, pos: egui::Pos2) {
+
+    }
+
+    /// Обработать перетаскивание для 3D.
+    fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
+
+    }
+
 }
 
 // --------------------------------------------------
@@ -230,6 +240,67 @@ impl AthenianApp {
             }
         }
     }
+
+
+    ///////////////////////////////
+    // 3D
+    //////////////////////////////
+    ///////////
+
+    /// Выбрать 3D модель в указанной точке.
+    fn select_3d_model(&mut self, pos: egui::Pos2) {
+    }
+
+    /// Переместить 3D модель.
+    fn move_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
+    }
+
+    /// Повернуть 3D модель.
+    fn rotate_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
+    }
+
+    /// Масштабировать 3D модель.
+    fn scale_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
+
+    }
+
+    /// Установить первую точку оси.
+    fn set_axis_point1(&mut self, pos: egui::Pos2) {
+        // TODO: преобразовать 2D позицию в 3D точку
+    }
+
+    /// Установить вторую точку оси.
+    fn set_axis_point2(&mut self, pos: egui::Pos2) {
+        // TODO: преобразовать 2D позицию в 3D точку
+
+    }
+
+    /// Применить поворот вокруг произвольной оси.
+    fn apply_axis_rotation(&mut self) {
+    }
+
+
+
+    // Простые методы для добавления многогранников
+    pub fn add_tetrahedron(&mut self) {
+        self.scene.add_model(Model3::tetrahedron());
+    }
+
+    pub fn add_hexahedron(&mut self) {
+        self.scene.add_model(Model3::hexahedron());
+    }
+
+    pub fn add_octahedron(&mut self) {
+        self.scene.add_model(Model3::octahedron());
+    }
+
+    pub fn set_perspective_projection(&mut self) {
+        // self.use_orthographic = false;
+    }
+
+    pub fn set_axonometric_projection(&mut self) {
+        // self.use_orthographic = true;
+    }
 }
 
 #[derive(Default)]
@@ -242,6 +313,17 @@ pub enum Instrument {
     Drag,
     Rotate,
     Scale,
+    // 3D инструменты
+    Select3D,
+    Move3D,
+    Rotate3D,
+    Scale3D,
+    ReflectXY,
+    ReflectXZ,
+    ReflectYZ,
+    RotateAroundAxis,
+    SetAxisPoint1,
+    SetAxisPoint2,
 }
 
 impl ToString for Instrument {
@@ -254,6 +336,17 @@ impl ToString for Instrument {
             Self::Drag => String::from("перетащить полигон"),
             Self::Rotate => String::from("повернуть полигон"),
             Self::Scale => String::from("изменить размер полигона"),
+            // 3D инструменты
+            Self::Select3D => String::from("выбрать 3D модель"),
+            Self::Move3D => String::from("переместить 3D модель"),
+            Self::Rotate3D => String::from("повернуть 3D модель"),
+            Self::Scale3D => String::from("масштабировать 3D модель"),
+            Self::ReflectXY => String::from("отражение XY"),
+            Self::ReflectXZ => String::from("отражение XZ"),
+            Self::ReflectYZ => String::from("отражение YZ"),
+            Self::RotateAroundAxis => String::from("поворот вокруг оси"),
+            Self::SetAxisPoint1 => String::from("установить точку оси 1"),
+            Self::SetAxisPoint2 => String::from("установить точку оси 2"),
         }
     }
 }
