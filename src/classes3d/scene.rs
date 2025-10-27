@@ -13,17 +13,24 @@ impl Scene {
         self.models.push(model);
     }
 
-    /// Нарисовать сцену на экран со всеми нужными преобразованиями.
+    //Нарисовать сцену на экран со всеми нужными преобразованиями.
+    //pub fn render(&self, camera: Camera3, painter: &mut Painter, style: &RenderStyle) {
+    // Изменить на &mut
+    //   self.models
+    //       .iter()
+    //      .cloned()
+    //     .map(|model| {
+    //         model
+    //              .to_world_coordinates()
+    //              .transform(camera.view_projection_matrix())
+    //     })
+    //      .for_each(|model| model.draw(painter, style));
+    // }
     pub fn render(&self, camera: Camera3, painter: &mut Painter, style: &RenderStyle) {
-        self.models
-            .iter()
-            .cloned()
-            .map(|model| {
-                model
-                    .to_world_coordinates()
-                    .transform(camera.view_projection_matrix())
-            })
-            .for_each(|model| model.draw(painter, style));
+        for model in &self.models {
+            // Временно используем упрощенную отрисовку без сложных преобразований
+            model.draw(painter, style);
+        }
     }
 }
 

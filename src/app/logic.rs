@@ -1,7 +1,6 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
-use g3d::{Model3, Transform3D, Point3, Vec3, Transformable3};
-
+use g3d::{Line3, Model3, Plane, Point3, Transform3D, Transformable3, Vec3};
 
 // --------------------------------------------------
 // Обработка области рисования (холст)
@@ -21,47 +20,20 @@ impl AthenianApp {
 
         // цвет холста
         painter.rect_filled(response.rect, 0.0, Color32::WHITE);
-        // границы
-        // painter.rect_stroke(
-        //     response.rect,
-        //     0,
-        //     Stroke::new(1.0, Color32::GRAY),
-        //     StrokeKind::Inside,
-        // );
 
         (response, painter)
     }
 
-    /// Очистить холст от полигонов.
+    /// Очистить холст от моделей.
     pub fn clear_canvas(&mut self) {
-// TODO
-    }
-
-    /// Нарисовать текущий якорь.
-    fn draw_anchor(&self, painter: &Painter) {
-        // if let Some(anchor) = self.selected_polygon_anchor {
-        //     painter.circle_filled(anchor, 5.0, Color32::RED);
-        // }
-    }
-
-    /// Нарисовать выбранную точку.
-    fn draw_point(&self, painter: &Painter) {
-        // if let Some(anchor) = self.selected_point {
-        //     painter.circle_filled(anchor, 5.0, Color32::GREEN);
-        // }
+        self.scene.models.clear();
+        self.selected_3d_model_index = None;
     }
 
     /// Нарисовать холст.
-    pub fn draw_canvas(&mut self, painter: &Painter) {
-        // for i in 0..self.polygons.len() {
-        //     if self.selected_polygon_index.is_some() && i == self.selected_polygon_index.unwrap() {
-        //         self.polygons[i].draw(&painter, &PolygonStyle::selected(), self.selected_point);
-        //     } else {
-        //         self.polygons[i].draw(&painter, &PolygonStyle::standard(), self.selected_point);
-        //     }
-        // }
-        // self.draw_anchor(painter);
-        // self.draw_point(painter);
+    pub fn draw_canvas(&mut self, painter: &mut Painter) {
+        let style = g3d::RenderStyle::default();
+        self.scene.render(self.camera.clone(), painter, &style); // Добавить .clone()
     }
 }
 
@@ -75,14 +47,42 @@ impl AthenianApp {
         self.handle_click(response);
         self.handle_drag(response);
     }
+    /// Установить первую точку оси.
+    pub fn set_axis_point1(&mut self, pos: egui::Pos2) {
+        // Преобразуем экранные координаты в 3D координаты на плоскости z=0
+        let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
+        let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
 
+        self.axis_point1 = Point3::new(screen_x, screen_y, 0.0);
+
+        println!(
+            "Axis point 1 set to: ({}, {}, {})",
+            self.axis_point1.x, self.axis_point1.y, self.axis_point1.z
+        );
+    }
+
+    /// Установить вторую точку оси.
+    pub fn set_axis_point2(&mut self, pos: egui::Pos2) {
+        // Преобразуем экранные координаты в 3D координаты на плоскости z=0
+        let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
+        let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
+
+        self.axis_point2 = Point3::new(screen_x, screen_y, 0.0);
+
+        println!(
+            "Axis point 2 set to: ({}, {}, {})",
+            self.axis_point2.x, self.axis_point2.y, self.axis_point2.z
+        );
+    }
     /// Обработать клики по холсту.
     fn handle_click(&mut self, response: &Response) {
         if response.clicked_by(egui::PointerButton::Primary) {
-            let pos = response.hover_pos().unwrap();
-            match &self.instrument {
-                Instrument::SetPoint => self.change_point(pos),
-                _ => self.handle_3d_click(pos),
+            if let Some(pos) = response.hover_pos() {
+                match &self.instrument {
+                    Instrument::SetAxisPoint1 => self.set_axis_point1(pos),
+                    Instrument::SetAxisPoint2 => self.set_axis_point2(pos),
+                    _ => self.select_3d_model(pos),
+                }
             }
         }
     }
@@ -101,179 +101,155 @@ impl AthenianApp {
         if let Some(drag_start) = self.drag_prev_pos
             && let Some(drag_cur) = response.hover_pos()
         {
-            match &self.instrument {
-                _ => self.handle_3d_drag(drag_start, drag_cur),
-            }
+            self.handle_3d_drag(drag_start, drag_cur);
         }
 
         self.drag_prev_pos = response.hover_pos();
     }
 
-    /// Обработать клики по холсту для 3D.
-    fn handle_3d_click(&mut self, pos: egui::Pos2) {
-
-    }
-
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
-
+        if let Some(index) = self.selected_3d_model_index {
+            match &self.instrument {
+                Instrument::Move3D => self.move_3d_model(index, start, end),
+                Instrument::Rotate3D => self.rotate_3d_model(index, start, end),
+                Instrument::Scale3D => self.scale_3d_model(index, start, end),
+                _ => {}
+            }
+        }
     }
-
 }
 
 // --------------------------------------------------
-// Взаимодействие с полигонами
+// Взаимодействие с 3D моделями
 // --------------------------------------------------
 
 impl AthenianApp {
-    /// Добавить новую вершину к текущему полигону.
-    fn add_vertex_to_selected_polygon(&mut self, pos: Pos2) {
-        // if let Some(index) = self.selected_polygon_index {
-        //     let polygon = &mut self.polygons[index];
-        //     polygon.add_vertex_pos(pos);
-        // }
-        // // Новый полигон
-        // else {
-        //     let polygon = Polygon::from_pos(pos);
-        //     self.polygons.push(polygon);
-        //     self.selected_polygon_index = Some(self.polygons.len() - 1);
-        // }
-    }
-
-    /// Выбрать полигон в указанной точке.
-    fn select_polygon(&mut self, pos: Pos2) {
-        // // обнулить прошлый якорь
-        // self.selected_polygon_anchor = None;
-
-        // for i in 0..self.polygons.len() {
-        //     if self.polygons[i].contains_pos(pos) {
-        //         self.selected_polygon_index = Some(i);
-        //         return;
-        //     }
-        // }
-        // self.selected_polygon_index = None;
-    }
-
-    /// Выбрать якорь для операций над полигоном.
-    fn change_anchor(&mut self, pos: Pos2) {
-        // self.selected_polygon_anchor = Some(pos);
-    }
-
-    /// Выбрать точку для проверки положения относительно ребёр.
-    fn change_point(&mut self, pos: Pos2) {
-        // self.selected_point = Some(pos);
-    }
-
-    /// Переместить выбранный полигон параллельно координатным осям.
-    fn drag_selected_polygon(&mut self, start: Pos2, end: Pos2) {
-        // if let Some(index) = self.selected_polygon_index {
-        //     let delta = end - start;
-        //     let polygon = &mut self.polygons[index];
-        //     polygon.apply_transform(Transform2D::translation(delta.x, delta.y));
-
-        //     #[cfg(debug_assertions)]
-        //     println!("drag with start {:#?} end {:#?}", start, end);
-        // }
-    }
-
-    /// Повернуть выбранный полигон через вектор смещения.
-    fn rotate_selected_polygon(&mut self, start: Pos2, end: Pos2) {
-        // if let Some(index) = self.selected_polygon_index {
-        //     let polygon = &mut self.polygons[index];
-
-        //     // Задан якорь для вращения
-        //     if let Some(anchor) = self.selected_polygon_anchor {
-        //         let angle = calculate_rotation_angle(anchor, start, end);
-        //         polygon.apply_transform(Transform2D::rotation_around_pos(angle, anchor));
-
-        //         #[cfg(debug_assertions)]
-        //         println!("rotate relative to {:#?} with angle {:#?}", anchor, angle);
-        //     }
-        //     // Просто повернуть относительно центра
-        //     else {
-        //         let center = polygon.get_center();
-        //         let angle = calculate_rotation_angle(center, start, end);
-        //         polygon.apply_transform(Transform2D::rotation_around_pos(angle, center));
-
-        //         #[cfg(debug_assertions)]
-        //         println!(
-        //             "rotate relative to center {:#?} with angle {:#?}",
-        //             center, angle
-        //         );
-        //     }
-        // }
-    }
-
-    /// Изменить размер полигона через вектор смещения.
-    fn scale_selected_polygon(&mut self, start: Pos2, end: Pos2) {
-        // if let Some(index) = self.selected_polygon_index {
-        //     let polygon = &mut self.polygons[index];
-
-        //     // Задан якорь для изменения размера
-        //     if let Some(anchor) = self.selected_polygon_anchor {
-        //         let (sx, sy) = calculate_scale(anchor, start, end);
-        //         polygon.apply_transform(Transform2D::scaling_around_pos(sx, sy, anchor));
-
-        //         #[cfg(debug_assertions)]
-        //         println!(
-        //             "scale relative to {:#?} with scale x:{} y:{}",
-        //             anchor, sx, sy
-        //         );
-        //     }
-        //     // Просто растянуть относительно центра
-        //     else {
-        //         let center = polygon.get_center();
-        //         let (sx, sy) = calculate_scale(center, start, end);
-        //         polygon.apply_transform(Transform2D::scaling_around_pos(sx, sy, center));
-
-        //         #[cfg(debug_assertions)]
-        //         println!(
-        //             "scale relative to center {:#?} with scale x:{} y:{}",
-        //             center, sx, sy
-        //         );
-        //     }
-        // }
-    }
-
-
-    ///////////////////////////////
-    // 3D
-    //////////////////////////////
-    ///////////
-
     /// Выбрать 3D модель в указанной точке.
     fn select_3d_model(&mut self, pos: egui::Pos2) {
+        // Преобразуем экранные координаты в нормализованные [-1, 1]
+        let screen_x = (pos.x / self.painter_width) * 2.0 - 1.0;
+        let screen_y = 1.0 - (pos.y / self.painter_height) * 2.0;
+
+        // Получаем луч из камеры
+        let ray = self.camera.screen_point_to_ray(screen_x, screen_y);
+
+        // Простая проверка пересечения - выбираем ближайшую модель
+        let mut closest_index = None;
+        let mut closest_distance = f32::MAX;
+
+        for (i, model) in self.scene.models.iter().enumerate() {
+            let world_model = model.clone().to_world_coordinates();
+
+            // Используем публичный метод для получения центра
+            let center = world_model.get_origin();
+
+            let distance_to_ray = distance_point_to_line(center, ray.origin, ray.direction);
+
+            if distance_to_ray < 0.5 && distance_to_ray < closest_distance {
+                closest_index = Some(i);
+                closest_distance = distance_to_ray;
+            }
+        }
+
+        self.selected_3d_model_index = closest_index;
     }
 
     /// Переместить 3D модель.
     fn move_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
+        let delta_x = (end.x - start.x) / self.painter_width * 5.0;
+        let delta_y = (end.y - start.y) / self.painter_height * 5.0;
+
+        let translation = Transform3D::translation(delta_x, -delta_y, 0.0);
+        self.scene.models[index].apply_transform(translation);
     }
 
     /// Повернуть 3D модель.
     fn rotate_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
+        let delta_x = (end.x - start.x) / self.painter_width * std::f32::consts::PI;
+        let delta_y = (end.y - start.y) / self.painter_height * std::f32::consts::PI;
+
+        let model = &self.scene.models[index];
+        let center = model.get_origin();
+
+        // Вращение вокруг осей
+        let rotation_x = Transform3D::rotation_around_line(
+            Line3::new(center, Vec3::new(1.0, 0.0, 0.0)),
+            delta_y,
+        );
+        let rotation_y = Transform3D::rotation_around_line(
+            Line3::new(center, Vec3::new(0.0, 1.0, 0.0)),
+            delta_x,
+        );
+
+        let combined_rotation = rotation_x.multiply(rotation_y);
+        self.scene.models[index].apply_transform(combined_rotation);
     }
 
     /// Масштабировать 3D модель.
     fn scale_3d_model(&mut self, index: usize, start: egui::Pos2, end: egui::Pos2) {
+        let delta =
+            ((end.x - start.x) + (end.y - start.y)) / (self.painter_width + self.painter_height);
+        let scale_factor = 1.0 + delta * 2.0;
 
+        let model = &self.scene.models[index];
+        let center = model.get_origin();
+
+        let scale =
+            Transform3D::scale_relative_to_point(center, scale_factor, scale_factor, scale_factor);
+        self.scene.models[index].apply_transform(scale);
     }
 
-    /// Установить первую точку оси.
-    fn set_axis_point1(&mut self, pos: egui::Pos2) {
-        // TODO: преобразовать 2D позицию в 3D точку
+    /// Применить отражение относительно выбранной плоскости.
+    pub fn apply_reflection(&mut self, plane_type: ReflectionPlane) {
+        if let Some(index) = self.selected_3d_model_index {
+            let model = &self.scene.models[index];
+            let center = model.get_origin();
+
+            let reflection = match plane_type {
+                ReflectionPlane::XY => Transform3D::reflection_xy(),
+                ReflectionPlane::XZ => Transform3D::reflection_xz(),
+                ReflectionPlane::YZ => Transform3D::reflection_yz(),
+            };
+
+            // Применяем отражение относительно центра модели
+            let transform = Transform3D::translation(-center.x, -center.y, -center.z)
+                .multiply(reflection)
+                .multiply(Transform3D::translation(center.x, center.y, center.z));
+
+            self.scene.models[index].apply_transform(transform);
+        }
     }
 
-    /// Установить вторую точку оси.
-    fn set_axis_point2(&mut self, pos: egui::Pos2) {
-        // TODO: преобразовать 2D позицию в 3D точку
+    /// Масштабировать относительно центра
+    pub fn scale_around_center(&mut self, scale_x: f32, scale_y: f32, scale_z: f32) {
+        if let Some(index) = self.selected_3d_model_index {
+            let model = &self.scene.models[index];
+            let center = model.get_origin();
 
+            let scale = Transform3D::scale_relative_to_point(center, scale_x, scale_y, scale_z);
+            self.scene.models[index].apply_transform(scale);
+        }
     }
 
-    /// Применить поворот вокруг произвольной оси.
-    fn apply_axis_rotation(&mut self) {
+    /// Повернуть вокруг оси через центр
+    pub fn rotate_around_center_axis(&mut self, axis: CenterAxis, angle_degrees: f32) {
+        if let Some(index) = self.selected_3d_model_index {
+            let model = &self.scene.models[index];
+            let center = model.get_origin();
+            let angle_rad = angle_degrees.to_radians();
+
+            let axis_vector = match axis {
+                CenterAxis::X => Vec3::new(1.0, 0.0, 0.0),
+                CenterAxis::Y => Vec3::new(0.0, 1.0, 0.0),
+                CenterAxis::Z => Vec3::new(0.0, 0.0, 1.0),
+            };
+
+            let rotation =
+                Transform3D::rotation_around_line(Line3::new(center, axis_vector), angle_rad);
+            self.scene.models[index].apply_transform(rotation);
+        }
     }
-
-
 
     // Простые методы для добавления многогранников
     pub fn add_tetrahedron(&mut self) {
@@ -288,48 +264,88 @@ impl AthenianApp {
         self.scene.add_model(Model3::octahedron());
     }
 
+    pub fn add_icosahedron(&mut self) {
+        // TODO: Реализовать когда будет готов икосаэдр
+        // self.scene.add_model(Model3::icosahedron());
+    }
+
+    pub fn add_dodecahedron(&mut self) {
+        // TODO: Реализовать когда будет готов додекаэдр
+        // self.scene.add_model(Model3::dodecahedron());
+    }
+
     /// Установить перспективную проекцию
     pub fn set_perspective_projection(&mut self) {
         self.current_projection = Projection::Perspective;
-        // Используем стандартную перспективную проекцию камеры
         self.camera.set_projection(
             std::f32::consts::PI / 3.0, // 60 degrees FOV
             self.painter_width / self.painter_height,
             0.1,
-            100.0
+            100.0,
         );
     }
 
     /// Установить изометрическую проекцию
     pub fn set_isometric_projection(&mut self) {
         self.current_projection = Projection::Isometric;
-        let isometric_transform = Transform3D::isometric();
-        self.apply_projection_transform(isometric_transform);
+        // Для аксонометрических проекций используем специальную камеру
+        self.camera.position = Point3::new(5.0, 5.0, 5.0);
+        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
+        self.camera.set_projection(
+            std::f32::consts::PI / 4.0,
+            self.painter_width / self.painter_height,
+            0.1,
+            100.0,
+        );
     }
 
     /// Установить диметрическую проекцию
     pub fn set_dimetric_projection(&mut self) {
         self.current_projection = Projection::Dimetric;
-        // Стандартные углы для диметрической проекции
-        let dimetric_transform = Transform3D::dimetric(20.0, 30.0, 0.5);
-        self.apply_projection_transform(dimetric_transform);
+        self.camera.position = Point3::new(7.0, 5.0, 7.0);
+        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
+        self.camera.set_projection(
+            std::f32::consts::PI / 4.0,
+            self.painter_width / self.painter_height,
+            0.1,
+            100.0,
+        );
     }
 
     /// Установить триметрическую проекцию
     pub fn set_trimetric_projection(&mut self) {
         self.current_projection = Projection::Trimetric;
-        // Произвольные углы для триметрической проекции
-        let trimetric_transform = Transform3D::trimetric(15.0, 25.0, 1.0, 0.7, 0.9);
-        self.apply_projection_transform(trimetric_transform);
+        self.camera.position = Point3::new(8.0, 6.0, 4.0);
+        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
+        self.camera.set_projection(
+            std::f32::consts::PI / 4.0,
+            self.painter_width / self.painter_height,
+            0.1,
+            100.0,
+        );
+    }
+
+    /// Установить кабинетную проекцию
+    pub fn set_cabinet_projection(&mut self) {
+        self.current_projection = Projection::Cabinet;
+        let cabinet_transform = Transform3D::cabinet(45.0, 0.5);
+        self.apply_projection_transform(cabinet_transform);
+    }
+
+    /// Установить кавальерную проекцию
+    pub fn set_cavalier_projection(&mut self) {
+        self.current_projection = Projection::Cavalier;
+        let cavalier_transform = Transform3D::cavalier(45.0, 1.0);
+        self.apply_projection_transform(cavalier_transform);
     }
 
     /// Применить матрицу проекции ко всем моделям на сцене
     fn apply_projection_transform(&mut self, projection: Transform3D) {
-        // Для аксонометрических проекций устанавливаем камеру
-        self.camera.position = Point3::new(0.0, 0.0, 5.0);
-        self.camera.direction = Vec3::new(0.0, 0.0, -1.0);
-        self.camera.up = Vec3::new(0.0, 1.0, 0.0);
-        
+        // Для специальных проекций применяем преобразование к моделям
+        // и используем простую камеру
+        self.camera.position = Point3::new(0.0, 0.0, 10.0);
+        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
+
         // Применяем проекцию ко всем моделям на сцене
         for i in 0..self.scene.models.len() {
             let model = self.scene.models[i].clone();
@@ -337,6 +353,18 @@ impl AthenianApp {
             self.scene.models[i] = transformed_model;
         }
     }
+}
+
+// Вспомогательные функции
+fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Vec3) -> f32 {
+    let point_vec: Vec3 = point.into();
+    let origin_vec: Vec3 = line_origin.into();
+
+    let v = point_vec - origin_vec;
+    let d = line_direction;
+
+    let cross = v.cross(d);
+    cross.length() / d.length()
 }
 
 #[derive(Default)]
@@ -371,46 +399,6 @@ impl ToString for Instrument {
     }
 }
 
-/// Считает угол поворота в раиданах на основе смещения относительно какого-то центра.
-fn calculate_rotation_angle(center: Pos2, start: Pos2, end: Pos2) -> f32 {
-    let start_vec = (start.x - center.x, start.y - center.y);
-    let end_vec = (end.x - center.x, end.y - center.y);
-
-    let start_angle = start_vec.1.atan2(start_vec.0);
-    let end_angle = end_vec.1.atan2(end_vec.0);
-
-    let mut angle = start_angle - end_angle;
-    let pi = std::f32::consts::PI;
-    while angle > pi {
-        angle -= 2.0 * pi;
-    }
-    while angle < -pi {
-        angle += 2.0 * pi;
-    }
-
-    angle
-}
-
-/// Считает растяжение на основе смещения относительно какого-то центра.
-fn calculate_scale(center: Pos2, start: Pos2, end: Pos2) -> (f32, f32) {
-    let start_vec = start - center;
-    let end_vec = end - center;
-
-    let scale_x = if start_vec.x.abs() < f32::EPSILON {
-        1.0
-    } else {
-        end_vec.x / start_vec.x
-    };
-
-    let scale_y = if start_vec.y.abs() < f32::EPSILON {
-        1.0
-    } else {
-        end_vec.y / start_vec.y
-    };
-
-    (scale_x, scale_y)
-}
-
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum Projection {
     #[default]
@@ -433,4 +421,18 @@ impl ToString for Projection {
             Self::Cavalier => "Cavalier".to_string(),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ReflectionPlane {
+    XY,
+    XZ,
+    YZ,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CenterAxis {
+    X,
+    Y,
+    Z,
 }

@@ -120,9 +120,15 @@ impl AthenianApp {
             ui.horizontal(|ui| {
                 ui.label(format!("инструмент: {}", self.instrument.to_string()));
                 ui.separator();
-                ui.label(format!("Projection: {}", self.current_projection.to_string()));
+                ui.label(format!(
+                    "Projection: {}",
+                    self.current_projection.to_string()
+                ));
                 ui.separator();
-                ui.label(format!("размер холста: {:.1} x {:.1}", self.painter_width, self.painter_height));
+                ui.label(format!(
+                    "размер холста: {:.1} x {:.1}",
+                    self.painter_width, self.painter_height
+                ));
             });
         });
     }
@@ -131,10 +137,14 @@ impl AthenianApp {
     fn show_central_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::Resize::default()
-                .default_size(egui::Vec2 {x: 900.0, y: 600.0})
+                .default_size(egui::Vec2 { x: 900.0, y: 600.0 })
                 .show(ui, |ui| {
                     let (response, painter) = self.allocate_painter(ui);
-                    self.draw_canvas(&painter);
+
+                    // Создаем mutable reference из painter
+                    let mut painter_mut = painter;
+                    self.draw_canvas(&mut painter_mut);
+
                     self.handle_input(&response);
                 });
         });

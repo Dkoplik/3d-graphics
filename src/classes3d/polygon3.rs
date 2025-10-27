@@ -1,6 +1,6 @@
 use egui::{Color32, Painter, Pos2, epaint::PathStroke};
 
-use crate::{Point3, Polygon3, RenderStyle};
+use crate::{Point3, Polygon3};
 
 // --------------------------------------------------
 // Конструкторы

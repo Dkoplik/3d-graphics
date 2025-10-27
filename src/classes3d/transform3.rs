@@ -149,7 +149,7 @@ impl Transform3D {
 
     /// Отражение относительно произвольной плоскости.
     pub fn reflection_plane(plane: Plane) -> Self {
-        todo!("Проверьте пж корректность reflection_plane в матрице 3д");
+        // todo!("Проверьте пж корректность reflection_plane в матрице 3д");
         let n = plane.normal;
         let d = -n.dot(plane.origin.into());
 

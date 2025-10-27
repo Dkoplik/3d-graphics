@@ -10,25 +10,43 @@ impl Model3 {
             polygons,
         }
     }
+    /// Получить центр модели.
+    pub fn get_origin(&self) -> Point3 {
+        self.origin
+    }
 
+    /// Получить вершины модели.
+    pub fn get_vertexes(&self) -> &Vec<Point3> {
+        &self.vertexes
+    }
+
+    /// Получить полигоны модели.
+    pub fn get_polygons(&self) -> &Vec<Polygon3> {
+        &self.polygons
+    }
+
+    /// Установить центр модели.
+    pub fn set_origin(&mut self, origin: Point3) {
+        self.origin = origin;
+    }
     /// Создание тетраэдра со сторонами единичной длины.
     pub fn tetrahedron() -> Self {
         // Координаты правильного тетраэдра с длиной ребра = 1
         let a = 1.0 / (2.0 * (2.0 as f32).sqrt());
         let b = 1.0 / (6.0 as f32).sqrt();
-        
+
         let vertexes = vec![
-            Point3::new(0.0, 0.0, b),                           // Верхняя вершина
-            Point3::new(2.0 * a, 0.0, -a),                      // Нижняя вершина 1
-            Point3::new(-a, (3.0 as f32).sqrt() * a, -a),       // Нижняя вершина 2
-            Point3::new(-a, (-3.0 as f32).sqrt() * a, -a),      // Нижняя вершина 3
+            Point3::new(0.0, 0.0, b),                      // Верхняя вершина
+            Point3::new(2.0 * a, 0.0, -a),                 // Нижняя вершина 1
+            Point3::new(-a, (3.0 as f32).sqrt() * a, -a),  // Нижняя вершина 2
+            Point3::new(-a, (-3.0 as f32).sqrt() * a, -a), // Нижняя вершина 3
         ];
 
         let polygons = vec![
             Polygon3::triangle(0, 1, 2),
             Polygon3::triangle(0, 2, 3),
             Polygon3::triangle(0, 3, 1),
-            Polygon3::triangle(1, 3, 2),  // Основание
+            Polygon3::triangle(1, 3, 2), // Основание
         ];
 
         let origin = Point3::new(0.0, 0.0, 0.0);
@@ -40,18 +58,18 @@ impl Model3 {
     pub fn hexahedron() -> Self {
         // Куб с длиной ребра = 1, центрированный в начале координат
         let half = 0.5;
-        
+
         let vertexes = vec![
             // Нижняя грань
             Point3::new(-half, -half, -half),
-            Point3::new(half, -half, -half), 
-            Point3::new(half, half, -half),  
-            Point3::new(-half, half, -half), 
+            Point3::new(half, -half, -half),
+            Point3::new(half, half, -half),
+            Point3::new(-half, half, -half),
             // Верхняя грань
-            Point3::new(-half, -half, half), 
-            Point3::new(half, -half, half),  
-            Point3::new(half, half, half),   
-            Point3::new(-half, half, half),  
+            Point3::new(-half, -half, half),
+            Point3::new(half, -half, half),
+            Point3::new(half, half, half),
+            Point3::new(-half, half, half),
         ];
 
         let polygons = vec![
@@ -84,14 +102,14 @@ impl Model3 {
     pub fn octahedron() -> Self {
         // Октаэдр с длиной ребра = 1, центрированный в начале координат
         let a = 1.0 / (2.0 as f32).sqrt(); // Для получения длины ребра = 1
-        
+
         let vertexes = vec![
             // Верхняя и нижняя вершины
-            Point3::new(0.0, 0.0, a), 
+            Point3::new(0.0, 0.0, a),
             Point3::new(0.0, 0.0, -a),
             // Вершины в плоскости XY
-            Point3::new(a, 0.0, 0.0), 
-            Point3::new(0.0, a, 0.0), 
+            Point3::new(a, 0.0, 0.0),
+            Point3::new(0.0, a, 0.0),
             Point3::new(-a, 0.0, 0.0),
             Point3::new(0.0, -a, 0.0),
         ];
@@ -139,12 +157,47 @@ impl Model3 {
 
     /// Нарисовать модель.
     pub fn draw(&self, painter: &mut Painter, style: &RenderStyle) {
-        self.polygons.iter().for_each(|polygon| {
-            polygon.draw(&self.vertexes, painter, style.edge_color, style.edge_width)
-        });
-        self.vertexes
+        // Преобразуем 3D точки в 2D с помощью простой ортографической проекции
+        let projected_points: Vec<egui::Pos2> = self
+            .vertexes
             .iter()
-            .for_each(|vertex| vertex.draw(painter, style.vertex_color, style.vertex_radius));
+            .map(|vertex| {
+                // Простая ортографическая проекция (игнорируем Z для демонстрации)
+                // Масштабируем координаты чтобы они поместились в видимую область
+                let scale = 100.0; // Масштаб для видимости
+                let center_x = 450.0; // Центр холста (предполагаемый размер)
+                let center_y = 300.0;
+
+                egui::Pos2::new(
+                    center_x + vertex.x * scale,
+                    center_y - vertex.y * scale, // Инвертируем Y для правильной ориентации
+                )
+            })
+            .collect();
+
+        // Рисуем рёбра
+        for polygon in &self.polygons {
+            if polygon.vertexes.len() >= 2 {
+                let points: Vec<egui::Pos2> = polygon
+                    .vertexes
+                    .iter()
+                    .map(|&index| projected_points[index])
+                    .collect();
+
+                // Рисуем линии между вершинами полигона
+                for i in 0..points.len() {
+                    let start = points[i];
+                    let end = points[(i + 1) % points.len()];
+
+                    painter.line_segment([start, end], (style.edge_width, style.edge_color));
+                }
+            }
+        }
+
+        // Рисуем вершины
+        for &point in &projected_points {
+            painter.circle_filled(point, style.vertex_radius, style.vertex_color);
+        }
     }
 }
 

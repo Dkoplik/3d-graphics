@@ -16,6 +16,21 @@ impl Default for Camera3 {
     }
 }
 
+// Добавить в начало файла, после impl Default for Camera3
+impl Clone for Camera3 {
+    fn clone(&self) -> Self {
+        Self {
+            position: self.position,
+            direction: self.direction,
+            up: self.up,
+            fov: self.fov,
+            aspect_ratio: self.aspect_ratio,
+            near_plane: self.near_plane,
+            far_plane: self.far_plane,
+        }
+    }
+}
+
 impl Camera3 {
     /// Создает новую камеру с указанными параметрами.
     pub fn new(
