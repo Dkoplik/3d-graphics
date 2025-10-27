@@ -265,13 +265,11 @@ impl AthenianApp {
     }
 
     pub fn add_icosahedron(&mut self) {
-        // TODO: Реализовать когда будет готов икосаэдр
-        // self.scene.add_model(Model3::icosahedron());
+        self.scene.add_model(Model3::icosahedron());
     }
 
     pub fn add_dodecahedron(&mut self) {
-        // TODO: Реализовать когда будет готов додекаэдр
-        // self.scene.add_model(Model3::dodecahedron());
+        self.scene.add_model(Model3::dodecahedron());
     }
 
     /// Установить перспективную проекцию
@@ -369,8 +367,8 @@ fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Ve
 
 #[derive(Default)]
 pub enum Instrument {
-    #[default]
     SetPoint,
+    #[default]
     Move3D,
     Rotate3D,
     Scale3D,
