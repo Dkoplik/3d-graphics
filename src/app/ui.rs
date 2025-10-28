@@ -90,15 +90,15 @@ impl AthenianApp {
                     }
 
                     if ui.button("Reflect XY").clicked() {
-                        self.instrument = crate::app::logic::Instrument::ReflectXY;
+                        self.apply_reflection(crate::app::logic::ReflectionPlane::XY);
                     }
 
                     if ui.button("Reflect XZ").clicked() {
-                        self.instrument = crate::app::logic::Instrument::ReflectXZ;
+                        self.apply_reflection(crate::app::logic::ReflectionPlane::XZ);
                     }
 
                     if ui.button("Reflect YZ").clicked() {
-                        self.instrument = crate::app::logic::Instrument::ReflectYZ;
+                        self.apply_reflection(crate::app::logic::ReflectionPlane::YZ);
                     }
 
                     if ui.button("Rotate Around Axis").clicked() {
