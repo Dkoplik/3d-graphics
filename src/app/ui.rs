@@ -101,42 +101,65 @@ impl AthenianApp {
                         self.apply_reflection(crate::app::logic::ReflectionPlane::YZ);
                     }
 
-                    if ui.button("Rotate Around X").clicked() {
-                        self.rotate_around_center_axis(crate::app::logic::CenterAxis::X, self.angle_of_rotate);
+                    if ui.button("Rotate Around X (Drag)").clicked() {
+                        self.instrument = crate::app::logic::Instrument::RotateAroundX;
                     }
 
-                    if ui.button("Rotate Around Y").clicked() {
-                        self.rotate_around_center_axis(crate::app::logic::CenterAxis::Y, self.angle_of_rotate);
+                    if ui.button("Rotate Around Y (Drag)").clicked() {
+                        self.instrument = crate::app::logic::Instrument::RotateAroundY;
                     }
 
-                    if ui.button("Rotate Around Z").clicked() {
-                        self.rotate_around_center_axis(crate::app::logic::CenterAxis::Z, self.angle_of_rotate);
+                    if ui.button("Rotate Around Z (Drag)").clicked() {
+                        self.instrument = crate::app::logic::Instrument::RotateAroundZ;
                     }
 
                     ui.separator();
 
                     // Ввод координат для произвольной оси
                     ui.label("Custom Axis Rotation:");
-                    
+
                     ui.label("Axis Point 1:");
                     ui.horizontal(|ui| {
-                        ui.add(egui::DragValue::new(&mut self.axis_point1_x).speed(0.1).prefix("X:"));
-                        ui.add(egui::DragValue::new(&mut self.axis_point1_y).speed(0.1).prefix("Y:"));
-                        ui.add(egui::DragValue::new(&mut self.axis_point1_z).speed(0.1).prefix("Z:"));
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point1_x)
+                                .speed(0.1)
+                                .prefix("X:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point1_y)
+                                .speed(0.1)
+                                .prefix("Y:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point1_z)
+                                .speed(0.1)
+                                .prefix("Z:"),
+                        );
                     });
 
                     ui.label("Axis Point 2:");
                     ui.horizontal(|ui| {
-                        ui.add(egui::DragValue::new(&mut self.axis_point2_x).speed(0.1).prefix("X:"));
-                        ui.add(egui::DragValue::new(&mut self.axis_point2_y).speed(0.1).prefix("Y:"));
-                        ui.add(egui::DragValue::new(&mut self.axis_point2_z).speed(0.1).prefix("Z:"));
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point2_x)
+                                .speed(0.1)
+                                .prefix("X:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point2_y)
+                                .speed(0.1)
+                                .prefix("Y:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point2_z)
+                                .speed(0.1)
+                                .prefix("Z:"),
+                        );
                     });
 
                     // Кнопка для вращения вокруг произвольной линии с перетаскиванием
                     if ui.button("Rotate Around Custom Line (Drag)").clicked() {
                         self.instrument = crate::app::logic::Instrument::RotateAroundCustomLine;
                     }
-
                 });
             });
     }

@@ -42,59 +42,11 @@ impl AthenianApp {
         self.handle_drag(response);
     }
 
-    // /// Установить первую точку оси.
-    // pub fn set_axis_point1(&mut self, pos: egui::Pos2) {
-    //     // Преобразуем экранные координаты в 3D координаты на плоскости z=0
-    //     let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
-    //     let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
-
-    //     self.axis_point1 = Point3::new(screen_x, screen_y, 0.0);
-
-    //     println!(
-    //         "Axis point 1 set to: ({}, {}, {})",
-    //         self.axis_point1.x, self.axis_point1.y, self.axis_point1.z
-    //     );
-    // }
-
-    // /// Установить вторую точку оси.
-    // pub fn set_axis_point2(&mut self, pos: egui::Pos2) {
-    //     // Преобразуем экранные координаты в 3D координаты на плоскости z=0
-    //     let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
-    //     let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
-
-    //     self.axis_point2 = Point3::new(screen_x, screen_y, 0.0);
-
-    //     println!(
-    //         "Axis point 2 set to: ({}, {}, {})",
-    //         self.axis_point2.x, self.axis_point2.y, self.axis_point2.z
-    //     );
-    // }
-
-    /// Применить вращение вокруг произвольной оси
-pub fn apply_custom_axis_rotation(&mut self) {
-    if let Some(model) = self.get_selected_model() {
-        let point1 = Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
-        let point2 = Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
-        
-        // Создаем линию из двух точек
-        let direction = (point2 - point1).normalize();
-        let line = Line3::new(point1, direction);
-        
-        let rotation = Transform3D::rotation_around_line(line, self.angle_of_rotate.to_radians());
-        
-        if let Some(model) = self.get_selected_model_mut() {
-            model.apply_transform(rotation);
-        }
-    }
-}
-
     /// Обработать клики по холсту.
     fn handle_click(&mut self, response: &Response) {
         if response.clicked_by(egui::PointerButton::Primary) {
             if let Some(pos) = response.hover_pos() {
                 match &self.instrument {
-                    // Instrument::SetAxisPoint1 => self.set_axis_point1(pos),
-                    // Instrument::SetAxisPoint2 => self.set_axis_point2(pos),
                     _ => {
                         // Если есть фигура на сцене, автоматически выбираем её
                         if !self.scene.models.is_empty() {
@@ -127,6 +79,7 @@ pub fn apply_custom_axis_rotation(&mut self) {
     }
 
     /// Обработать перетаскивание для 3D.
+    /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
         // Если есть фигура на сцене, применяем преобразования сразу
         if !self.scene.models.is_empty() {
@@ -134,7 +87,18 @@ pub fn apply_custom_axis_rotation(&mut self) {
                 Instrument::Move3D => self.move_3d_model(start, end),
                 Instrument::Rotate3D => self.rotate_3d_model(start, end),
                 Instrument::Scale3D => self.scale_3d_model(start, end),
-                Instrument::RotateAroundCustomLine => self.rotate_around_custom_line(start, end),
+                Instrument::RotateAroundX => {
+                    self.rotate_around_axis(AxisType::Center(CenterAxis::X), start, end)
+                }
+                Instrument::RotateAroundY => {
+                    self.rotate_around_axis(AxisType::Center(CenterAxis::Y), start, end)
+                }
+                Instrument::RotateAroundZ => {
+                    self.rotate_around_axis(AxisType::Center(CenterAxis::Z), start, end)
+                }
+                Instrument::RotateAroundCustomLine => {
+                    self.rotate_around_axis(AxisType::Custom, start, end)
+                }
                 _ => {}
             }
         }
@@ -237,31 +201,6 @@ impl AthenianApp {
                 model.apply_transform(scale);
             }
         }
-    }
-
-    /// Повернуть вокруг оси через центр
-    pub fn rotate_around_center_axis(&mut self, axis: CenterAxis, angle_degrees: f32) {
-        if let Some(model) = self.get_selected_model() {
-            let center = model.get_origin();
-            let angle_rad = angle_degrees.to_radians();
-
-            let axis_vector = match axis {
-                CenterAxis::X => Vec3::new(1.0, 0.0, 0.0),
-                CenterAxis::Y => Vec3::new(0.0, 1.0, 0.0),
-                CenterAxis::Z => Vec3::new(0.0, 0.0, 1.0),
-            };
-
-            let rotation =
-                Transform3D::rotation_around_line(Line3::new(center, axis_vector), angle_rad);
-            if let Some(model) = self.get_selected_model_mut() {
-                model.apply_transform(rotation);
-            }
-        }
-    }
-
-    /// Вращать модель вокруг произвольной линии (определенной двумя точками)
-    fn rotate_around_custom_line(&mut self, start: egui::Pos2, end: egui::Pos2) {
-//TODO
     }
 
     // Простые методы для добавления многогранников (заменяют текущую фигуру)
@@ -374,6 +313,43 @@ impl AthenianApp {
             self.scene.models[i] = transformed_model;
         }
     }
+
+    /// Повернуть модель вокруг оси (мышью)
+    pub fn rotate_around_axis(&mut self, axis_type: AxisType, start: egui::Pos2, end: egui::Pos2) {
+        if let Some(model) = self.get_selected_model() {
+            let line = match axis_type {
+                AxisType::Center(center_axis) => {
+                    let center = model.get_origin();
+                    let axis_vector = match center_axis {
+                        CenterAxis::X => Vec3::new(1.0, 0.0, 0.0),
+                        CenterAxis::Y => Vec3::new(0.0, 1.0, 0.0),
+                        CenterAxis::Z => Vec3::new(0.0, 0.0, 1.0),
+                    };
+                    Line3::new(center, axis_vector)
+                }
+                AxisType::Custom => {
+                    let point1 =
+                        Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
+                    let point2 =
+                        Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
+                    let direction = (point2 - point1).normalize();
+                    Line3::new(point1, direction)
+                }
+            };
+
+            // Вычисляем угол вращения на основе перемещения мыши
+            let delta_x = (end.x - start.x) / self.painter_width * std::f32::consts::PI;
+            let angle = delta_x * 2.0; // Множитель для более плавного вращения
+
+            let rotation = Transform3D::rotation_around_line(line, angle);
+
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(rotation);
+            }
+
+            println!("Rotated around axis by {:.2} radians", angle);
+        }
+    }
 }
 
 // Вспомогательные функции
@@ -387,16 +363,16 @@ fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Ve
     let cross = v.cross(d);
     cross.length() / d.length()
 }
-
 #[derive(Default)]
 pub enum Instrument {
     #[default]
     Move3D,
     Rotate3D,
     Scale3D,
-    SetAxisPoint1,
-    SetAxisPoint2,
-    RotateAroundCustomLine,
+    RotateAroundX,          // Вращение вокруг оси X через центр
+    RotateAroundY,          // Вращение вокруг оси Y через центр
+    RotateAroundZ,          // Вращение вокруг оси Z через центр
+    RotateAroundCustomLine, // Вращение вокруг произвольной линии
 }
 
 impl ToString for Instrument {
@@ -405,9 +381,10 @@ impl ToString for Instrument {
             Self::Move3D => String::from("переместить 3D модель"),
             Self::Rotate3D => String::from("повернуть 3D модель"),
             Self::Scale3D => String::from("масштабировать 3D модель"),
-            Self::SetAxisPoint1 => String::from("установить точку оси 1"),
-            Self::SetAxisPoint2 => String::from("установить точку оси 2"),
-            Self::RotateAroundCustomLine => String::from("вращать вокруг произвольной линии"), 
+            Self::RotateAroundX => String::from("вращать вокруг оси X"),
+            Self::RotateAroundY => String::from("вращать вокруг оси Y"),
+            Self::RotateAroundZ => String::from("вращать вокруг оси Z"),
+            Self::RotateAroundCustomLine => String::from("вращать вокруг произвольной линии"),
         }
     }
 }
@@ -448,4 +425,10 @@ pub enum CenterAxis {
     X,
     Y,
     Z,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum AxisType {
+    Center(CenterAxis),
+    Custom,
 }
