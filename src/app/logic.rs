@@ -28,6 +28,50 @@ impl AthenianApp {
     pub fn draw_canvas(&mut self, painter: &mut Painter) {
         let style = g3d::RenderStyle::default();
         self.scene.render(self.camera.clone(), painter, &style);
+
+        if self.instrument == Instrument::RotateAroundCustomLine {
+            self.draw_custom_axis_line(painter);
+        }
+    }
+
+    /// Отрисовать линию, заданную двумя точками
+    fn draw_custom_axis_line(&self, painter: &Painter) {
+        let point1 = Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
+        let point2 = Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
+        
+        let screen_point1 = self.world_to_screen(point1);
+        let screen_point2 = self.world_to_screen(point2);
+        
+        let direction = egui::Vec2 {
+            x: screen_point2.x - screen_point1.x,
+            y: screen_point2.y - screen_point1.y,
+        }.normalized();
+        
+        let line_length = (self.painter_width + self.painter_height) * 2.0; // Большая длина для выхода за границы
+        
+        let extended_start = screen_point1 - direction * line_length;
+        let extended_end = screen_point2 + direction * line_length;
+        
+        painter.line_segment(
+            [extended_start, extended_end],
+            egui::Stroke::new(2.0, Color32::RED),
+        );
+        
+        painter.circle_filled(screen_point1, 4.0, Color32::GREEN);
+        painter.circle_filled(screen_point2, 4.0, Color32::BLUE);
+    }
+
+    /// Преобразовать мировые координаты в экранные
+    fn world_to_screen(&self, point: Point3) -> Pos2 {
+        // Применяем преобразования камеры к точке
+        let view_proj = self.camera.view_projection_matrix();
+        let transformed = view_proj.apply_to_point(point);
+
+        // Преобразуем из NDC (-1..1) в экранные координаты
+        let screen_x = (transformed.x + 1.0) * 0.5 * self.painter_width;
+        let screen_y = (1.0 - transformed.y) * 0.5 * self.painter_height;
+
+        Pos2::new(screen_x, screen_y)
     }
 }
 
@@ -78,7 +122,6 @@ impl AthenianApp {
         self.drag_prev_pos = response.hover_pos();
     }
 
-    /// Обработать перетаскивание для 3D.
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
         // Если есть фигура на сцене, применяем преобразования сразу
@@ -187,18 +230,6 @@ impl AthenianApp {
 
             if let Some(model) = self.get_selected_model_mut() {
                 model.apply_transform(transform);
-            }
-        }
-    }
-
-    /// Масштабировать относительно центра
-    pub fn scale_around_center(&mut self, scale_x: f32, scale_y: f32, scale_z: f32) {
-        if let Some(model) = self.get_selected_model() {
-            let center = model.get_origin();
-
-            let scale = Transform3D::scale_relative_to_point(center, scale_x, scale_y, scale_z);
-            if let Some(model) = self.get_selected_model_mut() {
-                model.apply_transform(scale);
             }
         }
     }
@@ -363,16 +394,17 @@ fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Ve
     let cross = v.cross(d);
     cross.length() / d.length()
 }
-#[derive(Default)]
+
+#[derive(Default, PartialEq)]
 pub enum Instrument {
     #[default]
     Move3D,
     Rotate3D,
     Scale3D,
-    RotateAroundX,          // Вращение вокруг оси X через центр
-    RotateAroundY,          // Вращение вокруг оси Y через центр
-    RotateAroundZ,          // Вращение вокруг оси Z через центр
-    RotateAroundCustomLine, // Вращение вокруг произвольной линии
+    RotateAroundX,
+    RotateAroundY,
+    RotateAroundZ,
+    RotateAroundCustomLine,
 }
 
 impl ToString for Instrument {

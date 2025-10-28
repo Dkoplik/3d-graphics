@@ -56,7 +56,7 @@ impl AthenianApp {
                     ui.separator();
 
                     // Выбор многогранников
-                    ui.label("Polyhedra:");
+                    ui.label("Многогранники:");
                     if ui.button("тетраэдр").clicked() {
                         self.add_tetrahedron();
                     }
@@ -75,7 +75,7 @@ impl AthenianApp {
 
                     ui.separator();
 
-                    ui.label("3D Tools:");
+                    ui.label("3D инструменты:");
 
                     if ui.button("3D Move").clicked() {
                         self.instrument = crate::app::logic::Instrument::Move3D;
@@ -101,15 +101,15 @@ impl AthenianApp {
                         self.apply_reflection(crate::app::logic::ReflectionPlane::YZ);
                     }
 
-                    if ui.button("Rotate Around X (Drag)").clicked() {
+                    if ui.button("Rotate X").clicked() {
                         self.instrument = crate::app::logic::Instrument::RotateAroundX;
                     }
 
-                    if ui.button("Rotate Around Y (Drag)").clicked() {
+                    if ui.button("Rotate Y").clicked() {
                         self.instrument = crate::app::logic::Instrument::RotateAroundY;
                     }
 
-                    if ui.button("Rotate Around Z (Drag)").clicked() {
+                    if ui.button("Rotate Z").clicked() {
                         self.instrument = crate::app::logic::Instrument::RotateAroundZ;
                     }
 
@@ -157,7 +157,7 @@ impl AthenianApp {
                     });
 
                     // Кнопка для вращения вокруг произвольной линии с перетаскиванием
-                    if ui.button("Rotate Around Custom Line (Drag)").clicked() {
+                    if ui.button("Rotate Line").clicked() {
                         self.instrument = crate::app::logic::Instrument::RotateAroundCustomLine;
                     }
                 });
