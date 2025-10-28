@@ -366,12 +366,10 @@ fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Ve
 
 #[derive(Default)]
 pub enum Instrument {
-    SetPoint,
     #[default]
     Move3D,
     Rotate3D,
     Scale3D,
-    RotateAroundAxis,
     SetAxisPoint1,
     SetAxisPoint2,
 }
@@ -379,11 +377,9 @@ pub enum Instrument {
 impl ToString for Instrument {
     fn to_string(&self) -> String {
         match self {
-            Self::SetPoint => String::from("изменить точку"),
             Self::Move3D => String::from("переместить 3D модель"),
             Self::Rotate3D => String::from("повернуть 3D модель"),
             Self::Scale3D => String::from("масштабировать 3D модель"),
-            Self::RotateAroundAxis => String::from("поворот вокруг оси"),
             Self::SetAxisPoint1 => String::from("установить точку оси 1"),
             Self::SetAxisPoint2 => String::from("установить точку оси 2"),
         }

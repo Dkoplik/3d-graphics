@@ -101,9 +101,19 @@ impl AthenianApp {
                         self.apply_reflection(crate::app::logic::ReflectionPlane::YZ);
                     }
 
-                    if ui.button("Rotate Around Axis").clicked() {
-                        self.instrument = crate::app::logic::Instrument::RotateAroundAxis;
+                    if ui.button("Rotate Around X").clicked() {
+                        self.rotate_around_center_axis(crate::app::logic::CenterAxis::X, self.angle_of_rotate);
                     }
+
+                    if ui.button("Rotate Around Y").clicked() {
+                        self.rotate_around_center_axis(crate::app::logic::CenterAxis::Y, self.angle_of_rotate);
+                    }
+
+                    if ui.button("Rotate Around Z").clicked() {
+                        self.rotate_around_center_axis(crate::app::logic::CenterAxis::Z, self.angle_of_rotate);
+                    }
+                    ui.add(egui::Slider::new(&mut self.angle_of_rotate, 0.0..=360 as f32).text("угол поворота"));
+
 
                     if ui.button("Set Axis Point 1").clicked() {
                         self.instrument = crate::app::logic::Instrument::SetAxisPoint1;
@@ -113,9 +123,6 @@ impl AthenianApp {
                         self.instrument = crate::app::logic::Instrument::SetAxisPoint2;
                     }
 
-                    if ui.button("Set Point").clicked() {
-                        self.instrument = crate::app::logic::Instrument::SetPoint;
-                    }
                 });
             });
     }

@@ -24,6 +24,8 @@ pub struct AthenianApp {
     pub selected_3d_model_index: Option<usize>,
     pub current_projection: crate::app::logic::Projection,
 
+    pub angle_of_rotate: f32,
+
     // Поля для осей вращения
     axis_point1: g3d::Point3,
     axis_point2: g3d::Point3,
@@ -84,6 +86,7 @@ impl Default for AthenianApp {
             camera: Default::default(),
             selected_3d_model_index: Default::default(),
             current_projection: Default::default(),
+            angle_of_rotate: Default::default(),
             axis_point1: g3d::Point3::new(0.0, 0.0, 0.0),
             axis_point2: g3d::Point3::new(1.0, 0.0, 0.0),
         }
