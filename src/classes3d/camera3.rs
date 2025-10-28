@@ -2,6 +2,32 @@ use std::f32::consts::PI;
 
 use crate::{Camera3, Line3, Point3, Transform3D, Vec3};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProjectionType {
+    Perspective,
+    Orthographic,
+    Isometric,
+    Dimetric {
+        angle_x: f32,
+        angle_z: f32,
+        scale_y: f32,
+    },
+    Trimetric {
+        angle_x: f32,
+        angle_z: f32,
+        scale_x: f32,
+        scale_y: f32,
+        scale_z: f32,
+    },
+    Cabinet {
+        angle: f32,
+        depth_scale: f32,
+    },
+    Cavalier {
+        angle: f32,
+        depth_scale: f32,
+    },
+}
 impl Default for Camera3 {
     fn default() -> Self {
         Self {
@@ -12,6 +38,7 @@ impl Default for Camera3 {
             aspect_ratio: 16.0 / 9.0,
             near_plane: 0.1,
             far_plane: 100.0,
+            projection_type: ProjectionType::Perspective, // Добавьте это
         }
     }
 }
@@ -27,6 +54,7 @@ impl Clone for Camera3 {
             aspect_ratio: self.aspect_ratio,
             near_plane: self.near_plane,
             far_plane: self.far_plane,
+            projection_type: self.projection_type, // Добавьте это
         }
     }
 }
@@ -51,6 +79,7 @@ impl Camera3 {
             aspect_ratio,
             near_plane,
             far_plane,
+            projection_type: ProjectionType::Perspective, // Добавьте это
         }
     }
 
@@ -70,6 +99,7 @@ impl Camera3 {
             aspect_ratio: 16.0 / 9.0,
             near_plane: 0.1,
             far_plane: 100.0,
+            projection_type: ProjectionType::Perspective, // Добавьте это
         }
     }
 
@@ -93,8 +123,47 @@ impl Camera3 {
     }
 
     /// Возвращает матрицу проекции (projection matrix).
+    /// Возвращает матрицу проекции (projection matrix).
     pub fn projection_matrix(&self) -> Transform3D {
-        Transform3D::perspective(self.fov, self.aspect_ratio, self.near_plane, self.far_plane)
+        match self.projection_type {
+            ProjectionType::Perspective => Transform3D::perspective(
+                self.fov,
+                self.aspect_ratio,
+                self.near_plane,
+                self.far_plane,
+            ),
+            ProjectionType::Orthographic => {
+                let height = (self.fov / 2.0).tan() * 10.0;
+                let width = height * self.aspect_ratio;
+                Transform3D::orthographic(
+                    -width,
+                    width,
+                    -height,
+                    height,
+                    self.near_plane,
+                    self.far_plane,
+                )
+            }
+            ProjectionType::Isometric => Transform3D::isometric(),
+            ProjectionType::Dimetric {
+                angle_x,
+                angle_z,
+                scale_y,
+            } => Transform3D::dimetric(angle_x, angle_z, scale_y),
+            ProjectionType::Trimetric {
+                angle_x,
+                angle_z,
+                scale_x,
+                scale_y,
+                scale_z,
+            } => Transform3D::trimetric(angle_x, angle_z, scale_x, scale_y, scale_z),
+            ProjectionType::Cabinet { angle, depth_scale } => {
+                Transform3D::cabinet(angle, depth_scale)
+            }
+            ProjectionType::Cavalier { angle, depth_scale } => {
+                Transform3D::cavalier(angle, depth_scale)
+            }
+        }
     }
 
     /// Возвращает комбинированную матрицу вида-проекции.

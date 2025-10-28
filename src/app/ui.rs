@@ -32,12 +32,12 @@ impl AthenianApp {
                     if ui.button("Isometric").clicked() {
                         self.set_isometric_projection();
                     }
-                    if ui.button("Dimetric").clicked() {
-                        self.set_dimetric_projection();
-                    }
-                    if ui.button("Trimetric").clicked() {
-                        self.set_trimetric_projection();
-                    }
+                    //    if ui.button("Dimetric").clicked() {
+                    //        self.set_dimetric_projection();
+                    //    }
+                    //    if ui.button("Trimetric").clicked() {
+                    //       self.set_trimetric_projection();
+                    //   }
                 });
             });
         });

@@ -38,25 +38,26 @@ impl AthenianApp {
     fn draw_custom_axis_line(&self, painter: &Painter) {
         let point1 = Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
         let point2 = Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
-        
+
         let screen_point1 = self.world_to_screen(point1);
         let screen_point2 = self.world_to_screen(point2);
-        
+
         let direction = egui::Vec2 {
             x: screen_point2.x - screen_point1.x,
             y: screen_point2.y - screen_point1.y,
-        }.normalized();
-        
+        }
+        .normalized();
+
         let line_length = (self.painter_width + self.painter_height) * 2.0; // Большая длина для выхода за границы
-        
+
         let extended_start = screen_point1 - direction * line_length;
         let extended_end = screen_point2 + direction * line_length;
-        
+
         painter.line_segment(
             [extended_start, extended_end],
             egui::Stroke::new(2.0, Color32::RED),
         );
-        
+
         painter.circle_filled(screen_point1, 4.0, Color32::GREEN);
         painter.circle_filled(screen_point2, 4.0, Color32::BLUE);
     }
@@ -268,68 +269,60 @@ impl AthenianApp {
     /// Установить перспективную проекцию
     pub fn set_perspective_projection(&mut self) {
         self.current_projection = Projection::Perspective;
-        self.camera.set_projection(
-            std::f32::consts::PI / 3.0, // 60 degrees FOV
-            self.painter_width / self.painter_height,
-            0.1,
-            100.0,
-        );
+        self.camera.projection_type = g3d::ProjectionType::Perspective;
     }
 
     /// Установить изометрическую проекцию
     pub fn set_isometric_projection(&mut self) {
         self.current_projection = Projection::Isometric;
-        // Для аксонометрических проекций используем специальную камеру
+        self.camera.projection_type = g3d::ProjectionType::Isometric;
         self.camera.position = Point3::new(5.0, 5.0, 5.0);
         self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-        self.camera.set_projection(
-            std::f32::consts::PI / 4.0,
-            self.painter_width / self.painter_height,
-            0.1,
-            100.0,
-        );
     }
 
     /// Установить диметрическую проекцию
     pub fn set_dimetric_projection(&mut self) {
         self.current_projection = Projection::Dimetric;
-        self.camera.position = Point3::new(7.0, 5.0, 7.0);
-        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-        self.camera.set_projection(
-            std::f32::consts::PI / 4.0,
-            self.painter_width / self.painter_height,
-            0.1,
-            100.0,
-        );
+        self.camera.projection_type = g3d::ProjectionType::Dimetric {
+            angle_x: 20.0,
+            angle_z: 30.0,
+            scale_y: 0.5,
+        };
     }
 
     /// Установить триметрическую проекцию
     pub fn set_trimetric_projection(&mut self) {
         self.current_projection = Projection::Trimetric;
-        self.camera.position = Point3::new(8.0, 6.0, 4.0);
-        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-        self.camera.set_projection(
-            std::f32::consts::PI / 4.0,
-            self.painter_width / self.painter_height,
-            0.1,
-            100.0,
-        );
+        self.camera.projection_type = g3d::ProjectionType::Trimetric {
+            angle_x: 15.0,
+            angle_z: 25.0,
+            scale_x: 1.0,
+            scale_y: 0.7,
+            scale_z: 0.9,
+        };
     }
 
     /// Установить кабинетную проекцию
     pub fn set_cabinet_projection(&mut self) {
         self.current_projection = Projection::Cabinet;
-        let cabinet_transform = Transform3D::cabinet(45.0, 0.5);
-        self.apply_projection_transform(cabinet_transform);
+        self.camera.projection_type = g3d::ProjectionType::Cabinet {
+            angle: 45.0,
+            depth_scale: 0.5,
+        };
+        self.camera.position = Point3::new(0.0, 0.0, 10.0);
+        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
     }
 
     /// Установить кавальерную проекцию
     pub fn set_cavalier_projection(&mut self) {
         self.current_projection = Projection::Cavalier;
-        let cavalier_transform = Transform3D::cavalier(45.0, 1.0);
-        self.apply_projection_transform(cavalier_transform);
+        self.camera.projection_type = g3d::ProjectionType::Cavalier {
+            angle: 45.0,
+            depth_scale: 1.0,
+        };
+        self.camera.position = Point3::new(0.0, 0.0, 10.0);
+        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
     }
-
     /// Применить матрицу проекции ко всем моделям на сцене
     fn apply_projection_transform(&mut self, projection: Transform3D) {
         // Для специальных проекций применяем преобразование к моделям

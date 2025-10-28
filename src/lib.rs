@@ -1,8 +1,11 @@
 use egui::Color32;
+pub mod classes3d;
+
+// Экспортируем ProjectionType для использования в других модулях
+pub use classes3d::camera3::ProjectionType;
 
 /// Файл содержит только определения основных классов для 3D.
 /// Сами реализации в отдельных файлах, дабы задать более удобную структуру проекта.
-pub mod classes3d;
 
 /// Точка в 3D пространстве.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -65,6 +68,7 @@ pub struct Scene {
 }
 
 /// Камера в 3-х мерном пространстве.
+/// Камера в 3-х мерном пространстве.
 pub struct Camera3 {
     /// Позиция камеры в простанстве.
     pub position: Point3,
@@ -80,6 +84,8 @@ pub struct Camera3 {
     pub near_plane: f32,
     /// До какого расстояния отображать объекты.
     pub far_plane: f32,
+    /// Тип проекции камеры.
+    pub projection_type: ProjectionType, // Добавьте это поле
 }
 
 /// Преобразование в 3-х мерном пространстве.
