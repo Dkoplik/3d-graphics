@@ -244,7 +244,6 @@ pub fn dodecahedron() -> Self {
         .collect();
 
     let polygons = vec![
-        // 12 пятиугольных граней
         Polygon3::from_list(&[0, 8, 10, 2, 16]),
         Polygon3::from_list(&[0, 16, 17, 1, 12]),
         Polygon3::from_list(&[0, 12, 14, 4, 8]),

@@ -27,8 +27,12 @@ pub struct AthenianApp {
     pub angle_of_rotate: f32,
 
     // Поля для осей вращения
-    axis_point1: g3d::Point3,
-    axis_point2: g3d::Point3,
+    pub axis_point1_x: f32,
+    pub axis_point1_y: f32,
+    pub axis_point1_z: f32,
+    pub axis_point2_x: f32,
+    pub axis_point2_y: f32,
+    pub axis_point2_z: f32,
 }
 
 impl AthenianApp {
@@ -87,8 +91,12 @@ impl Default for AthenianApp {
             selected_3d_model_index: Default::default(),
             current_projection: Default::default(),
             angle_of_rotate: Default::default(),
-            axis_point1: g3d::Point3::new(0.0, 0.0, 0.0),
-            axis_point2: g3d::Point3::new(1.0, 0.0, 0.0),
+            axis_point1_x: 0.0,
+            axis_point1_y: 0.0,
+            axis_point1_z: 0.0,
+            axis_point2_x: 1.0,
+            axis_point2_y: 0.0,
+            axis_point2_z: 0.0,
         }
     }
 }

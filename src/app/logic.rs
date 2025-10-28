@@ -42,41 +42,59 @@ impl AthenianApp {
         self.handle_drag(response);
     }
 
-    /// Установить первую точку оси.
-    pub fn set_axis_point1(&mut self, pos: egui::Pos2) {
-        // Преобразуем экранные координаты в 3D координаты на плоскости z=0
-        let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
-        let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
+    // /// Установить первую точку оси.
+    // pub fn set_axis_point1(&mut self, pos: egui::Pos2) {
+    //     // Преобразуем экранные координаты в 3D координаты на плоскости z=0
+    //     let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
+    //     let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
 
-        self.axis_point1 = Point3::new(screen_x, screen_y, 0.0);
+    //     self.axis_point1 = Point3::new(screen_x, screen_y, 0.0);
 
-        println!(
-            "Axis point 1 set to: ({}, {}, {})",
-            self.axis_point1.x, self.axis_point1.y, self.axis_point1.z
-        );
+    //     println!(
+    //         "Axis point 1 set to: ({}, {}, {})",
+    //         self.axis_point1.x, self.axis_point1.y, self.axis_point1.z
+    //     );
+    // }
+
+    // /// Установить вторую точку оси.
+    // pub fn set_axis_point2(&mut self, pos: egui::Pos2) {
+    //     // Преобразуем экранные координаты в 3D координаты на плоскости z=0
+    //     let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
+    //     let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
+
+    //     self.axis_point2 = Point3::new(screen_x, screen_y, 0.0);
+
+    //     println!(
+    //         "Axis point 2 set to: ({}, {}, {})",
+    //         self.axis_point2.x, self.axis_point2.y, self.axis_point2.z
+    //     );
+    // }
+
+    /// Применить вращение вокруг произвольной оси
+pub fn apply_custom_axis_rotation(&mut self) {
+    if let Some(model) = self.get_selected_model() {
+        let point1 = Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
+        let point2 = Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
+        
+        // Создаем линию из двух точек
+        let direction = (point2 - point1).normalize();
+        let line = Line3::new(point1, direction);
+        
+        let rotation = Transform3D::rotation_around_line(line, self.angle_of_rotate.to_radians());
+        
+        if let Some(model) = self.get_selected_model_mut() {
+            model.apply_transform(rotation);
+        }
     }
-
-    /// Установить вторую точку оси.
-    pub fn set_axis_point2(&mut self, pos: egui::Pos2) {
-        // Преобразуем экранные координаты в 3D координаты на плоскости z=0
-        let screen_x = (pos.x / self.painter_width) * 4.0 - 2.0;
-        let screen_y = 2.0 - (pos.y / self.painter_height) * 4.0;
-
-        self.axis_point2 = Point3::new(screen_x, screen_y, 0.0);
-
-        println!(
-            "Axis point 2 set to: ({}, {}, {})",
-            self.axis_point2.x, self.axis_point2.y, self.axis_point2.z
-        );
-    }
+}
 
     /// Обработать клики по холсту.
     fn handle_click(&mut self, response: &Response) {
         if response.clicked_by(egui::PointerButton::Primary) {
             if let Some(pos) = response.hover_pos() {
                 match &self.instrument {
-                    Instrument::SetAxisPoint1 => self.set_axis_point1(pos),
-                    Instrument::SetAxisPoint2 => self.set_axis_point2(pos),
+                    // Instrument::SetAxisPoint1 => self.set_axis_point1(pos),
+                    // Instrument::SetAxisPoint2 => self.set_axis_point2(pos),
                     _ => {
                         // Если есть фигура на сцене, автоматически выбираем её
                         if !self.scene.models.is_empty() {
@@ -116,6 +134,7 @@ impl AthenianApp {
                 Instrument::Move3D => self.move_3d_model(start, end),
                 Instrument::Rotate3D => self.rotate_3d_model(start, end),
                 Instrument::Scale3D => self.scale_3d_model(start, end),
+                Instrument::RotateAroundCustomLine => self.rotate_around_custom_line(start, end),
                 _ => {}
             }
         }
@@ -238,6 +257,11 @@ impl AthenianApp {
                 model.apply_transform(rotation);
             }
         }
+    }
+
+    /// Вращать модель вокруг произвольной линии (определенной двумя точками)
+    fn rotate_around_custom_line(&mut self, start: egui::Pos2, end: egui::Pos2) {
+//TODO
     }
 
     // Простые методы для добавления многогранников (заменяют текущую фигуру)
@@ -372,6 +396,7 @@ pub enum Instrument {
     Scale3D,
     SetAxisPoint1,
     SetAxisPoint2,
+    RotateAroundCustomLine,
 }
 
 impl ToString for Instrument {
@@ -382,6 +407,7 @@ impl ToString for Instrument {
             Self::Scale3D => String::from("масштабировать 3D модель"),
             Self::SetAxisPoint1 => String::from("установить точку оси 1"),
             Self::SetAxisPoint2 => String::from("установить точку оси 2"),
+            Self::RotateAroundCustomLine => String::from("вращать вокруг произвольной линии"), 
         }
     }
 }
