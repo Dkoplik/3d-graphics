@@ -35,7 +35,7 @@ impl Model3 {
         // Координаты правильного тетраэдра с длиной ребра = 1
         let height = (2.0 / 3.0_f32).sqrt(); // высота тетраэдра
         let base_height = (3.0_f32).sqrt() / 3.0; // высота основания
-        
+
         let vertexes = vec![
             // Вершина тетраэдра
             Point3::new(0.0, 0.0, height),
@@ -74,24 +74,12 @@ impl Model3 {
         ];
 
         let polygons = vec![
-            // Нижняя грань
-            Polygon3::triangle(0, 1, 2),
-            Polygon3::triangle(0, 2, 3),
-            // Верхняя грань
-            Polygon3::triangle(4, 6, 5),
-            Polygon3::triangle(4, 7, 6),
-            // Передняя грань
-            Polygon3::triangle(3, 2, 6),
-            Polygon3::triangle(3, 6, 7),
-            // Задняя грань
-            Polygon3::triangle(0, 5, 1),
-            Polygon3::triangle(0, 4, 5),
-            // Левая грань
-            Polygon3::triangle(0, 3, 7),
-            Polygon3::triangle(0, 7, 4),
-            // Правая грань
-            Polygon3::triangle(1, 5, 6),
-            Polygon3::triangle(1, 6, 2),
+            Polygon3::from_list(&[0, 1, 2, 3]),
+            Polygon3::from_list(&[4, 5, 6, 7]),
+            Polygon3::from_list(&[3, 2, 6, 7]),
+            Polygon3::from_list(&[0, 1, 5, 4]),
+            Polygon3::from_list(&[0, 3, 7, 4]),
+            Polygon3::from_list(&[1, 2, 6, 5]),
         ];
 
         let origin = Point3::new(0.0, 0.0, 0.0);
@@ -133,133 +121,126 @@ impl Model3 {
         Model3::new(origin, vertexes, polygons)
     }
 
-/// Создание икосаэдра со сторонами единичной длины.
-pub fn icosahedron() -> Self {
-    // Золотое сечение
-    let phi = (1.0 + (5.0_f32).sqrt()) / 2.0;
-    
-    let vertexes = vec![
-        // Верхние и нижние вершины
-        Point3::new(0.0, 1.0, phi),    // 0: зад-верх
-        Point3::new(0.0, 1.0, -phi),   // 1: перед-верх
-        Point3::new(0.0, -1.0, phi),   // 2: зад-низ
-        Point3::new(0.0, -1.0, -phi),  // 3: перед-низ
-        
-        // Боковые вершины - передние
-        Point3::new(1.0, phi, 0.0),    // 4: верх-право
-        Point3::new(-1.0, phi, 0.0),   // 5: верх-лево
-        
-        // Боковые вершины - задние  
-        Point3::new(1.0, -phi, 0.0),   // 6: низ-право
-        Point3::new(-1.0, -phi, 0.0),  // 7: низ-лево
-        
-        // Передние и задние вершины
-        Point3::new(phi, 0.0, 1.0),    // 8: право-зад
-        Point3::new(phi, 0.0, -1.0),   // 9: право-перед
-        Point3::new(-phi, 0.0, 1.0),   // 10: лево-зад
-        Point3::new(-phi, 0.0, -1.0),  // 11: лево-перед
-    ];
+    /// Создание икосаэдра со сторонами единичной длины.
+    pub fn icosahedron() -> Self {
+        // Золотое сечение
+        let phi = (1.0 + (5.0_f32).sqrt()) / 2.0;
 
-    // Нормализуем вершины
-    let vertexes: Vec<Point3> = vertexes.into_iter()
-        .map(|p| {
-            let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
-            Point3::new(p.x / len, p.y / len, p.z / len)
-        })
-        .collect();
+        let vertexes = vec![
+            // Верхние и нижние вершины
+            Point3::new(0.0, 1.0, phi),   // 0: зад-верх
+            Point3::new(0.0, 1.0, -phi),  // 1: перед-верх
+            Point3::new(0.0, -1.0, phi),  // 2: зад-низ
+            Point3::new(0.0, -1.0, -phi), // 3: перед-низ
+            // Боковые вершины - передние
+            Point3::new(1.0, phi, 0.0),  // 4: верх-право
+            Point3::new(-1.0, phi, 0.0), // 5: верх-лево
+            // Боковые вершины - задние
+            Point3::new(1.0, -phi, 0.0),  // 6: низ-право
+            Point3::new(-1.0, -phi, 0.0), // 7: низ-лево
+            // Передние и задние вершины
+            Point3::new(phi, 0.0, 1.0),   // 8: право-зад
+            Point3::new(phi, 0.0, -1.0),  // 9: право-перед
+            Point3::new(-phi, 0.0, 1.0),  // 10: лево-зад
+            Point3::new(-phi, 0.0, -1.0), // 11: лево-перед
+        ];
 
-    let polygons = vec![
-        Polygon3::triangle(0, 4, 8),
-        Polygon3::triangle(0, 8, 2),
-        Polygon3::triangle(0, 2, 10),  
-        Polygon3::triangle(0, 10, 5),
-        Polygon3::triangle(0, 5, 4),
-        
-        Polygon3::triangle(1, 9, 4),
-        Polygon3::triangle(1, 4, 5),
-        Polygon3::triangle(1, 5, 11),
-        Polygon3::triangle(1, 11, 3),
-        Polygon3::triangle(1, 3, 9),
-        
-        Polygon3::triangle(4, 9, 8),
-        Polygon3::triangle(8, 9, 6), 
-        Polygon3::triangle(6, 9, 3),
-        Polygon3::triangle(11, 5, 10),
-        Polygon3::triangle(10, 5, 0),
-        
-        Polygon3::triangle(7, 6, 2),
-        Polygon3::triangle(7, 6, 3),
-        Polygon3::triangle(7, 2, 10),
-        Polygon3::triangle(7, 10, 11),
-        Polygon3::triangle(7, 11, 3),
-    ];
+        // Нормализуем вершины
+        let vertexes: Vec<Point3> = vertexes
+            .into_iter()
+            .map(|p| {
+                let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
+                Point3::new(p.x / len, p.y / len, p.z / len)
+            })
+            .collect();
 
-    let origin = Point3::new(0.0, 0.0, 0.0);
+        let polygons = vec![
+            Polygon3::triangle(0, 4, 8),
+            Polygon3::triangle(0, 8, 2),
+            Polygon3::triangle(0, 2, 10),
+            Polygon3::triangle(0, 10, 5),
+            Polygon3::triangle(0, 5, 4),
+            Polygon3::triangle(1, 9, 4),
+            Polygon3::triangle(1, 4, 5),
+            Polygon3::triangle(1, 5, 11),
+            Polygon3::triangle(1, 11, 3),
+            Polygon3::triangle(1, 3, 9),
+            Polygon3::triangle(4, 9, 8),
+            Polygon3::triangle(8, 9, 6),
+            Polygon3::triangle(6, 9, 3),
+            Polygon3::triangle(11, 5, 10),
+            Polygon3::triangle(10, 5, 0),
+            Polygon3::triangle(7, 6, 2),
+            Polygon3::triangle(7, 6, 3),
+            Polygon3::triangle(7, 2, 10),
+            Polygon3::triangle(7, 10, 11),
+            Polygon3::triangle(7, 11, 3),
+        ];
 
-    Model3::new(origin, vertexes, polygons)
-}
+        let origin = Point3::new(0.0, 0.0, 0.0);
 
-/// Создание додекаэдра со сторонами единичной длины.
-pub fn dodecahedron() -> Self {
-    // Золотое сечение
-    let phi = (1.0 + (5.0_f32).sqrt()) / 2.0;
-    let inv_phi = 1.0 / phi;
-    
-    let vertexes = vec![
-        // (±1, ±1, ±1)
-        Point3::new(1.0, 1.0, 1.0),        // 0
-        Point3::new(1.0, 1.0, -1.0),       // 1
-        Point3::new(1.0, -1.0, 1.0),       // 2
-        Point3::new(1.0, -1.0, -1.0),      // 3
-        Point3::new(-1.0, 1.0, 1.0),       // 4
-        Point3::new(-1.0, 1.0, -1.0),      // 5
-        Point3::new(-1.0, -1.0, 1.0),      // 6
-        Point3::new(-1.0, -1.0, -1.0),     // 7
-        
-        // (0, ±1/φ, ±φ)
-        Point3::new(0.0, inv_phi, phi),    // 8
-        Point3::new(0.0, inv_phi, -phi),   // 9
-        Point3::new(0.0, -inv_phi, phi),   // 10
-        Point3::new(0.0, -inv_phi, -phi),  // 11
-        
-        // (±1/φ, ±φ, 0)
-        Point3::new(inv_phi, phi, 0.0),    // 12
-        Point3::new(inv_phi, -phi, 0.0),   // 13
-        Point3::new(-inv_phi, phi, 0.0),   // 14
-        Point3::new(-inv_phi, -phi, 0.0),  // 15
-        
-        // (±φ, 0, ±1/φ)
-        Point3::new(phi, 0.0, inv_phi),    // 16
-        Point3::new(phi, 0.0, -inv_phi),   // 17
-        Point3::new(-phi, 0.0, inv_phi),   // 18
-        Point3::new(-phi, 0.0, -inv_phi),  // 19
-    ];
+        Model3::new(origin, vertexes, polygons)
+    }
 
-    // Нормализуем вершины
-    let vertexes: Vec<Point3> = vertexes.into_iter()
-        .map(|p| {
-            let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
-            Point3::new(p.x / len, p.y / len, p.z / len)
-        })
-        .collect();
+    /// Создание додекаэдра со сторонами единичной длины.
+    pub fn dodecahedron() -> Self {
+        // Золотое сечение
+        let phi = (1.0 + (5.0_f32).sqrt()) / 2.0;
+        let inv_phi = 1.0 / phi;
 
-    let polygons = vec![
-        Polygon3::from_list(&[0, 8, 10, 2, 16]),
-        Polygon3::from_list(&[0, 16, 17, 1, 12]),
-        Polygon3::from_list(&[0, 12, 14, 4, 8]),
-        Polygon3::from_list(&[1, 9, 11, 3, 17]),
-        Polygon3::from_list(&[2, 10, 6, 15, 13]),
-        Polygon3::from_list(&[3, 11, 7, 15, 13]),
-        Polygon3::from_list(&[3, 13, 2, 16, 17]),
-        Polygon3::from_list(&[4, 18, 19, 5, 14]),
-        Polygon3::from_list(&[5, 19, 7, 11, 9]),
-        Polygon3::from_list(&[6, 15, 7, 19, 18]),
-    ];
+        let vertexes = vec![
+            // (±1, ±1, ±1)
+            Point3::new(1.0, 1.0, 1.0),    // 0
+            Point3::new(1.0, 1.0, -1.0),   // 1
+            Point3::new(1.0, -1.0, 1.0),   // 2
+            Point3::new(1.0, -1.0, -1.0),  // 3
+            Point3::new(-1.0, 1.0, 1.0),   // 4
+            Point3::new(-1.0, 1.0, -1.0),  // 5
+            Point3::new(-1.0, -1.0, 1.0),  // 6
+            Point3::new(-1.0, -1.0, -1.0), // 7
+            // (0, ±1/φ, ±φ)
+            Point3::new(0.0, inv_phi, phi),   // 8
+            Point3::new(0.0, inv_phi, -phi),  // 9
+            Point3::new(0.0, -inv_phi, phi),  // 10
+            Point3::new(0.0, -inv_phi, -phi), // 11
+            // (±1/φ, ±φ, 0)
+            Point3::new(inv_phi, phi, 0.0),   // 12
+            Point3::new(inv_phi, -phi, 0.0),  // 13
+            Point3::new(-inv_phi, phi, 0.0),  // 14
+            Point3::new(-inv_phi, -phi, 0.0), // 15
+            // (±φ, 0, ±1/φ)
+            Point3::new(phi, 0.0, inv_phi),   // 16
+            Point3::new(phi, 0.0, -inv_phi),  // 17
+            Point3::new(-phi, 0.0, inv_phi),  // 18
+            Point3::new(-phi, 0.0, -inv_phi), // 19
+        ];
 
-    let origin = Point3::new(0.0, 0.0, 0.0);
+        // Нормализуем вершины
+        let vertexes: Vec<Point3> = vertexes
+            .into_iter()
+            .map(|p| {
+                let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
+                Point3::new(p.x / len, p.y / len, p.z / len)
+            })
+            .collect();
 
-    Model3::new(origin, vertexes, polygons)
-}
+        let polygons = vec![
+            Polygon3::from_list(&[0, 8, 10, 2, 16]),
+            Polygon3::from_list(&[0, 16, 17, 1, 12]),
+            Polygon3::from_list(&[0, 12, 14, 4, 8]),
+            Polygon3::from_list(&[1, 9, 11, 3, 17]),
+            Polygon3::from_list(&[2, 10, 6, 15, 13]),
+            Polygon3::from_list(&[3, 11, 7, 15, 13]),
+            Polygon3::from_list(&[3, 13, 2, 16, 17]),
+            Polygon3::from_list(&[4, 18, 19, 5, 14]),
+            Polygon3::from_list(&[5, 19, 7, 11, 9]),
+            Polygon3::from_list(&[6, 15, 7, 19, 18]),
+        ];
+
+        let origin = Point3::new(0.0, 0.0, 0.0);
+
+        Model3::new(origin, vertexes, polygons)
+    }
 
     /// Получить матрицу преобразования к мировым координатам.
     pub fn get_world_transform(&self) -> Transform3D {
@@ -274,49 +255,49 @@ pub fn dodecahedron() -> Self {
 
     // /// Нарисовать модель.
     // pub fn draw(&self, painter: &mut Painter, style: &RenderStyle) {
-        // Простая ортографическая проекция для демонстрации
-        // В реальном приложении здесь должны использоваться координаты после применения матриц проекции
-        
-        // let projected_points: Vec<egui::Pos2> = self
-        //     .vertexes
-        //     .iter()
-        //     .map(|vertex| {
-        //         // Для аксонометрических проекций используем все три координаты
-        //         let scale = 100.0;
-        //         let center_x = 450.0;
-        //         let center_y = 300.0;
-                
-        //         // Простая аксонометрическая проекция
-        //         let x_proj = vertex.x - vertex.z * 0.5;
-        //         let y_proj = vertex.y - vertex.z * 0.5;
-                
-        //         egui::Pos2::new(
-        //             center_x + x_proj * scale,
-        //             center_y - y_proj * scale,
-        //         )
-        //     })
-        //     .collect();
+    // Простая ортографическая проекция для демонстрации
+    // В реальном приложении здесь должны использоваться координаты после применения матриц проекции
 
-        // // Остальной код отрисовки рёбер и вершин остается прежним...
-        // for polygon in &self.polygons {
-        //     if polygon.vertexes.len() >= 2 {
-        //         let points: Vec<egui::Pos2> = polygon
-        //             .vertexes
-        //             .iter()
-        //             .map(|&index| projected_points[index])
-        //             .collect();
+    // let projected_points: Vec<egui::Pos2> = self
+    //     .vertexes
+    //     .iter()
+    //     .map(|vertex| {
+    //         // Для аксонометрических проекций используем все три координаты
+    //         let scale = 100.0;
+    //         let center_x = 450.0;
+    //         let center_y = 300.0;
 
-        //         for i in 0..points.len() {
-        //             let start = points[i];
-        //             let end = points[(i + 1) % points.len()];
-        //             painter.line_segment([start, end], (style.edge_width, style.edge_color));
-        //         }
-        //     }
-        // }
+    //         // Простая аксонометрическая проекция
+    //         let x_proj = vertex.x - vertex.z * 0.5;
+    //         let y_proj = vertex.y - vertex.z * 0.5;
 
-        // for &point in &projected_points {
-        //     painter.circle_filled(point, style.vertex_radius, style.vertex_color);
-        // }
+    //         egui::Pos2::new(
+    //             center_x + x_proj * scale,
+    //             center_y - y_proj * scale,
+    //         )
+    //     })
+    //     .collect();
+
+    // // Остальной код отрисовки рёбер и вершин остается прежним...
+    // for polygon in &self.polygons {
+    //     if polygon.vertexes.len() >= 2 {
+    //         let points: Vec<egui::Pos2> = polygon
+    //             .vertexes
+    //             .iter()
+    //             .map(|&index| projected_points[index])
+    //             .collect();
+
+    //         for i in 0..points.len() {
+    //             let start = points[i];
+    //             let end = points[(i + 1) % points.len()];
+    //             painter.line_segment([start, end], (style.edge_width, style.edge_color));
+    //         }
+    //     }
+    // }
+
+    // for &point in &projected_points {
+    //     painter.circle_filled(point, style.vertex_radius, style.vertex_color);
+    // }
     // }
 }
 
