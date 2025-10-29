@@ -25,41 +25,22 @@ impl AthenianApp {
     }
 
     /// Нарисовать холст.
-    pub fn draw_canvas(&mut self, painter: &mut Painter) {
+     pub fn draw_canvas(&mut self, painter: &mut Painter) {
         let style = g3d::RenderStyle::default();
-        self.scene.render(self.camera.clone(), painter, &style);
-
-        if self.instrument == Instrument::RotateAroundCustomLine {
-            self.draw_custom_axis_line(painter);
-        }
-    }
-
-    /// Отрисовать линию, заданную двумя точками
-    fn draw_custom_axis_line(&self, painter: &Painter) {
-        let point1 = Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
-        let point2 = Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
-
-        let screen_point1 = self.world_to_screen(point1);
-        let screen_point2 = self.world_to_screen(point2);
-
-        let direction = egui::Vec2 {
-            x: screen_point2.x - screen_point1.x,
-            y: screen_point2.y - screen_point1.y,
-        }
-        .normalized();
-
-        let line_length = (self.painter_width + self.painter_height) * 2.0; // Большая длина для выхода за границы
-
-        let extended_start = screen_point1 - direction * line_length;
-        let extended_end = screen_point2 + direction * line_length;
-
-        painter.line_segment(
-            [extended_start, extended_end],
-            egui::Stroke::new(2.0, Color32::RED),
+        
+        // Подготавливаем параметры для пользовательской оси
+        let show_custom_axis = self.instrument == crate::app::logic::Instrument::RotateAroundCustomLine;
+        let axis_point1 = Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
+        let axis_point2 = Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
+        
+        self.scene.render(
+            self.camera.clone(), 
+            painter, 
+            &style,
+            show_custom_axis,
+            axis_point1,
+            axis_point2,
         );
-
-        painter.circle_filled(screen_point1, 4.0, Color32::GREEN);
-        painter.circle_filled(screen_point2, 4.0, Color32::BLUE);
     }
 
     /// Преобразовать мировые координаты в экранные

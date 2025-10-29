@@ -1,5 +1,4 @@
-use egui::Painter;
-
+use egui::{Color32, Painter}; 
 use crate::{Camera3, Model3, RenderStyle, Scene, Transformable3, Point3};
 
 impl Scene {
@@ -14,22 +13,103 @@ impl Scene {
     }
 
     //Нарисовать сцену на экран со всеми нужными преобразованиями.
-    //pub fn render(&self, camera: Camera3, painter: &mut Painter, style: &RenderStyle) {
-    // Изменить на &mut
-    //   self.models
-    //       .iter()
-    //      .cloned()
-    //     .map(|model| {
-    //         model
-    //              .to_world_coordinates()
-    //              .transform(camera.view_projection_matrix())
-    //     })
-    //      .for_each(|model| model.draw(painter, style));
-    // }
-    pub fn render(&self, camera: Camera3, painter: &mut Painter, style: &RenderStyle) {
+     pub fn render(
+        &self, 
+        camera: Camera3, 
+        painter: &mut Painter, 
+        style: &RenderStyle,
+        show_custom_axis: bool,
+        axis_point1: Point3,
+        axis_point2: Point3,
+    ) {
+        self.draw_coordinate_axes(painter, &camera);
+        
+        if show_custom_axis {
+            self.draw_custom_axis_line(painter, &camera, axis_point1, axis_point2);
+        }
+        
         for model in &self.models {
             self.render_simple(model, painter, style, &camera);
         }
+    }
+
+    /// Отрисовка пользовательской оси для вращения
+    fn draw_custom_axis_line(&self, painter: &Painter, camera: &Camera3, point1: Point3, point2: Point3) {
+        // Проецируем точки в 2D используя нашу систему проекций
+        let screen_point1 = self.project_point(point1, camera);
+        let screen_point2 = self.project_point(point2, camera);
+        
+        // Вычисляем направление линии
+        let direction = (screen_point2 - screen_point1).normalized();
+        
+        // Удлиняем линию для лучшей видимости
+        let extension_length = 500.0;
+        let extended_start = screen_point1 - direction * extension_length;
+        let extended_end = screen_point2 + direction * extension_length;
+        
+        painter.line_segment(
+            [extended_start, extended_end],
+            egui::Stroke::new(2.0, Color32::from_rgb(255, 165, 0)), // Оранжевый цвет
+        );
+        
+        painter.circle_filled(screen_point1, 4.0, Color32::GREEN);
+        painter.circle_filled(screen_point2, 4.0, Color32::BLUE);
+    }
+
+    /// Отрисовка координатных осей
+    fn draw_coordinate_axes(&self, painter: &mut Painter, camera: &Camera3) {
+        let axis_length = 2.0; // Длина осей
+        let origin = Point3::new(0.0, 0.0, 0.0);
+        
+        let x_axis_end = Point3::new(axis_length, 0.0, 0.0);
+        let y_axis_end = Point3::new(0.0, axis_length, 0.0);
+        let z_axis_end = Point3::new(0.0, 0.0, axis_length);
+        
+        let origin_2d = self.project_point(origin, camera);
+        let x_end_2d = self.project_point(x_axis_end, camera);
+        let y_end_2d = self.project_point(y_axis_end, camera);
+        let z_end_2d = self.project_point(z_axis_end, camera);
+        
+        // Рисуем оси с разными цветами
+        // Ось X - красная
+        painter.line_segment([origin_2d, x_end_2d], egui::Stroke::new(3.0, Color32::RED));
+        painter.text(
+            x_end_2d + egui::Vec2::new(5.0, -5.0),
+            egui::Align2::LEFT_TOP,
+            "X",
+            egui::FontId::default(),
+            Color32::RED,
+        );
+        
+        // Ось Y - зелёная
+        painter.line_segment([origin_2d, y_end_2d], egui::Stroke::new(3.0, Color32::GREEN));
+        painter.text(
+            y_end_2d + egui::Vec2::new(5.0, -5.0),
+            egui::Align2::LEFT_TOP,
+            "Y",
+            egui::FontId::default(),
+            Color32::GREEN,
+        );
+        
+        // Ось Z - синяя
+        painter.line_segment([origin_2d, z_end_2d], egui::Stroke::new(3.0, Color32::BLUE));
+        painter.text(
+            z_end_2d + egui::Vec2::new(5.0, -5.0),
+            egui::Align2::LEFT_TOP,
+            "Z",
+            egui::FontId::default(),
+            Color32::BLUE,
+        );
+        
+        // Рисуем начало координат
+        painter.circle_filled(origin_2d, 4.0, Color32::BLACK);
+        painter.text(
+            origin_2d + egui::Vec2::new(8.0, 8.0),
+            egui::Align2::LEFT_TOP,
+            "O",
+            egui::FontId::default(),
+            Color32::BLACK,
+        );
     }
 
     fn render_simple(&self, model: &Model3, painter: &mut Painter, style: &RenderStyle, camera: &Camera3) {
