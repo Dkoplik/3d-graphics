@@ -1,6 +1,6 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
-use g3d::{Line3, Model3, Plane, Point3, Transform3D, Transformable3, Vec3};
+use g3d::{Line3, Model3, Point3, Transform3D, Transformable3, Vec3};
 
 // --------------------------------------------------
 // Обработка области рисования (холст)
@@ -64,16 +64,16 @@ impl AthenianApp {
 
     /// Преобразовать мировые координаты в экранные
     fn world_to_screen(&self, point: Point3) -> Pos2 {
-        // Применяем преобразования камеры к точке
         let view_proj = self.camera.view_projection_matrix();
         let transformed = view_proj.apply_to_point(point);
-
+        
         // Преобразуем из NDC (-1..1) в экранные координаты
         let screen_x = (transformed.x + 1.0) * 0.5 * self.painter_width;
         let screen_y = (1.0 - transformed.y) * 0.5 * self.painter_height;
-
+        
         Pos2::new(screen_x, screen_y)
     }
+
 }
 
 // --------------------------------------------------
@@ -237,105 +237,28 @@ impl AthenianApp {
 
     // Простые методы для добавления многогранников (заменяют текущую фигуру)
     pub fn add_tetrahedron(&mut self) {
-        let mut tetrahedron = Model3::tetrahedron();
-        self.center_model_position(&mut tetrahedron);
+        let tetrahedron = Model3::tetrahedron();
         self.set_model(tetrahedron);
     }
 
     pub fn add_hexahedron(&mut self) {
-        let mut hexahedron = Model3::hexahedron();
-        self.center_model_position(&mut hexahedron);
+        let hexahedron = Model3::hexahedron();
         self.set_model(hexahedron);
     }
 
     pub fn add_octahedron(&mut self) {
-        let mut octahedron = Model3::octahedron();
-        self.center_model_position(&mut octahedron);
+        let octahedron = Model3::octahedron();
         self.set_model(octahedron);
     }
 
     pub fn add_icosahedron(&mut self) {
-        let mut icosahedron = Model3::icosahedron();
-        self.center_model_position(&mut icosahedron);
+        let icosahedron = Model3::icosahedron();
         self.set_model(icosahedron);
     }
 
     pub fn add_dodecahedron(&mut self) {
-        let mut dodecahedron = Model3::dodecahedron();
-        self.center_model_position(&mut dodecahedron);
+        let dodecahedron = Model3::dodecahedron();
         self.set_model(dodecahedron);
-    }
-
-    /// Установить перспективную проекцию
-    pub fn set_perspective_projection(&mut self) {
-        self.current_projection = Projection::Perspective;
-        self.camera.projection_type = g3d::ProjectionType::Perspective;
-    }
-
-    /// Установить изометрическую проекцию
-    pub fn set_isometric_projection(&mut self) {
-        self.current_projection = Projection::Isometric;
-        self.camera.projection_type = g3d::ProjectionType::Isometric;
-        self.camera.position = Point3::new(5.0, 5.0, 5.0);
-        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-    }
-
-    /// Установить диметрическую проекцию
-    pub fn set_dimetric_projection(&mut self) {
-        self.current_projection = Projection::Dimetric;
-        self.camera.projection_type = g3d::ProjectionType::Dimetric {
-            angle_x: 20.0,
-            angle_z: 30.0,
-            scale_y: 0.5,
-        };
-    }
-
-    /// Установить триметрическую проекцию
-    pub fn set_trimetric_projection(&mut self) {
-        self.current_projection = Projection::Trimetric;
-        self.camera.projection_type = g3d::ProjectionType::Trimetric {
-            angle_x: 15.0,
-            angle_z: 25.0,
-            scale_x: 1.0,
-            scale_y: 0.7,
-            scale_z: 0.9,
-        };
-    }
-
-    /// Установить кабинетную проекцию
-    pub fn set_cabinet_projection(&mut self) {
-        self.current_projection = Projection::Cabinet;
-        self.camera.projection_type = g3d::ProjectionType::Cabinet {
-            angle: 45.0,
-            depth_scale: 0.5,
-        };
-        self.camera.position = Point3::new(0.0, 0.0, 10.0);
-        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-    }
-
-    /// Установить кавальерную проекцию
-    pub fn set_cavalier_projection(&mut self) {
-        self.current_projection = Projection::Cavalier;
-        self.camera.projection_type = g3d::ProjectionType::Cavalier {
-            angle: 45.0,
-            depth_scale: 1.0,
-        };
-        self.camera.position = Point3::new(0.0, 0.0, 10.0);
-        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-    }
-    /// Применить матрицу проекции ко всем моделям на сцене
-    fn apply_projection_transform(&mut self, projection: Transform3D) {
-        // Для специальных проекций применяем преобразование к моделям
-        // и используем простую камеру
-        self.camera.position = Point3::new(0.0, 0.0, 10.0);
-        self.camera.look_at_target(Point3::new(0.0, 0.0, 0.0));
-
-        // Применяем проекцию ко всем моделям на сцене
-        for i in 0..self.scene.models.len() {
-            let model = self.scene.models[i].clone();
-            let transformed_model = model.transform(projection);
-            self.scene.models[i] = transformed_model;
-        }
     }
 
     /// Повернуть модель вокруг оси (мышью)
@@ -376,16 +299,28 @@ impl AthenianApp {
     }
 }
 
-// Вспомогательные функции
-fn distance_point_to_line(point: Point3, line_origin: Point3, line_direction: Vec3) -> f32 {
-    let point_vec: Vec3 = point.into();
-    let origin_vec: Vec3 = line_origin.into();
+// --------------------------------------------------
+// Установка проекций
+// --------------------------------------------------
 
-    let v = point_vec - origin_vec;
-    let d = line_direction;
+impl AthenianApp {
+    /// Установить перспективную проекцию
+    pub fn set_perspective_projection(&mut self) {
+        self.camera.projection_type = g3d::ProjectionType::Perspective;
+        
+        // Настройка камеры для перспективы
+        self.camera.position = Point3::new(0.0, 0.0, 10.0); // Камера смотрит вдоль Z
+        self.camera.set_fov_degrees(60.0);
+        self.camera.set_aspect_ratio(self.painter_width / self.painter_height);
+    }
 
-    let cross = v.cross(d);
-    cross.length() / d.length()
+    /// Установить изометрическую проекцию
+    pub fn set_isometric_projection(&mut self) {
+        self.camera.projection_type = g3d::ProjectionType::Isometric;
+        
+        // Для изометрии используем специальные углы
+        self.camera.position = Point3::new(0.0, 0.0, 0.0); // Положение не важно для нашей простой проекции
+    }
 }
 
 #[derive(Default, PartialEq)]
@@ -410,30 +345,6 @@ impl ToString for Instrument {
             Self::RotateAroundY => String::from("вращать вокруг оси Y"),
             Self::RotateAroundZ => String::from("вращать вокруг оси Z"),
             Self::RotateAroundCustomLine => String::from("вращать вокруг произвольной линии"),
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub enum Projection {
-    #[default]
-    Perspective,
-    Isometric,
-    Dimetric,
-    Trimetric,
-    Cabinet,
-    Cavalier,
-}
-
-impl ToString for Projection {
-    fn to_string(&self) -> String {
-        match self {
-            Self::Perspective => "Perspective".to_string(),
-            Self::Isometric => "Isometric".to_string(),
-            Self::Dimetric => "Dimetric".to_string(),
-            Self::Trimetric => "Trimetric".to_string(),
-            Self::Cabinet => "Cabinet".to_string(),
-            Self::Cavalier => "Cavalier".to_string(),
         }
     }
 }

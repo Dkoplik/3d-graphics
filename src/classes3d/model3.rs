@@ -29,7 +29,7 @@ impl Model3 {
     pub fn set_origin(&mut self, origin: Point3) {
         self.origin = origin;
     }
-    
+
     /// Создание тетраэдра со сторонами единичной длины.
     pub fn tetrahedron() -> Self {
         // Координаты правильного тетраэдра с длиной ребра = 1
@@ -272,50 +272,52 @@ pub fn dodecahedron() -> Self {
         self.transform(transform)
     }
 
-    /// Нарисовать модель.
-    /// Нарисовать модель.
-    pub fn draw(&self, painter: &mut Painter, style: &RenderStyle) {
-        // Преобразуем 3D точки в 2D с помощью простой ортографической проекции
-        let projected_points: Vec<egui::Pos2> = self
-            .vertexes
-            .iter()
-            .map(|vertex| {
-                // Простая ортографическая проекция (игнорируем Z для демонстрации)
-                // Масштабируем координаты чтобы они поместились в видимую область
-                let scale = 100.0; // Масштаб для видимости
-                let center_x = 450.0; // Центр холста (предполагаемый размер)
-                let center_y = 300.0;
+    // /// Нарисовать модель.
+    // pub fn draw(&self, painter: &mut Painter, style: &RenderStyle) {
+        // Простая ортографическая проекция для демонстрации
+        // В реальном приложении здесь должны использоваться координаты после применения матриц проекции
+        
+        // let projected_points: Vec<egui::Pos2> = self
+        //     .vertexes
+        //     .iter()
+        //     .map(|vertex| {
+        //         // Для аксонометрических проекций используем все три координаты
+        //         let scale = 100.0;
+        //         let center_x = 450.0;
+        //         let center_y = 300.0;
+                
+        //         // Простая аксонометрическая проекция
+        //         let x_proj = vertex.x - vertex.z * 0.5;
+        //         let y_proj = vertex.y - vertex.z * 0.5;
+                
+        //         egui::Pos2::new(
+        //             center_x + x_proj * scale,
+        //             center_y - y_proj * scale,
+        //         )
+        //     })
+        //     .collect();
 
-                egui::Pos2::new(
-                    center_x + vertex.x * scale,
-                    center_y - vertex.y * scale, // Инвертируем Y для правильной ориентации
-                )
-            })
-            .collect();
+        // // Остальной код отрисовки рёбер и вершин остается прежним...
+        // for polygon in &self.polygons {
+        //     if polygon.vertexes.len() >= 2 {
+        //         let points: Vec<egui::Pos2> = polygon
+        //             .vertexes
+        //             .iter()
+        //             .map(|&index| projected_points[index])
+        //             .collect();
 
-        // Рисуем рёбра
-        for polygon in &self.polygons {
-            if polygon.vertexes.len() >= 2 {
-                let points: Vec<egui::Pos2> = polygon
-                    .vertexes
-                    .iter()
-                    .map(|&index| projected_points[index])
-                    .collect();
+        //         for i in 0..points.len() {
+        //             let start = points[i];
+        //             let end = points[(i + 1) % points.len()];
+        //             painter.line_segment([start, end], (style.edge_width, style.edge_color));
+        //         }
+        //     }
+        // }
 
-                // Рисуем линии между вершинами полигона
-                for i in 0..points.len() {
-                    let start = points[i];
-                    let end = points[(i + 1) % points.len()];
-
-                    painter.line_segment([start, end], (style.edge_width, style.edge_color));
-                }
-            }
-        }
-
-        for &point in &projected_points {
-            painter.circle_filled(point, style.vertex_radius, style.vertex_color);
-        }
-    }
+        // for &point in &projected_points {
+        //     painter.circle_filled(point, style.vertex_radius, style.vertex_color);
+        // }
+    // }
 }
 
 impl Transformable3 for Model3 {

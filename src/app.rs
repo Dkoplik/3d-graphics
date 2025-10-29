@@ -22,7 +22,6 @@ pub struct AthenianApp {
     // 3D поля
     pub camera: g3d::Camera3,
     pub selected_3d_model_index: Option<usize>,
-    pub current_projection: crate::app::logic::Projection,
 
     pub angle_of_rotate: f32,
 
@@ -66,17 +65,6 @@ impl AthenianApp {
         self.selected_3d_model_index = None;
     }
 
-    /// Центрировать позицию модели
-    pub fn center_model_position(&self, model: &mut g3d::Model3) {
-        model.set_origin(g3d::Point3::new(0.0, 0.0, 0.0));
-    }
-
-    /// Центрировать текущую фигуру на холсте
-    pub fn center_model(&mut self) {
-        if let Some(model) = self.get_selected_model_mut() {
-            model.set_origin(g3d::Point3::new(0.0, 0.0, 0.0));
-        }
-    }
 }
 
 impl Default for AthenianApp {
@@ -89,7 +77,6 @@ impl Default for AthenianApp {
             painter_height: Default::default(),
             camera: Default::default(),
             selected_3d_model_index: Default::default(),
-            current_projection: Default::default(),
             angle_of_rotate: Default::default(),
             axis_point1_x: 0.0,
             axis_point1_y: 0.0,

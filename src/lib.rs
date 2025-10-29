@@ -68,7 +68,6 @@ pub struct Scene {
 }
 
 /// Камера в 3-х мерном пространстве.
-/// Камера в 3-х мерном пространстве.
 pub struct Camera3 {
     /// Позиция камеры в простанстве.
     pub position: Point3,
@@ -85,7 +84,7 @@ pub struct Camera3 {
     /// До какого расстояния отображать объекты.
     pub far_plane: f32,
     /// Тип проекции камеры.
-    pub projection_type: ProjectionType, // Добавьте это поле
+    pub projection_type: ProjectionType,
 }
 
 /// Преобразование в 3-х мерном пространстве.

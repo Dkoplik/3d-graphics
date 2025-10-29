@@ -32,12 +32,6 @@ impl AthenianApp {
                     if ui.button("Isometric").clicked() {
                         self.set_isometric_projection();
                     }
-                    //    if ui.button("Dimetric").clicked() {
-                    //        self.set_dimetric_projection();
-                    //    }
-                    //    if ui.button("Trimetric").clicked() {
-                    //       self.set_trimetric_projection();
-                    //   }
                 });
             });
         });
@@ -169,11 +163,6 @@ impl AthenianApp {
         egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(format!("инструмент: {}", self.instrument.to_string()));
-                ui.separator();
-                ui.label(format!(
-                    "Projection: {}",
-                    self.current_projection.to_string()
-                ));
                 ui.separator();
                 ui.label(format!(
                     "размер холста: {:.1} x {:.1}",
