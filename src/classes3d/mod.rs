@@ -1,12 +1,15 @@
-/// Костыль (или нет?) дабы вынести реализации классов в отдельную папку.
+//! Этот модуль содержит объявления других модулей с реализациями структур из библиотеки.
+//!
+//! В какой-то степени это костыль, но зато все файлы с реализациями можно вынести в отдельную папку модуля.
 
-pub mod point3;
-pub mod vec3;
-pub mod plane;
-pub mod line3;
-pub mod polygon3;
-pub mod model3;
-pub mod scene;
 pub mod camera3;
+pub mod hvec3;
+pub mod line3;
+pub mod model3;
+pub mod plane;
+pub mod point3;
+pub mod polygon3;
+pub mod scene;
 pub mod transform2;
 pub mod transform3;
+pub mod vec3;

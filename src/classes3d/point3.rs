@@ -1,35 +1,34 @@
-use std::ops::{Add, Sub};
-use egui::{Color32, Painter, Pos2};
+//! Реализация структуры `Point3`.
 
-use crate::{Point3, Transformable3, Vec3};
+use std::ops::{Add, Sub};
+
+use crate::{Point3, Vec3};
 
 impl Point3 {
+    /// Создать новую точку по 3-м координатам.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
     }
 
     /// Приблизительное сравнение точек на равенство.
-    pub fn approx_equal(&self, other: &Point3, tolerance: f32) -> bool {
-        if (self.x - other.x).abs() >= tolerance {
-            false
-        } else if (self.y - other.y).abs() >= tolerance {
-            false
-        } else if (self.z - other.z).abs() >= tolerance {
-            false
-        } else {
-            true
-        }
-    }
-
-    /// Нарисовать точку (вершину).
-    pub fn draw(&self, painter: &mut Painter, color: Color32, radius: f32) {
-        painter.circle_filled(Pos2::new(self.x, self.y), radius, color);
+    ///
+    /// ## Arguments
+    /// - `other` - другая точка, с которой происходит сравнение;
+    /// - `tolerance` - допустимая погрешность. Если разница между координатами >=`tolerance`, то координаты считаются разными.
+    pub fn approx_equal(&self, other: &Self, tolerance: f32) -> bool {
+        (self.x - other.x).abs() < tolerance
+            && (self.y - other.y).abs() < tolerance
+            && (self.z - other.z).abs() < tolerance
     }
 }
 
 impl Sub for Point3 {
     type Output = Vec3;
 
+    /// Производит операцию `-` между двумя точками, получая вектор.
+    ///
+    /// ## Returns
+    /// Возвращает вектор, направленный из вычитаемой (правой) точки в уменьшаемую (левую) точку.
     fn sub(self, rhs: Self) -> Self::Output {
         Vec3::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
     }
@@ -38,26 +37,17 @@ impl Sub for Point3 {
 impl Add<Vec3> for Point3 {
     type Output = Self;
 
+    /// Выполняет операцию `+` между точкой и вектором.
+    ///
+    /// По смыслу операция представляет собой смещение текущей точки на заданный вектор.
     fn add(self, rhs: Vec3) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
     }
 }
 
 impl From<Vec3> for Point3 {
+    /// Получить точку из `Vec3`.
     fn from(value: Vec3) -> Self {
         Self::new(value.x, value.y, value.z)
-    }
-}
-
-impl Transformable3 for Point3 {
-    fn transform(self, transform: crate::Transform3D) -> Self {
-        transform.apply_to_point(self)
-    }
-
-    fn apply_transform(&mut self, transform: crate::Transform3D) {
-        let transformed = self.transform(transform);
-        self.x = transformed.x;
-        self.y = transformed.y;
-        self.z = transformed.z;
     }
 }
