@@ -112,7 +112,6 @@ impl Camera3 {
                 self.far_plane,
             ),
             ProjectionType::Isometric => Transform3D::isometric(),
-
         }
     }
 
