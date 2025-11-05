@@ -1,10 +1,14 @@
 //! Реализация структуры `Vec3`.
 
+//! Реализация структуры `Vec3`.
+
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::{HVec3, Point3, Vec3};
+use crate::{HVec3, Point3, Vec3};
 
 impl Vec3 {
+    /// Создать вектор по 3-м координатам.
     /// Создать вектор по 3-м координатам.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
@@ -123,6 +127,7 @@ impl Neg for Vec3 {
     type Output = Self;
 
     /// Создаёт из вектора `a` отрицательный вектор `-a`.
+    /// Создаёт из вектора `a` отрицательный вектор `-a`.
     fn neg(self) -> Self::Output {
         Self::new(-self.x, -self.y, -self.z)
     }
@@ -131,6 +136,7 @@ impl Neg for Vec3 {
 impl Add for Vec3 {
     type Output = Self;
 
+    /// Находит сумму между двумя векторами по правилу параллелограмма.
     /// Находит сумму между двумя векторами по правилу параллелограмма.
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -149,6 +155,7 @@ impl Sub for Vec3 {
     type Output = Self;
 
     /// Находит разность между векторами по правилу параллелограмма.
+    /// Находит разность между векторами по правилу параллелограмма.
     fn sub(self, rhs: Self) -> Self::Output {
         self + (-rhs)
     }
@@ -165,6 +172,7 @@ impl SubAssign for Vec3 {
 impl Mul<f32> for Vec3 {
     type Output = Self;
 
+    /// Умножение вектора на скаляр.
     /// Умножение вектора на скаляр.
     fn mul(self, rhs: f32) -> Self::Output {
         Self {
@@ -184,6 +192,7 @@ impl MulAssign<f32> for Vec3 {
 }
 
 impl From<Point3> for Vec3 {
+    /// Получить вектор из `Point3`.
     /// Получить вектор из `Point3`.
     fn from(value: Point3) -> Self {
         Self {
