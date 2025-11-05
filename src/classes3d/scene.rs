@@ -1,4 +1,4 @@
-use crate::{Camera3, Model3, Point3, RenderStyle, Scene, Transformable3};
+use crate::{Camera3, Model3, Point3, Scene};
 use egui::{Color32, Painter};
 
 impl Scene {
@@ -15,12 +15,11 @@ impl Scene {
         self.models.push(model);
     }
 
-    //Нарисовать сцену на экран со всеми нужными преобразованиями.
+    /// Нарисовать сцену на экран со всеми нужными преобразованиями.
     pub fn render(
         &self,
         camera: Camera3,
         painter: &mut Painter,
-        style: &RenderStyle,
         show_custom_axis: bool,
         axis_point1: Point3,
         axis_point2: Point3,
@@ -35,6 +34,19 @@ impl Scene {
             self.render_simple(model, painter, style, &camera);
         }
     }
+
+    /// Преобразовать кординаты всех объектов на сцене к координатам камеры.
+    ///
+    /// Обычное 3D преобразование, которое переводит координаты всех объектов к локальным координатам камеры.
+    /// Это преобразование **изменяет** объекты на сцене, дабы не выполнять ненужных клонирований.
+    /// После использования результата этого метода, необходимо обратить его действие через метод `undo_camera_tranformation`.
+    fn camera_transformation(&mut self) {}
+
+    /// Преобразует коодринаты всех объектов на сцене из локальных координат камеры обратно к координатам объектов.
+    ///
+    /// Это действие обратно действию из метода `camera_transformation`. Эту функцию **всегда** следует вызывать после
+    /// использования `camera_transformation`.
+    fn undo_camera_transformation(&mut self) {}
 
     /// Отрисовка пользовательской оси для вращения
     fn draw_custom_axis_line(
