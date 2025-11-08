@@ -5,10 +5,8 @@
 use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::{HVec3, Point3, Vec3};
-use crate::{HVec3, Point3, Vec3};
 
 impl Vec3 {
-    /// Создать вектор по 3-м координатам.
     /// Создать вектор по 3-м координатам.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
@@ -19,12 +17,42 @@ impl Vec3 {
         Self::new(0.0, 0.0, 0.0)
     }
 
+    /// Получить единичный вектор (1.0, 0.0, 0.0) в глобальных координатах.
+    pub fn plus_x() -> Self {
+        Self::new(1.0, 0.0, 0.0)
+    }
+
+    /// Получить единичный вектор (-1.0, 0.0, 0.0) в глобальных координатах.
+    pub fn minus_x() -> Self {
+        Self::new(-1.0, 0.0, 0.0)
+    }
+
+    /// Получить единичный вектор (0.0, 1.0, 0.0) в глобальных координатах.
+    pub fn plus_y() -> Self {
+        Self::new(0.0, 1.0, 0.0)
+    }
+
+    /// Получить единичный вектор (0.0, -1.0, 0.0) в глобальных координатах.
+    pub fn minus_y() -> Self {
+        Self::new(0.0, -1.0, 0.0)
+    }
+
+    /// Получить единичный вектор (0.0, 0.0, 1.0) в глобальных координатах.
+    pub fn plus_z() -> Self {
+        Self::new(0.0, 0.0, 1.0)
+    }
+
+    /// Получить единичный вектор (0.0, 0.0, -1.0) в глобальных координатах.
+    pub fn minus_z() -> Self {
+        Self::new(0.0, 0.0, -1.0)
+    }
+
     /// Получить единичный вектор с направлением "вверх".
     ///
     /// Координатная система правкорукая (right-handed), направлением вверх считается `+z`, как в `Blender`,
     /// поэтому вектор имеет вид `(0.0, 0.0, 1.0)`.
     pub fn up() -> Self {
-        Self::new(0.0, 0.0, 1.0)
+        Self::plus_z()
     }
 
     /// Получить единичный вектор с направлением "вниз".
@@ -32,7 +60,7 @@ impl Vec3 {
     /// Координатная система правкорукая (right-handed), направлением вниз считается `-z`, как в `Blender`,
     /// поэтому вектор имеет вид `(0.0, 0.0, -1.0)`.
     pub fn down() -> Self {
-        Self::new(0.0, 0.0, -1.0)
+        Self::minus_z()
     }
 
     /// Получить единичный вектор с направлением "влево".
@@ -40,7 +68,7 @@ impl Vec3 {
     /// Координатная система правкорукая (right-handed), направлением влево считается `+y`, как в `Blender`,
     /// поэтому вектор имеет вид `(0.0, 1.0, 0.0)`.
     pub fn left() -> Self {
-        Self::new(0.0, 1.0, 0.0)
+        Self::plus_y()
     }
 
     /// Получить единичный вектор с направлением "вправо".
@@ -48,7 +76,7 @@ impl Vec3 {
     /// Координатная система правкорукая (right-handed), направлением вправо считается `-y`, как в `Blender`,
     /// поэтому вектор имеет вид `(0.0, -1.0, 0.0)`.
     pub fn right() -> Self {
-        Self::new(0.0, -1.0, 0.0)
+        Self::minus_y()
     }
 
     /// Получить единичный вектор с направлением "прямо".
@@ -56,7 +84,7 @@ impl Vec3 {
     /// Координатная система правкорукая (right-handed), направлением прямо считается `+x`, как в `Blender`,
     /// поэтому вектор имеет вид `(1.0, 0.0, 0.0)`.
     pub fn forward() -> Self {
-        Self::new(1.0, 0.0, 0.0)
+        Self::plus_x()
     }
 
     /// Получить единичный вектор с направлением "назад".
@@ -64,31 +92,46 @@ impl Vec3 {
     /// Координатная система правкорукая (right-handed), направлением назад считается `-x`, как в `Blender`,
     /// поэтому вектор имеет вид `(-1.0, 0.0, 0.0)`.
     pub fn backward() -> Self {
-        Self::new(-1.0, 0.0, 0.0)
+        Self::minus_x()
+    }
+
+    /// Получить проекцию вектора `from` на плоскость XY в **глобальных** координатах.
+    pub fn projection_xy(from: Self) -> Self {
+        Self::new(from.x, from.y, 0.0)
+    }
+
+    /// Получить проекцию вектора `from` на плоскость XZ в **глобальных** координатах.
+    pub fn projection_xz(from: Self) -> Self {
+        Self::new(from.x, 0.0, from.z)
+    }
+
+    /// Получить проекцию вектора `from` на плоскость YZ в **глобальных** координатах.
+    pub fn projection_yz(from: Self) -> Self {
+        Self::new(0.0, from.y, from.z)
     }
 
     /// Скалярное произведение векторов.
-    pub fn dot(&self, other: Self) -> f32 {
+    pub fn dot(self, other: Self) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
     /// Возвращает косинус угла между 2-мя векторами.
-    pub fn cos(&self, other: Self) -> f32 {
+    pub fn cos(self, other: Self) -> f32 {
         self.dot(other) / (self.length() * other.length())
     }
 
     /// Возвращает угл в радианах между 2-мя векторами.
-    pub fn angle_rad(&self, other: Self) -> f32 {
+    pub fn angle_rad(self, other: Self) -> f32 {
         self.cos(other).acos()
     }
 
     /// Возвращает угл в градусах между 2-мя векторами.
-    pub fn angle_deg(&self, other: Self) -> f32 {
+    pub fn angle_deg(self, other: Self) -> f32 {
         self.cos(other).acos().to_degrees()
     }
 
     /// Векторное произведение векторов.
-    pub fn cross(&self, other: Self) -> Self {
+    pub fn cross(self, other: Self) -> Self {
         Self {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
@@ -97,12 +140,12 @@ impl Vec3 {
     }
 
     /// Получить длину вектора.
-    pub fn length(&self) -> f32 {
+    pub fn length(self) -> f32 {
         (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
     /// Привести вектор к единичной длине.
-    pub fn normalize(&self) -> Self {
+    pub fn normalize(self) -> Self {
         let len = self.length();
         Self {
             x: self.x / len,
@@ -116,7 +159,7 @@ impl Vec3 {
     /// # Arguments
     /// - `other` - другой вектор, с которым происходит сравнение;
     /// - `tolerance` - допустимая погрешность. Если разница между координатами >=`tolerance`, то координаты считаются разными.
-    pub fn approx_equal(&self, other: &Self, tolerance: f32) -> bool {
+    pub fn approx_equal(self, other: Self, tolerance: f32) -> bool {
         (self.x - other.x).abs() < tolerance
             && (self.y - other.y).abs() < tolerance
             && (self.z - other.z).abs() < tolerance

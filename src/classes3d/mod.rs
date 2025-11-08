@@ -17,5 +17,3 @@ pub mod scene;
 pub mod transform2;
 pub mod transform3;
 pub mod vec3;
-
-pub mod vec3;
