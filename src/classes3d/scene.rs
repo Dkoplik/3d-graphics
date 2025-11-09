@@ -1,5 +1,7 @@
-use crate::{Camera3, Model3, Point3, Scene};
-use egui::{Color32, Painter};
+use crate::{
+    Camera3, Canvas, HVec3, Model3, Point3, ProjectionType, RenderType, Scene, Transform3D,
+};
+use egui::{Color32, Pos2};
 
 impl Scene {
     /// Создать пустую сцену.
@@ -15,50 +17,84 @@ impl Scene {
         self.models.push(model);
     }
 
-    /// Нарисовать сцену на экран со всеми нужными преобразованиями.
+    /// Нарисовать сцену на холст со всеми нужными преобразованиями.
     pub fn render(
         &self,
-        camera: Camera3,
-        painter: &mut Painter,
+        canvas: &mut Canvas,
+        projection_type: ProjectionType,
+        render_type: RenderType,
         show_custom_axis: bool,
         axis_point1: Point3,
         axis_point2: Point3,
     ) {
-        self.draw_coordinate_axes(painter, &camera);
+        // Стереть прошлый кадр.
+        canvas.clear(Color32::GRAY);
+        let global_to_screen_transform =
+            self.get_view_projection_transform(projection_type, canvas);
+
+        self.draw_coordinate_axes(canvas, &global_to_screen_transform);
 
         if show_custom_axis {
-            self.draw_custom_axis_line(painter, &camera, axis_point1, axis_point2);
+            self.draw_custom_axis_line(
+                canvas,
+                &global_to_screen_transform,
+                axis_point1,
+                axis_point2,
+            );
         }
 
         for model in &self.models {
-            self.render_simple(model, painter, style, &camera);
+            match render_type {
+                RenderType::WireFrame => {
+                    self.render_model_wireframe(canvas, global_to_screen_transform, model)
+                }
+            }
         }
     }
 
-    /// Преобразовать кординаты всех объектов на сцене к координатам камеры.
-    ///
-    /// Обычное 3D преобразование, которое переводит координаты всех объектов к локальным координатам камеры.
-    /// Это преобразование **изменяет** объекты на сцене, дабы не выполнять ненужных клонирований.
-    /// После использования результата этого метода, необходимо обратить его действие через метод `undo_camera_tranformation`.
-    fn camera_transformation(&mut self) {}
+    /// Получить матрицу преобразования из глоабльных координат в экранные (viewport, он же canvas)
+    fn get_view_projection_transform(
+        &self,
+        projection_type: ProjectionType,
+        canvas: &Canvas,
+    ) -> Transform3D {
+        let proj_matrix = match projection_type {
+            ProjectionType::Parallel => Transform3D::parallel_symmetric(
+                canvas.width as f32,
+                canvas.height as f32,
+                self.camera.get_near_plane(),
+                self.camera.get_far_plane(),
+            ),
+            ProjectionType::Perspective => Transform3D::perspective(
+                self.camera.get_fov(),
+                self.camera.get_aspect_ratio(),
+                self.camera.get_near_plane(),
+                self.camera.get_far_plane(),
+            ),
+        };
 
-    /// Преобразует коодринаты всех объектов на сцене из локальных координат камеры обратно к координатам объектов.
-    ///
-    /// Это действие обратно действию из метода `camera_transformation`. Эту функцию **всегда** следует вызывать после
-    /// использования `camera_transformation`.
-    fn undo_camera_transformation(&mut self) {}
+        let scale_x = canvas.width as f32 / 2.0; // растянуть NDC по ширине
+        let scale_y = canvas.height as f32 / 2.0; // растянуть NDC по высоте
+
+        self.camera
+            .get_local_frame()
+            .global_to_local_matrix()
+            .multiply(proj_matrix) // вот тут получается NDC с координатами [-1, +1]
+            .multiply(Transform3D::translation_uniform(1.0)) // теперь координаты [0, +2]
+            .multiply(Transform3D::scale(scale_x, scale_y, 1.0)) // теперь экранные
+    }
 
     /// Отрисовка пользовательской оси для вращения
     fn draw_custom_axis_line(
         &self,
-        painter: &Painter,
-        camera: &Camera3,
+        canvas: &mut Canvas,
+        view_proj_matrix: &Transform3D,
         point1: Point3,
         point2: Point3,
     ) {
         // Проецируем точки в 2D используя нашу систему проекций
-        let screen_point1 = self.project_point(point1, camera);
-        let screen_point2 = self.project_point(point2, camera);
+        let screen_point1 = self.project_point(point1, view_proj_matrix);
+        let screen_point2 = self.project_point(point2, view_proj_matrix);
 
         // Вычисляем направление линии
         let direction = (screen_point2 - screen_point1).normalized();
@@ -68,17 +104,15 @@ impl Scene {
         let extended_start = screen_point1 - direction * extension_length;
         let extended_end = screen_point2 + direction * extension_length;
 
-        painter.line_segment(
-            [extended_start, extended_end],
-            egui::Stroke::new(2.0, Color32::from_rgb(255, 165, 0)), // Оранжевый цвет
-        );
+        let orange = Color32::from_rgb(255, 165, 0);
+        canvas.draw_sharp_line(extended_start, extended_end, orange);
 
-        painter.circle_filled(screen_point1, 4.0, Color32::GREEN);
-        painter.circle_filled(screen_point2, 4.0, Color32::BLUE);
+        canvas.circle_filled(screen_point1, 4.0, Color32::GREEN);
+        canvas.circle_filled(screen_point2, 4.0, Color32::BLUE);
     }
 
     /// Отрисовка координатных осей
-    fn draw_coordinate_axes(&self, painter: &mut Painter, camera: &Camera3) {
+    fn draw_coordinate_axes(&self, canvas: &mut Canvas, view_proj_matrix: &Transform3D) {
         let axis_length = 2.0; // Длина осей
         let origin = Point3::new(0.0, 0.0, 0.0);
 
@@ -86,133 +120,70 @@ impl Scene {
         let y_axis_end = Point3::new(0.0, axis_length, 0.0);
         let z_axis_end = Point3::new(0.0, 0.0, axis_length);
 
-        let origin_2d = self.project_point(origin, camera);
-        let x_end_2d = self.project_point(x_axis_end, camera);
-        let y_end_2d = self.project_point(y_axis_end, camera);
-        let z_end_2d = self.project_point(z_axis_end, camera);
+        let origin_2d = self.project_point(origin, view_proj_matrix);
+        let x_end_2d = self.project_point(x_axis_end, view_proj_matrix);
+        let y_end_2d = self.project_point(y_axis_end, view_proj_matrix);
+        let z_end_2d = self.project_point(z_axis_end, view_proj_matrix);
 
         // Рисуем оси с разными цветами
         // Ось X - красная
-        painter.line_segment([origin_2d, x_end_2d], egui::Stroke::new(3.0, Color32::RED));
-        painter.text(
-            x_end_2d + egui::Vec2::new(5.0, -5.0),
-            egui::Align2::LEFT_TOP,
-            "X",
-            egui::FontId::default(),
-            Color32::RED,
-        );
+        canvas.draw_sharp_line(origin_2d, x_end_2d, Color32::RED);
 
         // Ось Y - зелёная
-        painter.line_segment(
-            [origin_2d, y_end_2d],
-            egui::Stroke::new(3.0, Color32::GREEN),
-        );
-        painter.text(
-            y_end_2d + egui::Vec2::new(5.0, -5.0),
-            egui::Align2::LEFT_TOP,
-            "Y",
-            egui::FontId::default(),
-            Color32::GREEN,
-        );
+        canvas.draw_sharp_line(origin_2d, y_end_2d, Color32::GREEN);
 
         // Ось Z - синяя
-        painter.line_segment([origin_2d, z_end_2d], egui::Stroke::new(3.0, Color32::BLUE));
-        painter.text(
-            z_end_2d + egui::Vec2::new(5.0, -5.0),
-            egui::Align2::LEFT_TOP,
-            "Z",
-            egui::FontId::default(),
-            Color32::BLUE,
-        );
-
-        // Рисуем начало координат
-        painter.circle_filled(origin_2d, 4.0, Color32::BLACK);
-        painter.text(
-            origin_2d + egui::Vec2::new(8.0, 8.0),
-            egui::Align2::LEFT_TOP,
-            "O",
-            egui::FontId::default(),
-            Color32::BLACK,
-        );
+        canvas.draw_sharp_line(origin_2d, z_end_2d, Color32::BLUE);
     }
 
-    fn render_simple(
+    fn project_point(&self, point: Point3, view_proj_matrix: &Transform3D) -> Pos2 {
+        let proj_point: Point3 = view_proj_matrix.apply_to_hvec(point.into()).into();
+        Pos2::new(proj_point.x, proj_point.y)
+    }
+
+    fn render_model_wireframe(
         &self,
+        canvas: &mut Canvas,
+        view_proj_matrix: Transform3D,
         model: &Model3,
-        painter: &mut Painter,
-        style: &RenderStyle,
-        camera: &Camera3,
     ) {
-        let projected_points: Vec<egui::Pos2> = model
+        // Преобразование из координат модели в проекцию NDC.
+        let full_transform = model
+            .get_mesh()
+            .get_local_frame()
+            .local_to_global_matrix()
+            .multiply(view_proj_matrix);
+
+        let projected_vertexes: Vec<HVec3> = model
+            .get_mesh()
             .get_vertexes()
             .iter()
-            .map(|vertex| {
-                // Применяем мировое преобразование модели
-                let world_vertex = *vertex + model.get_origin().into();
-
-                self.project_point(world_vertex, camera)
-            })
+            .map(|vertex| vertex.apply_transform(&full_transform))
             .collect();
 
         // Рисуем рёбра
-        for polygon in model.get_polygons() {
-            if polygon.vertexes.len() >= 2 {
-                let points: Vec<egui::Pos2> = polygon
-                    .vertexes
-                    .iter()
-                    .map(|&index| projected_points[index])
-                    .collect();
+        for polygon in model.get_mesh().get_polygons() {
+            // Проекция вершин полигона
+            let points: Vec<HVec3> = polygon
+                .get_vertexes()
+                .iter()
+                .map(|&index| projected_vertexes[index])
+                .collect();
 
-                for i in 0..points.len() {
-                    let start = points[i];
-                    let end = points[(i + 1) % points.len()];
-                    painter.line_segment([start, end], (style.edge_width, style.edge_color));
-                }
+            for i in 0..points.len() {
+                let start = points[i];
+                let end = points[(i + 1) % points.len()];
+
+                let start_pos = Pos2::new(start.x, start.y);
+                let end_pos = Pos2::new(end.x, end.y);
+                canvas.draw_sharp_line(start_pos, end_pos, Color32::WHITE);
             }
         }
 
         // Рисуем вершины
-        for &point in &projected_points {
-            painter.circle_filled(point, style.vertex_radius, style.vertex_color);
-        }
-    }
-
-    /// Проецирование 3D точки в 2D в зависимости от типа проекции
-    fn project_point(&self, point: Point3, camera: &Camera3) -> egui::Pos2 {
-        match camera.projection_type {
-            crate::ProjectionType::Perspective => {
-                // Перспективная проекция
-                let distance = 5.0; // Расстояние от камеры
-                let scale = 100.0;
-                let center_x = 450.0;
-                let center_y = 300.0;
-
-                let factor = distance / (distance + point.z);
-                let x_proj = point.x * factor;
-                let y_proj = point.y * factor;
-
-                egui::Pos2::new(center_x + x_proj * scale, center_y - y_proj * scale)
-            }
-            crate::ProjectionType::Isometric => {
-                // Изометрическая проекция
-                let scale = 80.0;
-                let center_x = 450.0;
-                let center_y = 300.0;
-
-                // Стандартная изометрия: углы 30° для X и Z
-                let x_proj = point.x * 0.866 - point.z * 0.866; // cos(30°) = 0.866
-                let y_proj = point.y + (point.x + point.z) * 0.5; // sin(30°) = 0.5
-
-                egui::Pos2::new(center_x + x_proj * scale, center_y - y_proj * scale)
-            }
-            _ => {
-                // По умолчанию - ортографическая проекция
-                let scale = 100.0;
-                let center_x = 450.0;
-                let center_y = 300.0;
-
-                egui::Pos2::new(center_x + point.x * scale, center_y - point.y * scale)
-            }
+        for &vertex in &projected_vertexes {
+            let pos = Pos2::new(vertex.x, vertex.y);
+            canvas.circle_filled(pos, 3.0, Color32::WHITE);
         }
     }
 }

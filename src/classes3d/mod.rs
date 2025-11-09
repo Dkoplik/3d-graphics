@@ -6,13 +6,14 @@
 //! В какой-то степени это костыль, но зато все файлы с реализациями можно вынести в отдельную папку модуля.
 
 pub mod camera3;
+pub mod canvas;
 pub mod coord_frame;
 pub mod hvec3;
 pub mod line3;
+pub mod mesh;
 pub mod model3;
 pub mod plane;
 pub mod point3;
-pub mod polygon3;
 pub mod scene;
 pub mod transform2;
 pub mod transform3;

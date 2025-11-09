@@ -1,12 +1,14 @@
 //! Реализация структуры `Vec3`.
 
-//! Реализация структуры `Vec3`.
-
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
 use crate::{HVec3, Point3, Vec3};
 
 impl Vec3 {
+    // ========================================
+    // Различные конструкторы вектора
+    // ========================================
+
     /// Создать вектор по 3-м координатам.
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
@@ -110,6 +112,10 @@ impl Vec3 {
         Self::new(0.0, from.y, from.z)
     }
 
+    // ========================================
+    // Операции над 3D вектором
+    // ========================================
+
     /// Скалярное произведение векторов.
     pub fn dot(self, other: Self) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
@@ -139,19 +145,21 @@ impl Vec3 {
         }
     }
 
+    /// Получить квадрат длины вектора.
+    pub fn length_squared(self) -> f32 {
+        self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
     /// Получить длину вектора.
-    pub fn length(self) -> f32 {
-        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
+    pub fn length(&self) -> f32 {
+        self.length_squared().sqrt()
     }
 
     /// Привести вектор к единичной длине.
     pub fn normalize(self) -> Self {
         let len = self.length();
-        Self {
-            x: self.x / len,
-            y: self.y / len,
-            z: self.z / len,
-        }
+        debug_assert_ne!(len, 0.0, "попытка нормализовать нулевой вектор");
+        self / len
     }
 
     /// Приблизительное сравнение векторов на равенство.
@@ -170,7 +178,6 @@ impl Neg for Vec3 {
     type Output = Self;
 
     /// Создаёт из вектора `a` отрицательный вектор `-a`.
-    /// Создаёт из вектора `a` отрицательный вектор `-a`.
     fn neg(self) -> Self::Output {
         Self::new(-self.x, -self.y, -self.z)
     }
@@ -179,7 +186,6 @@ impl Neg for Vec3 {
 impl Add for Vec3 {
     type Output = Self;
 
-    /// Находит сумму между двумя векторами по правилу параллелограмма.
     /// Находит сумму между двумя векторами по правилу параллелограмма.
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -198,7 +204,6 @@ impl Sub for Vec3 {
     type Output = Self;
 
     /// Находит разность между векторами по правилу параллелограмма.
-    /// Находит разность между векторами по правилу параллелограмма.
     fn sub(self, rhs: Self) -> Self::Output {
         self + (-rhs)
     }
@@ -215,7 +220,6 @@ impl SubAssign for Vec3 {
 impl Mul<f32> for Vec3 {
     type Output = Self;
 
-    /// Умножение вектора на скаляр.
     /// Умножение вектора на скаляр.
     fn mul(self, rhs: f32) -> Self::Output {
         Self {
@@ -234,8 +238,27 @@ impl MulAssign<f32> for Vec3 {
     }
 }
 
+impl Div<f32> for Vec3 {
+    type Output = Vec3;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        Self {
+            x: self.x / rhs,
+            y: self.y / rhs,
+            z: self.z / rhs,
+        }
+    }
+}
+
+impl DivAssign<f32> for Vec3 {
+    fn div_assign(&mut self, rhs: f32) {
+        self.x /= rhs;
+        self.y /= rhs;
+        self.z /= rhs;
+    }
+}
+
 impl From<Point3> for Vec3 {
-    /// Получить вектор из `Point3`.
     /// Получить вектор из `Point3`.
     fn from(value: Point3) -> Self {
         Self {
@@ -251,6 +274,11 @@ impl From<HVec3> for Vec3 {
     ///
     /// 4D вектор `(x, y, z, w)` становится 3D вектором `(x/w, y/w, z/w)`.
     fn from(value: HVec3) -> Self {
+        debug_assert_ne!(
+            value.w, 0.0,
+            "компонента однородности равна 0, невозможно преобразовать HVec3 в Vec3"
+        );
+
         Self {
             x: value.x / value.w,
             y: value.y / value.w,
@@ -263,23 +291,45 @@ impl From<HVec3> for Vec3 {
 mod tests {
     use super::*;
 
+    const TOLERANCE: f32 = 1e-8;
+
+    fn assert_vectors(got: Vec3, expected: Vec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_floats(got: f32, expected: f32, tolerance: f32) {
+        assert!(
+            (got - expected).abs() <= tolerance,
+            "ожидалось число {}, но получено {}, которое отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
     #[test]
     fn test_dot_product() {
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(4.0, 5.0, 6.0);
 
         // (1*4) + (2*5) + (3*6) = 4 + 10 + 18 = 32
-        assert_eq!(v1.dot(v2), 32.0);
+        assert_floats(v1.dot(v2), 32.0, TOLERANCE);
 
         // Тест с перпендикулярными векторами (должен быть 0)
         let v3 = Vec3::new(1.0, 0.0, 0.0);
         let v4 = Vec3::new(0.0, 1.0, 0.0);
-        assert_eq!(v3.dot(v4), 0.0);
+        assert_floats(v3.dot(v4), 0.0, TOLERANCE);
 
         // Тест с отрицательными координатами
         let v5 = Vec3::new(-1.0, 2.0, -3.0);
         let v6 = Vec3::new(2.0, -1.0, 1.0);
-        assert_eq!(v5.dot(v6), -2.0 - 2.0 - 3.0); // -1*2 + 2*(-1) + (-3)*1
+        assert_floats(v5.dot(v6), -2.0 - 2.0 - 3.0, TOLERANCE); // -1*2 + 2*(-1) + (-3)*1
     }
 
     #[test]
@@ -290,45 +340,45 @@ mod tests {
         let k = Vec3::new(0.0, 0.0, 1.0);
 
         // i × j = k
-        assert!(i.cross(j).approx_equal(&k, 1e-6));
+        assert_vectors(i.cross(j), k, TOLERANCE);
 
         // j × k = i
-        assert!(j.cross(k).approx_equal(&i, 1e-6));
+        assert_vectors(j.cross(k), i, TOLERANCE);
 
         // k × i = j
-        assert!(k.cross(i).approx_equal(&j, 1e-6));
+        assert_vectors(k.cross(i), j, TOLERANCE);
 
         // Антикоммутативность: j × i = -k
-        assert!(j.cross(i).approx_equal(&(-k), 1e-6));
+        assert_vectors(j.cross(i), -k, TOLERANCE);
 
         // Тест с произвольными векторами
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(4.0, 5.0, 6.0);
         let result = v1.cross(v2);
         let expected = Vec3::new(-3.0, 6.0, -3.0); // (2*6 - 3*5, 3*4 - 1*6, 1*5 - 2*4)
-        assert!(result.approx_equal(&expected, 1e-6));
+        assert_vectors(result, expected, TOLERANCE);
     }
 
     #[test]
     fn test_length() {
         // Нулевой вектор
-        assert_eq!(Vec3::zero().length(), 0.0);
+        assert_floats(Vec3::zero().length(), 0.0, TOLERANCE);
 
         // Единичный вектор
         let unit = Vec3::new(1.0, 0.0, 0.0);
-        assert_eq!(unit.length(), 1.0);
+        assert_floats(unit.length(), 1.0, TOLERANCE);
 
         // Вектор с длиной 5 (3-4-5 треугольник)
         let v = Vec3::new(3.0, 4.0, 0.0);
-        assert_eq!(v.length(), 5.0);
+        assert_floats(v.length(), 5.0, TOLERANCE);
 
         // Вектор с отрицательными координатами
         let v_neg = Vec3::new(-3.0, -4.0, 0.0);
-        assert_eq!(v_neg.length(), 5.0);
+        assert_floats(v_neg.length(), 5.0, TOLERANCE);
 
         // 3D вектор
         let v3d = Vec3::new(1.0, 2.0, 2.0);
-        assert_eq!(v3d.length(), 3.0); // sqrt(1 + 4 + 4) = 3
+        assert_floats(v3d.length(), 3.0, TOLERANCE); // sqrt(1 + 4 + 4) = 3
     }
 
     #[test]
@@ -336,26 +386,21 @@ mod tests {
         // Нормализация единичного вектора
         let unit = Vec3::new(1.0, 0.0, 0.0);
         let normalized_unit = unit.normalize();
-        assert!(normalized_unit.approx_equal(&unit, 1e-6));
-        assert_eq!(normalized_unit.length(), 1.0);
+        assert_vectors(normalized_unit, unit, 1e-6);
+        assert_floats(normalized_unit.length(), 1.0, 1e-6);
 
         // Нормализация ненулевого вектора
         let v = Vec3::new(3.0, 4.0, 0.0);
         let normalized_v = v.normalize();
         let expected = Vec3::new(0.6, 0.8, 0.0); // (3/5, 4/5, 0)
-        assert!(normalized_v.approx_equal(&expected, 1e-6));
-        assert!((normalized_v.length() - 1.0).abs() < 1e-6);
+        assert_vectors(normalized_v, expected, 1e-6);
+        assert_floats(normalized_v.length(), 1.0, 1e-6);
 
         // Нормализация вектора с отрицательными координатами
         let v_neg = Vec3::new(-3.0, -4.0, 0.0);
         let normalized_neg = v_neg.normalize();
         let expected_neg = Vec3::new(-0.6, -0.8, 0.0);
-        assert!(normalized_neg.approx_equal(&expected_neg, 1e-6));
-
-        // Нормализация нулевого вектора (должен остаться нулевым)
-        let zero = Vec3::zero();
-        let normalized_zero = zero.normalize();
-        assert!(normalized_zero.approx_equal(&zero, 1e-6));
+        assert_vectors(normalized_neg, expected_neg, 1e-6);
     }
 
     #[test]
@@ -365,7 +410,7 @@ mod tests {
 
         let result = v1 + v2;
         let expected = Vec3::new(5.0, 7.0, 9.0);
-        assert!(result.approx_equal(&expected, 1e-6));
+        assert_vectors(result, expected, 1e-6);
 
         // С отрицательными числами
         let v3 = Vec3::new(-1.0, -2.0, -3.0);
@@ -373,12 +418,12 @@ mod tests {
 
         let result2 = v3 + v4;
         let expected2 = Vec3::new(1.0, 1.0, 1.0);
-        assert!(result2.approx_equal(&expected2, 1e-6));
+        assert_vectors(result2, expected2, 1e-6);
 
         // AddAssign
         let mut v5 = Vec3::new(1.0, 1.0, 1.0);
         v5 += Vec3::new(2.0, 3.0, 4.0);
-        assert!(v5.approx_equal(&Vec3::new(3.0, 4.0, 5.0), 1e-6));
+        assert_vectors(v5, Vec3::new(3.0, 4.0, 5.0), 1e-6);
     }
 
     #[test]
@@ -388,7 +433,7 @@ mod tests {
 
         let result = v1 - v2;
         let expected = Vec3::new(4.0, 5.0, 6.0);
-        assert!(result.approx_equal(&expected, 1e-6));
+        assert_vectors(result, expected, 1e-6);
 
         // С отрицательными числами
         let v3 = Vec3::new(1.0, 1.0, 1.0);
@@ -396,12 +441,12 @@ mod tests {
 
         let result2 = v3 - v4;
         let expected2 = Vec3::new(-1.0, -2.0, -3.0);
-        assert!(result2.approx_equal(&expected2, 1e-6));
+        assert_vectors(result2, expected2, 1e-6);
 
         // SubAssign
         let mut v5 = Vec3::new(5.0, 5.0, 5.0);
         v5 -= Vec3::new(2.0, 3.0, 4.0);
-        assert!(v5.approx_equal(&Vec3::new(3.0, 2.0, 1.0), 1e-6));
+        assert_vectors(v5, Vec3::new(3.0, 2.0, 1.0), 1e-6);
     }
 
     #[test]
@@ -411,26 +456,27 @@ mod tests {
         // Умножение на положительный скаляр
         let result = v * 2.0;
         let expected = Vec3::new(2.0, 4.0, 6.0);
-        assert!(result.approx_equal(&expected, 1e-6));
+        assert_vectors(result, expected, 1e-6);
 
         // Умножение на отрицательный скаляр
         let result2 = v * (-1.5);
         let expected2 = Vec3::new(-1.5, -3.0, -4.5);
-        assert!(result2.approx_equal(&expected2, 1e-6));
+        assert_vectors(result2, expected2, 1e-6);
 
         // Умножение на ноль
         let result3 = v * 0.0;
-        assert!(result3.approx_equal(&Vec3::zero(), 1e-6));
+        assert_vectors(result3, Vec3::zero(), 1e-6);
     }
 
     #[test]
     fn test_edge_cases() {
         // Очень маленькие векторы
         let small = Vec3::new(1e-10, 2e-10, 3e-10);
-        assert!(small.length() > 0.0);
+        assert_floats(small.length(), 0.0, 1e-9);
 
         // Очень большие векторы
         let large = Vec3::new(1e10, 2e10, 3e10);
-        assert!(large.length() > 0.0);
+        let expected_length = (1e20f32 + 4e20 + 9e20).sqrt();
+        assert_floats(large.length(), expected_length, 1e-5);
     }
 }

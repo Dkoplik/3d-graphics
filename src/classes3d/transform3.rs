@@ -58,6 +58,11 @@ impl Transform3D {
         }
     }
 
+    /// Создает матрицу перемещения на основе вектора смещения.
+    pub fn translation_vec(delta: Vec3) -> Self {
+        Self::translation(delta.x, delta.y, delta.z)
+    }
+
     /// Создает матрицу масштабирования с одинаковым коэффициентом по всем осям.
     ///
     /// После применения этой матрицы к вектору, тот будет масштабирован равномерно по всем осям на значение `s`.
@@ -145,6 +150,39 @@ impl Transform3D {
     pub fn rotation_z_deg(angle: f32) -> Self {
         Self::rotation_z_rad(angle.to_radians())
     }
+
+    /// Создает матрицу поворота вокруг произвольной оси, но эта ось проходит через начало коодринат.
+    pub fn rotation_around_axis(axis: Vec3, angle: f32) -> Self {
+        let axis = axis.normalize();
+        let cos_a = angle.cos();
+        let sin_a = angle.sin();
+        let one_minus_cos = 1.0 - cos_a;
+
+        let x = axis.x;
+        let y = axis.y;
+        let z = axis.z;
+
+        Self {
+            m: [
+                cos_a + x * x * one_minus_cos,
+                x * y * one_minus_cos + z * sin_a,
+                x * z * one_minus_cos - y * sin_a,
+                0.0,
+                x * y * one_minus_cos - z * sin_a,
+                cos_a + y * y * one_minus_cos,
+                y * z * one_minus_cos + x * sin_a,
+                0.0,
+                x * z * one_minus_cos + y * sin_a,
+                y * z * one_minus_cos - x * sin_a,
+                cos_a + z * z * one_minus_cos,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+            ],
+        }
+    }
 }
 
 // --------------------------------------------------
@@ -181,30 +219,62 @@ impl Transform3D {
     pub fn rotation_aligning(from: Vec3, to: Vec3) -> Self {
         debug_assert!(
             (from.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Вектор from должен быть нормализован."
+            "Вектор from {:?} должен быть нормализован, но он имеет длину {}",
+            from,
+            from.length(),
         );
         debug_assert!(
             (to.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Вектор to должен быть нормализован."
+            "Вектор to {:?} должен быть нормализован, но он имеет длину {}",
+            to,
+            to.length(),
         );
 
-        // Ось вращения - векторное произведение
+        if from.approx_equal(to, 1e-9) {
+            return Self::identity();
+        }
+
+        let cos_angle = from.dot(to);
+
+        // Для численной стабильности
+        if cos_angle >= 1.0 - 1e-9 {
+            return Self::identity();
+        }
+        if cos_angle <= -1.0 + 1e-9 {
+            // 180 градусов - находим ортогональную ось
+            let mut axis = from.cross(Vec3::plus_x());
+            if axis.length_squared() < 1e-9 {
+                axis = from.cross(Vec3::plus_y());
+            }
+            axis = axis.normalize();
+
+            return Self {
+                m: [
+                    2.0 * axis.x * axis.x - 1.0,
+                    2.0 * axis.x * axis.y,
+                    2.0 * axis.x * axis.z,
+                    0.0,
+                    2.0 * axis.x * axis.y,
+                    2.0 * axis.y * axis.y - 1.0,
+                    2.0 * axis.y * axis.z,
+                    0.0,
+                    2.0 * axis.x * axis.z,
+                    2.0 * axis.y * axis.z,
+                    2.0 * axis.z * axis.z - 1.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0,
+                ],
+            };
+        }
+
         let axis = from.cross(to).normalize();
-        let angle = from.angle_rad(to);
+        let angle = cos_angle.acos();
 
-        // Разлагаем ось на углы вокруг Y и Z
-        let angle_y = (-axis.z).atan2(axis.x); // угол для совмещения оси с XZ-плоскостью
-        let angle_z = axis.y.atan2(Vec3::projection_xz(axis).length()); // угол для совмещения с осью X
-
-        // Композиция:
-        // 1. Совмещаем ось вращения с осью X
-        // 2. Вращаем вокруг X на нужный угол
-        // 3. Возвращаем ось обратно
-        Self::rotation_z_rad(angle_z)
-            .multiply(Self::rotation_y_rad(angle_y))
-            .multiply(Self::rotation_x_rad(angle))
-            .multiply(Self::rotation_y_rad(-angle_y))
-            .multiply(Self::rotation_z_rad(-angle_z))
+        // Используем существующий метод вращения вокруг оси
+        Self::rotation_around_axis(axis, angle)
     }
 
     /// Отражение относительно произвольной плоскости.
@@ -219,7 +289,9 @@ impl Transform3D {
         let reflect = Self::scale(1.0, 1.0, -1.0);
 
         // 4. Обратные преобразования
-        let inverse_align = align_normal.inverse();
+        let inverse_align = align_normal
+            .inverse()
+            .expect("Для align всегда должна существовать обратная матрица");
         let from_origin = Self::translation(plane.origin.x, plane.origin.y, plane.origin.z);
 
         // Композиция операций
@@ -235,22 +307,14 @@ impl Transform3D {
         // 1. Переносим линию в начало координат
         let to_origin = Self::translation(-line.origin.x, -line.origin.y, -line.origin.z);
 
-        // 2. Совмещаем направление линии с осью X
-        let align_direction = Self::rotation_aligning(line.direction, Vec3::new(1.0, 0.0, 0.0));
+        // 2. Вращаем вокруг заданой оси.
+        let rotate = Self::rotation_around_axis(line.direction, angle_rad);
 
-        // 3. Вращаем вокруг оси X
-        let rotate = Self::rotation_x_rad(angle_rad);
-
-        // 4. Обратные преобразования
-        let inverse_align = align_direction.inverse();
+        // 3. Обратное преобразование
         let from_origin = Self::translation(line.origin.x, line.origin.y, line.origin.z);
 
         // Композиция операций
-        to_origin
-            .multiply(align_direction)
-            .multiply(rotate)
-            .multiply(inverse_align)
-            .multiply(from_origin)
+        to_origin.multiply(rotate).multiply(from_origin)
     }
 }
 
@@ -259,16 +323,113 @@ impl Transform3D {
 // --------------------------------------------------
 
 impl Transform3D {
-    /// Создаёт матрицу параллельной проекции
-    pub fn parallel() -> Self {
-        // TODO
-        unimplemented!("Сделать матрицу параллельной проекции.")
+    /// Создаёт матрицу параллельной проекции (ортографической проекции).
+    ///
+    /// Параметры определяют объем усеченной пирамиды (viewing frustum):
+    /// - `left`, `right`: координаты левой и правой плоскостей отсечения
+    /// - `bottom`, `top`: координаты нижней и верхней плоскостей отсечения  
+    /// - `near`, `far`: координаты ближней и дальней плоскостей отсечения
+    ///
+    /// После применения этой матрицы, объем преобразуется в нормализованный куб [-1, 1]^3.
+    pub fn parallel(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> Self {
+        debug_assert!(
+            left < right,
+            "левая граница {} должна быть меньше правой {}",
+            left,
+            right
+        );
+        debug_assert!(
+            bottom < top,
+            "нижняя граница {} должна быть меньше верхней {}",
+            bottom,
+            top
+        );
+        debug_assert!(
+            near > 0.0,
+            "ближняя граница {} не может быть отрицательной",
+            near
+        );
+        debug_assert!(
+            near < far,
+            "ближняя граница {} должна быть меньше дальней {}",
+            near,
+            far
+        );
+
+        let inv_width = 1.0 / (right - left);
+        let inv_height = 1.0 / (top - bottom);
+        let inv_depth = 1.0 / (far - near);
+
+        Self {
+            m: [
+                2.0 * inv_width,
+                0.0,
+                0.0,
+                0.0, // первая строка
+                0.0,
+                2.0 * inv_height,
+                0.0,
+                0.0, // вторая строка
+                0.0,
+                0.0,
+                -2.0 * inv_depth,
+                0.0, // третья строка (отрицательная для правой системы координат)
+                -(right + left) * inv_width, // четвертая строка (перемещение)
+                -(top + bottom) * inv_height,
+                -(far + near) * inv_depth,
+                1.0,
+            ],
+        }
     }
 
-    /// Создает матрицу перспективной проекции.
+    /// Создаёт симметричную матрицу параллельной проекции.
+    ///
+    /// Упрощенный вариант, где left = -right, bottom = -top.
+    /// - `width`: полная ширина объема (right - left)
+    /// - `height`: полная высота объема (top - bottom)  
+    /// - `near`, `far`: координаты ближней и дальней плоскостей отсечения
+    pub fn parallel_symmetric(width: f32, height: f32, near: f32, far: f32) -> Self {
+        let half_width = width * 0.5;
+        let half_height = height * 0.5;
+
+        Self::parallel(
+            -half_width,
+            half_width,
+            -half_height,
+            half_height,
+            near,
+            far,
+        )
+    }
+
+    /// Создает матрицу перспективной проекции (исправленная версия).
+    ///
+    /// Параметры:
+    /// - `fov_rad`: вертикальный угол обзора в радианах
+    /// - `aspect`: соотношение сторон (width / height)
+    /// - `near`: расстояние до ближней плоскости отсечения (должно быть > 0)
+    /// - `far`: расстояние до дальней плоскости отсечения (должно быть > near)
+    ///
+    /// После применения этой матрицы, координаты преобразуются в NDC.
     pub fn perspective(fov_rad: f32, aspect: f32, near: f32, far: f32) -> Self {
-        // TODO
-        todo!("Переделать матрицу проекции через базовые операции");
+        debug_assert!(
+            near > 0.0,
+            "ближняя граница {} не может быть отрицательной",
+            near
+        );
+        debug_assert!(
+            near < far,
+            "ближняя граница {} должна быть меньше дальней {}",
+            near,
+            far
+        );
+        debug_assert!(near < far);
+        debug_assert!(
+            aspect > 0.0,
+            "соотношение сторон {} не может быть отрицательным",
+            aspect
+        );
+
         let f = 1.0 / (fov_rad / 2.0).tan();
         let range_inv = 1.0 / (near - far);
 
@@ -277,19 +438,19 @@ impl Transform3D {
                 f / aspect,
                 0.0,
                 0.0,
-                0.0, // 1 строка
+                0.0, // первая строка
                 0.0,
                 f,
                 0.0,
-                0.0, // 2 строка
+                0.0, // вторая строка
                 0.0,
                 0.0,
-                (near + far) * range_inv,
-                -1.0, // 3 строка
+                (far + near) * range_inv,
+                -1.0, // третья строка
                 0.0,
                 0.0,
-                2.0 * near * far * range_inv,
-                0.0, // 4 строка
+                2.0 * far * near * range_inv,
+                0.0, // четвертая строка
             ],
         }
     }
@@ -470,6 +631,26 @@ mod tests {
 
     const TOLERANCE: f32 = 1e-6;
 
+    fn assert_floats(got: f32, expected: f32, tolerance: f32) {
+        assert!(
+            (got - expected).abs() <= tolerance,
+            "ожидалось число {}, но получено {}, которое отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_hvecs(got: HVec3, expected: HVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
     // --------------------------------------------------
     // Тесты базовых преобразований
     // --------------------------------------------------
@@ -481,7 +662,7 @@ mod tests {
         // Проверка, что единичная матрица не меняет вектор
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed = identity.apply_to_hvec(test_vec);
-        assert!(transformed.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(transformed, test_vec, TOLERANCE);
     }
 
     #[test]
@@ -492,7 +673,19 @@ mod tests {
         let transformed = translation.apply_to_hvec(test_vec);
         let expected = HVec3::new(3.0, 4.0, 5.0); // (1+2, 1+3, 1+4)
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
+    }
+
+    #[test]
+    fn test_translation_vec() {
+        // Тест перемещения с разными значениями по осям через вектор
+        let delta = Vec3::new(2.0, 3.0, 4.0);
+        let translation = Transform3D::translation_vec(delta);
+        let test_vec = HVec3::new(1.0, 1.0, 1.0);
+        let transformed = translation.apply_to_hvec(test_vec);
+        let expected = HVec3::new(3.0, 4.0, 5.0); // (1+2, 1+3, 1+4)
+
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -503,7 +696,7 @@ mod tests {
         let transformed_uniform = uniform_translation.apply_to_hvec(test_vec);
         let expected_uniform = HVec3::new(6.0, 6.0, 6.0); // (1+5, 1+5, 1+5)
 
-        assert!(transformed_uniform.approx_equal(expected_uniform, TOLERANCE));
+        assert_hvecs(transformed_uniform, expected_uniform, TOLERANCE);
     }
 
     #[test]
@@ -514,7 +707,7 @@ mod tests {
         let transformed = scale.apply_to_hvec(test_vec);
         let expected = HVec3::new(2.0, 6.0, 12.0); // (1*2, 2*3, 3*4)
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -522,10 +715,10 @@ mod tests {
         // Тест равномерного масштабирования
         let uniform_scale = Transform3D::scale_uniform(2.0);
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
-        let transformed_uniform = uniform_scale.apply_to_hvec(&test_vec);
+        let transformed_uniform = uniform_scale.apply_to_hvec(test_vec);
         let expected_uniform = HVec3::new(2.0, 4.0, 6.0); // (1*2, 2*2, 3*2)
 
-        assert!(transformed_uniform.approx_equal(expected_uniform, TOLERANCE));
+        assert_hvecs(transformed_uniform, expected_uniform, TOLERANCE);
     }
 
     #[test]
@@ -534,7 +727,7 @@ mod tests {
         let scale = Transform3D::scale(2.0, 3.0, 4.0);
         let zero_vec = HVec3::zero();
         let transformed_zero = scale.apply_to_hvec(zero_vec);
-        assert!(transformed_zero.approx_equal(zero_vec, TOLERANCE));
+        assert_hvecs(transformed_zero, zero_vec, TOLERANCE);
     }
 
     #[test]
@@ -546,7 +739,7 @@ mod tests {
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::up();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -558,7 +751,7 @@ mod tests {
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::right();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -569,7 +762,7 @@ mod tests {
 
         let transformed = rotation.apply_to_hvec(test_vec);
 
-        assert!(transformed.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(transformed, test_vec, TOLERANCE);
     }
 
     #[test]
@@ -579,9 +772,9 @@ mod tests {
         let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::up();
+        let expected = HVec3::down();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -593,7 +786,7 @@ mod tests {
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::backward();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -604,7 +797,7 @@ mod tests {
 
         let transformed = rotation.apply_to_hvec(test_vec);
 
-        assert!(transformed.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(transformed, test_vec, TOLERANCE);
     }
 
     #[test]
@@ -616,7 +809,7 @@ mod tests {
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::left();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -628,7 +821,7 @@ mod tests {
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::backward();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -639,7 +832,7 @@ mod tests {
 
         let transformed = rotation.apply_to_hvec(test_vec);
 
-        assert!(transformed.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(transformed, test_vec, TOLERANCE);
     }
 
     // --------------------------------------------------
@@ -654,7 +847,7 @@ mod tests {
         // Точка в центре масштабирования не должна измениться
         let center_vec = HVec3::from(anchor);
         let transformed_center = scale.apply_to_hvec(center_vec);
-        assert!(transformed_center.approx_equal(center_vec, TOLERANCE));
+        assert_hvecs(transformed_center, center_vec, TOLERANCE);
     }
 
     #[test]
@@ -667,7 +860,7 @@ mod tests {
         let transformed = scale.apply_to_hvec(test_vec);
         let expected = HVec3::new(3.0, 3.0, 3.0); // Центр (1,1,1) + (1,1,1)*2 = (3,3,3)
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
@@ -677,7 +870,7 @@ mod tests {
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed_xy = reflection_xy.apply_to_hvec(test_vec);
         let expected_xy = HVec3::new(1.0, 2.0, -3.0);
-        assert!(transformed_xy.approx_equal(expected_xy, TOLERANCE));
+        assert_hvecs(transformed_xy, expected_xy, TOLERANCE);
     }
 
     #[test]
@@ -687,7 +880,7 @@ mod tests {
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed_xz = reflection_xz.apply_to_hvec(test_vec);
         let expected_xz = HVec3::new(1.0, -2.0, 3.0);
-        assert!(transformed_xz.approx_equal(expected_xz, TOLERANCE));
+        assert_hvecs(transformed_xz, expected_xz, TOLERANCE);
     }
 
     #[test]
@@ -697,7 +890,37 @@ mod tests {
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed_yz = reflection_yz.apply_to_hvec(test_vec);
         let expected_yz = HVec3::new(-1.0, 2.0, 3.0);
-        assert!(transformed_yz.approx_equal(expected_yz, TOLERANCE));
+        assert_hvecs(transformed_yz, expected_yz, TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotation_aligning_up_to_forward() {
+        let from = Vec3::up();
+        let to = Vec3::forward();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotation_aligning_backward_to_forward() {
+        let from = Vec3::backward();
+        let to = Vec3::forward();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotation_aligning_up_to_left() {
+        let from = Vec3::up();
+        let to = Vec3::left();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
     }
 
     #[test]
@@ -709,7 +932,7 @@ mod tests {
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed_xy = reflection.apply_to_hvec(test_vec);
         let expected_xy = HVec3::new(1.0, 2.0, -3.0);
-        assert!(transformed_xy.approx_equal(expected_xy, TOLERANCE));
+        assert_hvecs(transformed_xy, expected_xy, TOLERANCE);
     }
 
     #[test]
@@ -721,7 +944,7 @@ mod tests {
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed_xz = reflection.apply_to_hvec(test_vec);
         let expected_xz = HVec3::new(1.0, -2.0, 3.0);
-        assert!(transformed_xz.approx_equal(expected_xz, TOLERANCE));
+        assert_hvecs(transformed_xz, expected_xz, TOLERANCE);
     }
 
     #[test]
@@ -733,46 +956,46 @@ mod tests {
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed_yz = reflection.apply_to_hvec(test_vec);
         let expected_yz = HVec3::new(-1.0, 2.0, 3.0);
-        assert!(transformed_yz.approx_equal(expected_yz, TOLERANCE));
+        assert_hvecs(transformed_yz, expected_yz, TOLERANCE);
     }
 
     #[test]
     fn test_rotation_around_line_x_90() {
         // Поворот вокруг оси X (должен совпадать с rotation_x)
         let x_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_x());
-        let rotation = Transform3D::rotation_around_line(x_axis, 90.0.to_radians());
+        let rotation = Transform3D::rotation_around_line(x_axis, (90.0 as f32).to_radians());
         let test_vec = HVec3::left();
 
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::up();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
     fn test_rotation_around_line_y_90() {
         // Поворот вокруг оси Y (должен совпадать с rotation_y)
         let y_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_y());
-        let rotation = Transform3D::rotation_around_line(y_axis, 90.0.to_radians());
+        let rotation = Transform3D::rotation_around_line(y_axis, (90.0 as f32).to_radians());
         let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::up();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     #[test]
     fn test_rotation_around_line_z_90() {
         // Поворот вокруг оси X (должен совпадать с rotation_x)
         let z_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_z());
-        let rotation = Transform3D::rotation_around_line(z_axis, 90.0.to_radians());
+        let rotation = Transform3D::rotation_around_line(z_axis, (90.0 as f32).to_radians());
         let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::left();
 
-        assert!(transformed.approx_equal(expected, TOLERANCE));
+        assert_hvecs(transformed, expected, TOLERANCE);
     }
 
     // --------------------------------------------------
@@ -790,23 +1013,25 @@ mod tests {
         // Проверка последовательности преобразований
         let test_vec = HVec3::new(1.0, 1.0, 1.0);
 
-        // Сначала масштабирование, потом перемещение
-        let scaled_then_translated = translation.apply_to_hvec(scale.apply_to_hvec(&test_vec));
+        // Сначала перемещение, потом масштабирование
+        let scaled_then_translated = scale.apply_to_hvec(translation.apply_to_hvec(test_vec));
         // Комбинированное преобразование
         let combined_result = combined.apply_to_hvec(test_vec);
 
-        assert!(scaled_then_translated.approx_equal(combined_result, TOLERANCE));
+        assert_hvecs(scaled_then_translated, combined_result, TOLERANCE);
     }
 
     #[test]
     fn test_inverse_identity() {
         // Тест обратной матрицы для тождественной.
-        let inv_identity = Transform3D::identity().inverse();
+        let inv_identity = Transform3D::identity()
+            .inverse()
+            .expect("У тождественной матрицы есть обратная - она же сама");
 
         // Проверка, что единичная матрица не меняет вектор
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed = inv_identity.apply_to_hvec(test_vec);
-        assert!(transformed.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(transformed, test_vec, TOLERANCE);
     }
 
     #[test]
@@ -817,9 +1042,9 @@ mod tests {
 
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let transformed = translation.apply_to_hvec(test_vec);
-        let restored = inverse_translation.apply_to_hvec(&transformed);
+        let restored = inverse_translation.apply_to_hvec(transformed);
 
-        assert!(restored.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(restored, test_vec, TOLERANCE);
     }
 
     #[test]
@@ -830,9 +1055,9 @@ mod tests {
 
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let scaled = scale.apply_to_hvec(test_vec);
-        let restored_scale = inverse_scale.apply_to_hvec(&scaled);
+        let restored_scale = inverse_scale.apply_to_hvec(scaled);
 
-        assert!(restored_scale.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(restored_scale, test_vec, TOLERANCE);
     }
 
     #[test]
@@ -843,23 +1068,23 @@ mod tests {
 
         let test_vec = HVec3::new(1.0, 2.0, 3.0);
         let rotated = rotation.apply_to_hvec(test_vec);
-        let restored_rotation = inverse_rotation.apply_to_hvec(&rotated);
+        let restored_rotation = inverse_rotation.apply_to_hvec(rotated);
 
-        assert!(restored_rotation.approx_equal(test_vec, TOLERANCE));
+        assert_hvecs(restored_rotation, test_vec, TOLERANCE);
     }
 
     #[test]
     fn test_determinant() {
         // Определитель единичной матрицы должен быть 1
         let identity = Transform3D::identity();
-        assert!((identity.determinant() - 1.0).abs() < TOLERANCE);
+        assert_floats(identity.determinant(), 1.0, TOLERANCE);
 
         // Определитель матрицы масштабирования
         let scale = Transform3D::scale(2.0, 3.0, 4.0);
-        assert!((scale.determinant() - 24.0).abs() < TOLERANCE); // 2 * 3 * 4
+        assert_floats(scale.determinant(), 24.0, TOLERANCE); // 2 * 3 * 4
 
         // Определитель матрицы перемещения должен быть 1 (афинное преобразование сохраняет объем)
         let translation = Transform3D::translation(1.0, 2.0, 3.0);
-        assert!((translation.determinant() - 1.0).abs() < TOLERANCE);
+        assert_floats(translation.determinant(), 1.0, TOLERANCE);
     }
 }
