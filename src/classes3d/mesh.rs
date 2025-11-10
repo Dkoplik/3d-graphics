@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Vec3, Transform3D};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -15,8 +15,47 @@ impl Mesh {
         #[cfg(debug_assertions)]
         Self::assert_polygons(vertexes, polygons);
 
-        // TODO надо просто обойти все полигоны и для их вершин посчитать нормали и усреднить, если у одной вершины их несколько
-        todo!("Генерация нормалей");
+        let mut normals = vec![Vec3::zero(); vertexes.len()];
+        let mut face_count = vec![0; vertexes.len()];
+
+        // Вычисляем центр меша для согласованной ориентации нормалей
+        let mesh_center = Self::calculate_center(vertexes);
+
+        // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
+        // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
+        for polygon in polygons {
+            let poly_normal = polygon.get_normal(vertexes, Some(mesh_center));
+            let vertex_indices = polygon.get_vertexes();
+
+            for &vertex_index in vertex_indices {
+                normals[vertex_index] = normals[vertex_index] + poly_normal;
+                face_count[vertex_index] += 1;
+            }
+        }
+
+        // Усредняем нормали и нормализуем
+        for i in 0..normals.len() {
+            if face_count[i] > 0 {
+                normals[i] = normals[i] * (1.0 / face_count[i] as f32);
+                normals[i] = normals[i].normalize();
+            }
+        }
+
+        normals
+    }
+
+    /// Вычислить центр меша
+    fn calculate_center(vertexes: &Vec<HVec3>) -> Vec3 {
+        if vertexes.is_empty() {
+            return Vec3::zero();
+        }
+
+        let sum: Vec3 = vertexes
+            .iter()
+            .map(|v| Vec3::from(*v))
+            .fold(Vec3::zero(), |acc, v| acc + v);
+
+        sum * (1.0 / vertexes.len() as f32)
     }
 
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
@@ -88,9 +127,7 @@ impl Mesh {
     /// `axis` - ось, вокруг которой происходит вращение
     /// `parts` - количество разбиений
     pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
-        let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
-
-          if parts < 3 {
+        if parts < 3 {
             panic!("Количество разбиений должно быть не менее 3");
         }
         if profile_points.len() < 2 {
@@ -98,14 +135,12 @@ impl Mesh {
         }
 
         let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
-        
+
         // Создаем все вершины вращения
         let mut vertexes = Vec::new();
-        
+
         // Для каждой точки профиля создаем кольцо вершин
         for profile_point in profile_points {
-            let point_vec = Vec3::new(profile_point.x, profile_point.y, profile_point.z);
-            
             // Вращаем точку вокруг оси
             for i in 0..=parts {
                 let angle = angle_step * i as f32;
@@ -125,7 +160,7 @@ impl Mesh {
             for segment_idx in 0..parts {
                 let current_ring_start = profile_idx * vertices_per_profile;
                 let next_ring_start = (profile_idx + 1) * vertices_per_profile;
-                
+
                 let v0 = current_ring_start + segment_idx;
                 let v1 = current_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v2 = next_ring_start + (segment_idx + 1) % vertices_per_profile;
@@ -144,7 +179,11 @@ impl Mesh {
     }
 
     /// Создает верхнюю и нижнюю крышки для модели вращения
-    fn create_rotation_caps(polygons: &mut Vec<Polygon3>, profile_count: usize, vertices_per_profile: usize) {
+    fn create_rotation_caps(
+        polygons: &mut Vec<Polygon3>,
+        profile_count: usize,
+        vertices_per_profile: usize,
+    ) {
         // Нижняя крышка (первый профиль)
         if profile_count > 1 {
             let mut bottom_cap = Vec::new();
@@ -550,9 +589,67 @@ impl Polygon3 {
         &self.vertexes
     }
 
-    /// Получить нормаль к полигону.
-    pub fn get_normal(&self) -> Vec3 {
-        // TODO Тупо через векторное произведение сделать и не забыть нормализовать
-        todo!("Нормаль полигона")
+    /// Получить нормаль к полигону
+    pub fn get_normal(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
+        let vertex_indices = self.get_vertexes();
+
+        match vertex_indices.len() {
+            0 | 1 | 2 => Vec3::new(0.0, 0.0, 1.0), // Недостаточно вершин
+            _ => self.get_normal_polygon(vertexes, mesh_center),
+        }
+    }
+
+    /// Нормаль для многоугольника
+    fn get_normal_polygon(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
+        let poly_vertex_indices = self.get_vertexes();
+        let mut normal = Vec3::zero();
+
+        for i in 0..poly_vertex_indices.len() {
+            let current = Vec3::from(vertexes[poly_vertex_indices[i]]);
+            let next =
+                Vec3::from(vertexes[poly_vertex_indices[(i + 1) % poly_vertex_indices.len()]]);
+
+            normal.x += (current.y - next.y) * (current.z + next.z);
+            normal.y += (current.z - next.z) * (current.x + next.x);
+            normal.z += (current.x - next.x) * (current.y + next.y);
+        }
+
+        // Ориентируем нормаль от центра объекта, если центр предоставлен
+        if let Some(center) = mesh_center {
+            normal = self.orient_polygon_normal_from_center(normal, vertexes, center);
+        }
+
+        if normal.length() > 0.001 {
+            normal.normalize()
+        } else {
+            Vec3::new(0.0, 0.0, 1.0)
+        }
+    }
+
+    /// Ориентирует нормаль многоугольника от центра
+    fn orient_polygon_normal_from_center(
+        &self,
+        normal: Vec3,
+        vertexes: &Vec<HVec3>,
+        center: Vec3,
+    ) -> Vec3 {
+        let vertex_indices = self.get_vertexes();
+
+        // Вычисляем центр многоугольника
+        let mut face_center = Vec3::zero();
+        for &index in vertex_indices {
+            face_center = face_center + Vec3::from(vertexes[index]);
+        }
+        face_center = face_center * (1.0 / vertex_indices.len() as f32);
+
+        // Вектор от центра объекта к центру грани
+        let center_to_face = face_center - center;
+
+        // Если нормаль направлена к центру объекта, разворачиваем её
+        if normal.dot(center_to_face) < 0.0 {
+            -normal
+        } else {
+            normal
+        }
     }
 }
