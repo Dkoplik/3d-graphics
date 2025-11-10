@@ -107,9 +107,22 @@ impl AthenianApp {
         if ui.button("Сохранить OBJ...").clicked() {
             self.save_obj_file();
         }
+
+        ui.separator();
+
+        egui::CollapsingHeader::new("Создание моделей вращения")
+            .default_open(false)
+            .show(ui, |ui| {
+                self.show_rotation_model_controls(ui);
+            });
+
+            
         if ui.button("Создать вращением").clicked() {
             self.create_rotation_model();
         }
+        
+        ui.separator();
+        
         if ui.button("Создать из функции").clicked() {
             self.create_function_model();
         }
@@ -281,6 +294,124 @@ impl AthenianApp {
                 self.apply_custom_rotation();
             }
         }
+    }
+
+    /// Показать управление созданием моделей вращения
+    fn show_rotation_model_controls(&mut self, ui: &mut egui::Ui) {
+        // Сначала обрабатываем UI элементы, которые не требуют вызовов self
+        self.show_rotation_params_ui(ui);
+        
+        // Затем обрабатываем кнопки действий
+        self.show_rotation_actions(ui);
+    }
+    
+    fn show_rotation_params_ui(&mut self, ui: &mut egui::Ui) {
+        let rotation_params = &mut self.rotation_params;
+        
+        ui.label("Модель вращения:");
+        
+        // Выбор оси вращения
+        ui.label("Ось вращения:");
+        egui::ComboBox::from_label("")
+            .selected_text(rotation_params.axis_type.name())
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    &mut rotation_params.axis_type, 
+                    logic::AxisType::Center(logic::CenterAxis::X), 
+                    "Ось X"
+                );
+                ui.selectable_value(
+                    &mut rotation_params.axis_type, 
+                    logic::AxisType::Center(logic::CenterAxis::Y), 
+                    "Ось Y"
+                );
+                ui.selectable_value(
+                    &mut rotation_params.axis_type, 
+                    logic::AxisType::Center(logic::CenterAxis::Z), 
+                    "Ось Z"
+                );
+                ui.selectable_value(
+                    &mut rotation_params.axis_type, 
+                    logic::AxisType::Custom, 
+                    "Произвольная ось"
+                );
+            });
+
+        if let logic::AxisType::Custom = rotation_params.axis_type {
+            ui.label("Произвольная ось:");
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label("Начало:");
+                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_start.x).speed(0.1).prefix("X:"));
+                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_start.y).speed(0.1).prefix("Y:"));
+                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_start.z).speed(0.1).prefix("Z:"));
+                });
+                ui.vertical(|ui| {
+                    ui.label("Конец:");
+                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_end.x).speed(0.1).prefix("X:"));
+                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_end.y).speed(0.1).prefix("Y:"));
+                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_end.z).speed(0.1).prefix("Z:"));
+                });
+            });
+        }
+
+        ui.label("Количество сегментов:");
+        ui.add(egui::Slider::new(&mut rotation_params.segments, 4..=64).text("Сегментов"));
+
+        if !rotation_params.profile_points.is_empty() {
+            ui.label("Редактирование точек:");
+            egui::ScrollArea::vertical()
+                .max_height(150.0)
+                .show(ui, |ui| {
+                    for (i, point) in rotation_params.profile_points.iter_mut().enumerate() {
+                        ui.horizontal(|ui| {
+                            ui.label(format!("Точка {}:", i));
+                            ui.add(egui::DragValue::new(&mut point.x).speed(0.1).prefix("X:"));
+                            ui.add(egui::DragValue::new(&mut point.y).speed(0.1).prefix("Y:"));
+                            ui.add(egui::DragValue::new(&mut point.z).speed(0.1).prefix("Z:"));
+                        });
+                    }
+                });
+        }
+
+        // Информация о профиле
+        ui.label(format!("Количество точек профиля: {}", rotation_params.profile_points.len()));
+
+        // Предупреждение если недостаточно точек
+        if rotation_params.profile_points.len() < 2 {
+            ui.colored_label(egui::Color32::RED, "Профиль должен содержать хотя бы 2 точки");
+        }
+    }
+    
+    fn show_rotation_actions(&mut self, ui: &mut egui::Ui) {
+        // Управление точками профиля
+        ui.label("Точки профиля:");
+        ui.horizontal(|ui| {
+            if ui.button("Добавить точку").clicked() {
+                if let Some(last_point) = self.rotation_params.profile_points.last() {
+                    self.add_profile_point(*last_point);
+                } else {
+                    self.add_profile_point(g3d::Point3::new(0.0, 0.0, 0.0));
+                }
+            }
+            if ui.button("Удалить точку").clicked() {
+                self.remove_last_profile_point();
+            }
+            if ui.button("Очистить").clicked() {
+                self.clear_profile();
+            }
+        });
+
+        // Кнопки создания и сохранения
+        ui.horizontal(|ui| {
+            if ui.button("Создать модель вращения").clicked() {
+                self.create_rotation_model();
+            }
+            
+            if ui.button("Сохранить модель").clicked() {
+                self.save_rotation_model();
+            }
+        });
     }
 
     /// Показать управление материалами и текстурами.

@@ -27,6 +27,9 @@ pub struct AthenianApp {
     axis_point1: g3d::Point3,
     axis_point2: g3d::Point3,
 
+    /// Параметры для создания моделей вращения
+    rotation_params: logic::RotationModelParams,
+
     // Настройки рендеринга
     render_options: g3d::classes3d::scene::RenderOptions,
 
@@ -80,6 +83,7 @@ impl Default for AthenianApp {
             angle_of_rotate: 0.0,
             axis_point1: g3d::Point3::new(0.0, 0.0, 0.0),
             axis_point2: g3d::Point3::new(1.0, 0.0, 0.0),
+            rotation_params: logic::RotationModelParams::default(),
             render_options: Default::default(),
             current_material: Default::default(),
             selected_light_index: None,

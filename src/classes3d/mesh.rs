@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Vec3};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Vec3, Transform3D};
 
 impl Mesh {
     // --------------------------------------------------
@@ -90,9 +90,85 @@ impl Mesh {
     pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
         let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
 
-        // TODO: точки из профиля надо будет вращать вокруг оси (поэтому они HVec3, дабы можно было их менять)
-        // и потом эти точки надо будет как-то в полигоны объединить и создать из этого Mesh.
-        todo!("Сделать модель вращения")
+          if parts < 3 {
+            panic!("Количество разбиений должно быть не менее 3");
+        }
+        if profile_points.len() < 2 {
+            panic!("Профиль должен содержать хотя бы 2 точки");
+        }
+
+        let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
+        
+        // Создаем все вершины вращения
+        let mut vertexes = Vec::new();
+        
+        // Для каждой точки профиля создаем кольцо вершин
+        for profile_point in profile_points {
+            let point_vec = Vec3::new(profile_point.x, profile_point.y, profile_point.z);
+            
+            // Вращаем точку вокруг оси
+            for i in 0..=parts {
+                let angle = angle_step * i as f32;
+                let rotation = Transform3D::rotation_around_line(axis, angle);
+                let rotated_point = rotation.apply_to_hvec(*profile_point);
+                vertexes.push(rotated_point);
+            }
+        }
+
+        // Создаем полигоны
+        let mut polygons = Vec::new();
+        let profile_count = profile_points.len();
+        let vertices_per_profile = parts + 1;
+
+        // Создаем полигоны между соседними профилями
+        for profile_idx in 0..profile_count - 1 {
+            for segment_idx in 0..parts {
+                let current_ring_start = profile_idx * vertices_per_profile;
+                let next_ring_start = (profile_idx + 1) * vertices_per_profile;
+                
+                let v0 = current_ring_start + segment_idx;
+                let v1 = current_ring_start + (segment_idx + 1) % vertices_per_profile;
+                let v2 = next_ring_start + (segment_idx + 1) % vertices_per_profile;
+                let v3 = next_ring_start + segment_idx;
+
+                // Создаем два треугольника для каждого квада
+                polygons.push(Polygon3::triangle(v0, v1, v2));
+                polygons.push(Polygon3::triangle(v0, v2, v3));
+            }
+        }
+
+        // Создаем крышки (если нужно)
+        Self::create_rotation_caps(&mut polygons, profile_count, vertices_per_profile);
+
+        Self::from_polygons(vertexes, polygons)
+    }
+
+    /// Создает верхнюю и нижнюю крышки для модели вращения
+    fn create_rotation_caps(polygons: &mut Vec<Polygon3>, profile_count: usize, vertices_per_profile: usize) {
+        // Нижняя крышка (первый профиль)
+        if profile_count > 1 {
+            let mut bottom_cap = Vec::new();
+            for i in 0..vertices_per_profile {
+                bottom_cap.push(i);
+            }
+            if bottom_cap.len() >= 3 {
+                polygons.push(Polygon3::from_list(&bottom_cap));
+            }
+        }
+
+        // Верхняя крышка (последний профиль)
+        if profile_count > 1 {
+            let top_profile_start = (profile_count - 1) * vertices_per_profile;
+            let mut top_cap = Vec::new();
+            for i in 0..vertices_per_profile {
+                top_cap.push(top_profile_start + i);
+            }
+            // Реверсируем для правильной ориентации нормали
+            top_cap.reverse();
+            if top_cap.len() >= 3 {
+                polygons.push(Polygon3::from_list(&top_cap));
+            }
+        }
     }
 
     /// Создать Mesh как график функции от 2-х переменных

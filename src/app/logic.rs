@@ -365,8 +365,78 @@ impl AthenianApp {
     }
 
     pub fn create_rotation_model(&mut self) {
-        // TODO: Реализовать создание модели вращения
-        todo!("создание модели вращения")
+        // делаем так, чтобы в self.add_model(model); не было ошибки
+        let params = std::mem::take(&mut self.rotation_params);
+
+        if params.profile_points.len() < 2 {
+            eprintln!("Профиль должен содержать хотя бы 2 точки");
+            return;
+        }
+
+        // Преобразуем точки профиля в HVec3
+        let profile_hvec: Vec<g3d::HVec3> = params.profile_points
+            .iter()
+            .map(|p| g3d::HVec3::from(*p))
+            .collect();
+
+        // Получаем ось вращения
+        let axis = params.axis_type.to_line(params.custom_axis_start, params.custom_axis_end);
+
+        // Создаем mesh
+        let mesh = g3d::Mesh::create_rotation_model(&profile_hvec, axis, params.segments);
+        let model = g3d::Model3::from_mesh(mesh);
+
+        // Возвращаем параметры обратно
+        self.rotation_params = params;
+        
+        self.add_model(model);
+        println!("Модель вращения создана с {} сегментами", self.rotation_params.segments);
+    }
+
+    /// Добавить точку к профилю вращения
+    pub fn add_profile_point(&mut self, point: g3d::Point3) {
+        self.rotation_params.profile_points.push(point);
+    }
+
+    /// Удалить последнюю точку профиля
+    pub fn remove_last_profile_point(&mut self) {
+        if self.rotation_params.profile_points.len() > 2 {
+            self.rotation_params.profile_points.pop();
+        } else {
+            eprintln!("Профиль должен содержать хотя бы 2 точки");
+        }
+    }
+
+    /// Очистить профиль вращения
+    pub fn clear_profile(&mut self) {
+        self.rotation_params.profile_points.clear();
+        // Добавляем базовые точки
+        self.rotation_params.profile_points.push(g3d::Point3::new(0.0, 1.0, 0.0));
+        self.rotation_params.profile_points.push(g3d::Point3::new(1.0, 0.0, 0.0));
+    }
+
+    /// Сохранить модель вращения в OBJ
+    pub fn save_rotation_model(&mut self) {
+        if let Some(model) = self.get_selected_model() {
+            let file_path = rfd::FileDialog::new()
+                .add_filter("OBJ files", &["obj"])
+                .set_title("Сохранить модель вращения")
+                .set_file_name("rotation_model.obj")
+                .save_file();
+
+            if let Some(path) = file_path {
+                match model.save_to_obj(path.to_str().unwrap()) {
+                    Ok(()) => println!("Модель вращения сохранена в {}", path.display()),
+                    Err(e) => eprintln!("Ошибка сохранения: {:?}", e),
+                }
+            }
+        } else {
+            eprintln!("Нет выбранной модели для сохранения");
+        }
+    }
+
+    pub fn get_rotation_params_mut(&mut self) -> &mut RotationModelParams {
+        &mut self.rotation_params
     }
 
     pub fn create_function_model(&mut self) {
@@ -456,4 +526,70 @@ pub enum CenterAxis {
 pub enum AxisType {
     Center(CenterAxis),
     Custom,
+}
+
+#[derive(Debug, Clone)]
+pub struct RotationModelParams {
+    pub profile_points: Vec<g3d::Point3>,
+    pub axis_type: AxisType,
+    pub custom_axis_start: g3d::Point3,
+    pub custom_axis_end: g3d::Point3,
+    pub segments: usize,
+}
+
+impl Default for RotationModelParams {
+    fn default() -> Self {
+        Self {
+            profile_points: vec![
+                g3d::Point3::new(0.0, 1.0, 0.0),
+                g3d::Point3::new(0.5, 0.8, 0.0),
+                g3d::Point3::new(1.0, 0.0, 0.0),
+            ],
+            axis_type: AxisType::Center(CenterAxis::Y),
+            custom_axis_start: g3d::Point3::new(0.0, 0.0, 0.0),
+            custom_axis_end: g3d::Point3::new(0.0, 1.0, 0.0),
+            segments: 16,
+        }
+    }
+}
+
+// Добавляем метод преобразования AxisType в Line3
+impl AxisType {
+    pub fn to_line(&self, custom_start: g3d::Point3, custom_end: g3d::Point3) -> g3d::Line3 {
+        match self {
+            AxisType::Center(CenterAxis::X) => g3d::Line3::from_points(
+                g3d::Point3::new(0.0, 0.0, 0.0),
+                g3d::Point3::new(1.0, 0.0, 0.0)
+            ),
+            AxisType::Center(CenterAxis::Y) => g3d::Line3::from_points(
+                g3d::Point3::new(0.0, 0.0, 0.0),
+                g3d::Point3::new(0.0, 1.0, 0.0)
+            ),
+            AxisType::Center(CenterAxis::Z) => g3d::Line3::from_points(
+                g3d::Point3::new(0.0, 0.0, 0.0),
+                g3d::Point3::new(0.0, 0.0, 1.0)
+            ),
+            AxisType::Custom => g3d::Line3::from_points(custom_start, custom_end),
+        }
+    }
+    
+    pub fn name(&self) -> String {
+        match self {
+            AxisType::Center(CenterAxis::X) => "Ось X".to_string(),
+            AxisType::Center(CenterAxis::Y) => "Ось Y".to_string(),
+            AxisType::Center(CenterAxis::Z) => "Ось Z".to_string(),
+            AxisType::Custom => "Произвольная ось".to_string(),
+        }
+    }
+}
+
+// Также добавим метод для CenterAxis для удобства
+impl CenterAxis {
+    pub fn name(&self) -> &'static str {
+        match self {
+            CenterAxis::X => "Ось X",
+            CenterAxis::Y => "Ось Y",
+            CenterAxis::Z => "Ось Z",
+        }
+    }
 }
