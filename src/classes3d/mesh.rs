@@ -4,6 +4,7 @@
 //! для рендера в формате wireframe.
 
 use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -12,23 +13,69 @@ impl Mesh {
 
     /// Сгенерировать карту нормалей по имеющимся полигонам.
     pub fn generate_normals(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) -> Vec<Vec3> {
-        #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
+        let mut normals = vec![Vec3::new(0.0, 0.0, 0.0); vertexes.len()];
 
-        // TODO надо просто обойти все полигоны и для их вершин посчитать нормали и усреднить, если у одной вершины их несколько
-        todo!("Генерация нормалей");
+        let mut normals = vec![Vec3::zero(); vertexes.len()];
+        let mut face_count = vec![0; vertexes.len()];
+
+        // Вычисляем центр меша для согласованной ориентации нормалей
+        let mesh_center = Self::calculate_center(vertexes);
+
+        // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
+        // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
+        for polygon in polygons {
+            let poly_normal = polygon.get_normal(vertexes, Some(mesh_center));
+            let vertex_indices = polygon.get_vertexes();
+
+            for &vertex_index in vertex_indices {
+                normals[vertex_index] = normals[vertex_index] + poly_normal;
+                face_count[vertex_index] += 1;
+            }
+        }
+
+        // Усредняем нормали и нормализуем
+        for i in 0..normals.len() {
+            if face_count[i] > 0 {
+                normals[i] = normals[i] * (1.0 / face_count[i] as f32);
+                normals[i] = normals[i].normalize();
+            }
+        }
+
+        normals
+    }
+
+    /// Вычислить центр меша
+    fn calculate_center(vertexes: &Vec<HVec3>) -> Vec3 {
+        if vertexes.is_empty() {
+            return Vec3::zero();
+        }
+
+        let sum: Vec3 = vertexes
+            .iter()
+            .map(|v| Vec3::from(*v))
+            .fold(Vec3::zero(), |acc, v| acc + v);
+
+        sum * (1.0 / vertexes.len() as f32)
     }
 
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
     pub fn generate_texture_coord(
         vertexes: &Vec<HVec3>,
-        polygons: &Vec<Polygon3>,
+        _polygons: &Vec<Polygon3>,
     ) -> Vec<(f32, f32)> {
         #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
+        Self::assert_polygons(vertexes, _polygons);
 
-        // TODO какую-нибудь развертку сделать, чтобы полигоны всей модели можно было уместить на UV текстуре
-        todo!("Генерация координат текстуры");
+        // Простая проекция на плоскость XY для текстурных координат
+        vertexes
+            .iter()
+            .map(|v| {
+                // Нормализуем координаты в диапазон [0, 1]
+                let u = (v.x + 1.0) / 2.0;
+                let v = (v.y + 1.0) / 2.0;
+                (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+            })
+            .collect()
     }
 
     // --------------------------------------------------
@@ -88,8 +135,6 @@ impl Mesh {
     /// `axis` - ось, вокруг которой происходит вращение
     /// `parts` - количество разбиений
     pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
-        let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
-
         if parts < 3 {
             panic!("Количество разбиений должно быть не менее 3");
         }
@@ -104,8 +149,6 @@ impl Mesh {
 
         // Для каждой точки профиля создаем кольцо вершин
         for profile_point in profile_points {
-            let point_vec = Vec3::new(profile_point.x, profile_point.y, profile_point.z);
-
             // Вращаем точку вокруг оси
             for i in 0..=parts {
                 let angle = angle_step * i as f32;
@@ -192,8 +235,52 @@ impl Mesh {
     where
         F: Fn(f32, f32) -> f32,
     {
-        // TODO: Надо тупо вычислять график, будут вершины, а потом как-то в полигоны объединить.
-        todo!("Сделать модель по графику")
+        let (x0, x1) = x_range;
+        let (y0, y1) = y_range;
+
+        let dx = (x1 - x0) / x_steps as f32;
+        let dy = (y1 - y0) / y_steps as f32;
+
+        let mut vertexes = Vec::new();
+
+        // Генерируем вершины
+        for j in 0..=y_steps {
+            for i in 0..=x_steps {
+                let x = x0 + i as f32 * dx;
+                let y = y0 + j as f32 * dy;
+                let z = func(x, y);
+
+                if z.is_finite() {
+                    vertexes.push(HVec3::new(x, y, z));
+                } else {
+                    vertexes.push(HVec3::new(x, y, 0.0));
+                }
+            }
+        }
+
+        // Генерируем полигоны (треугольники)
+        let mut polygons = Vec::new();
+        for j in 0..y_steps {
+            for i in 0..x_steps {
+                let idx = |i: usize, j: usize| -> usize { j * (x_steps + 1) + i };
+
+                // Первый треугольник
+                polygons.push(Polygon3::triangle(
+                    idx(i, j),
+                    idx(i + 1, j),
+                    idx(i + 1, j + 1),
+                ));
+
+                // Второй треугольник
+                polygons.push(Polygon3::triangle(
+                    idx(i, j),
+                    idx(i + 1, j + 1),
+                    idx(i, j + 1),
+                ));
+            }
+        }
+
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание тетраэдра со сторонами единичной длины.
@@ -554,9 +641,67 @@ impl Polygon3 {
         &self.vertexes
     }
 
-    /// Получить нормаль к полигону.
-    pub fn get_normal(&self) -> Vec3 {
-        // TODO Тупо через векторное произведение сделать и не забыть нормализовать
-        todo!("Нормаль полигона")
+    /// Получить нормаль к полигону
+    pub fn get_normal(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
+        let vertex_indices = self.get_vertexes();
+
+        match vertex_indices.len() {
+            0 | 1 | 2 => Vec3::new(0.0, 0.0, 1.0), // Недостаточно вершин
+            _ => self.get_normal_polygon(vertexes, mesh_center),
+        }
+    }
+
+    /// Нормаль для многоугольника
+    fn get_normal_polygon(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
+        let poly_vertex_indices = self.get_vertexes();
+        let mut normal = Vec3::zero();
+
+        for i in 0..poly_vertex_indices.len() {
+            let current = Vec3::from(vertexes[poly_vertex_indices[i]]);
+            let next =
+                Vec3::from(vertexes[poly_vertex_indices[(i + 1) % poly_vertex_indices.len()]]);
+
+            normal.x += (current.y - next.y) * (current.z + next.z);
+            normal.y += (current.z - next.z) * (current.x + next.x);
+            normal.z += (current.x - next.x) * (current.y + next.y);
+        }
+
+        // Ориентируем нормаль от центра объекта, если центр предоставлен
+        if let Some(center) = mesh_center {
+            normal = self.orient_polygon_normal_from_center(normal, vertexes, center);
+        }
+
+        if normal.length() > 0.001 {
+            normal.normalize()
+        } else {
+            Vec3::new(0.0, 0.0, 1.0)
+        }
+    }
+
+    /// Ориентирует нормаль многоугольника от центра
+    fn orient_polygon_normal_from_center(
+        &self,
+        normal: Vec3,
+        vertexes: &Vec<HVec3>,
+        center: Vec3,
+    ) -> Vec3 {
+        let vertex_indices = self.get_vertexes();
+
+        // Вычисляем центр многоугольника
+        let mut face_center = Vec3::zero();
+        for &index in vertex_indices {
+            face_center = face_center + Vec3::from(vertexes[index]);
+        }
+        face_center = face_center * (1.0 / vertex_indices.len() as f32);
+
+        // Вектор от центра объекта к центру грани
+        let center_to_face = face_center - center;
+
+        // Если нормаль направлена к центру объекта, разворачиваем её
+        if normal.dot(center_to_face) < 0.0 {
+            -normal
+        } else {
+            normal
+        }
     }
 }
