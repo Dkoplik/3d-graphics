@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Vec3, Transform3D};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -47,8 +47,8 @@ impl Mesh {
         #[cfg(debug_assertions)]
         {
             Self::assert_polygons(&vertexes, &polygons);
-            Self::assert_normals(&vertexes, &normals);
-            Self::assert_texture(&vertexes, &texture_coords);
+            Self::assert_normals(&normals);
+            Self::assert_texture(&texture_coords);
         }
 
         Mesh {
@@ -90,7 +90,7 @@ impl Mesh {
     pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
         let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
 
-          if parts < 3 {
+        if parts < 3 {
             panic!("Количество разбиений должно быть не менее 3");
         }
         if profile_points.len() < 2 {
@@ -98,14 +98,14 @@ impl Mesh {
         }
 
         let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
-        
+
         // Создаем все вершины вращения
         let mut vertexes = Vec::new();
-        
+
         // Для каждой точки профиля создаем кольцо вершин
         for profile_point in profile_points {
             let point_vec = Vec3::new(profile_point.x, profile_point.y, profile_point.z);
-            
+
             // Вращаем точку вокруг оси
             for i in 0..=parts {
                 let angle = angle_step * i as f32;
@@ -125,7 +125,7 @@ impl Mesh {
             for segment_idx in 0..parts {
                 let current_ring_start = profile_idx * vertices_per_profile;
                 let next_ring_start = (profile_idx + 1) * vertices_per_profile;
-                
+
                 let v0 = current_ring_start + segment_idx;
                 let v1 = current_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v2 = next_ring_start + (segment_idx + 1) % vertices_per_profile;
@@ -144,7 +144,11 @@ impl Mesh {
     }
 
     /// Создает верхнюю и нижнюю крышки для модели вращения
-    fn create_rotation_caps(polygons: &mut Vec<Polygon3>, profile_count: usize, vertices_per_profile: usize) {
+    fn create_rotation_caps(
+        polygons: &mut Vec<Polygon3>,
+        profile_count: usize,
+        vertices_per_profile: usize,
+    ) {
         // Нижняя крышка (первый профиль)
         if profile_count > 1 {
             let mut bottom_cap = Vec::new();
@@ -419,10 +423,24 @@ impl Mesh {
     }
 
     pub fn get_normals(&self) -> &Vec<Vec3> {
+        #[cfg(debug_assertions)]
+        if self.normals.len() != self.vertexes.len() {
+            eprintln!(
+                "Warning: используются нормали модели, но их количество не совпадает с количеством вершин"
+            );
+        }
+
         &self.normals
     }
 
     pub fn get_texture_coords(&self) -> &Vec<(f32, f32)> {
+        #[cfg(debug_assertions)]
+        if self.texture_coords.len() != self.vertexes.len() {
+            eprintln!(
+                "Warning: используются текстурные координаты модели, но их количество не совпадает с количеством вершин"
+            );
+        }
+
         &self.texture_coords
     }
 
@@ -446,32 +464,18 @@ impl Mesh {
     }
 
     /// Проверка нормалей на корректность
-    fn assert_normals(vertexes: &Vec<HVec3>, normals: &Vec<Vec3>) {
-        assert!(
-            normals.len() == vertexes.len(),
-            "Количество нормалей {} должно совпадать с количеством вершин {}",
-            normals.len(),
-            vertexes.len()
-        );
-
+    fn assert_normals(normals: &Vec<Vec3>) {
         for normal in normals {
             assert!(
                 (normal.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-                "Нормаль длиной {} должена быть нормированной",
+                "Нормаль вершины длиной {} должена быть нормированной",
                 normal.length()
             );
         }
     }
 
     /// Проверка текстурных координат на корректность
-    fn assert_texture(vertexes: &Vec<HVec3>, texture_coords: &Vec<(f32, f32)>) {
-        assert!(
-            texture_coords.len() == vertexes.len(),
-            "Количество текстурных координат {} должно совпадать с количеством вершин {}",
-            texture_coords.len(),
-            vertexes.len()
-        );
-
+    fn assert_texture(texture_coords: &Vec<(f32, f32)>) {
         for (u, v) in texture_coords.clone() {
             assert!(
                 (u >= 0.0) && (u <= 1.0),
