@@ -366,7 +366,6 @@ impl Canvas {
         let mut y0 = pos1.y.round() as i32;
         let x1 = pos2.x.round() as i32;
         let y1 = pos2.y.round() as i32;
-
         let dx = x1.abs_diff(x0) as i32;
         let sx = if x0 < x1 { 1 } else { -1 };
         let dy = -(y1.abs_diff(y0) as i32);
@@ -374,7 +373,11 @@ impl Canvas {
         let mut error = dx + dy;
 
         loop {
-            self[(x0 as usize, y0 as usize)] = color;
+            // ✅ ДОБАВЬТЕ ЭТУ ПРОВЕРКУ:
+            if (x0 as usize) < self.width && (y0 as usize) < self.height {
+                self[(x0 as usize, y0 as usize)] = color;
+            }
+
             let e2 = 2 * error;
             if e2 >= dy {
                 if x0 == x1 {
@@ -434,10 +437,37 @@ impl Canvas {
 
             intery += gradient;
         }
+
+        for x in (x1 as i32)..=(x2 as i32) {
+            let y_floor = intery as i32;
+            let intensity1 = 1.0 - (intery - y_floor as f32);
+            let intensity2 = intery - y_floor as f32;
+
+            if steep {
+                if (y_floor as usize) < self.height && (x as usize) < self.width {
+                    // ✅ ДОБАВЬТЕ
+                    self.set_pixel(y_floor, x, color, intensity1);
+                }
+                if ((y_floor + 1) as usize) < self.height && (x as usize) < self.width {
+                    // ✅ ДОБАВЬТЕ
+                    self.set_pixel(y_floor + 1, x, color, intensity2);
+                }
+            } else {
+                if (x as usize) < self.width && (y_floor as usize) < self.height {
+                    // ✅ ДОБАВЬТЕ
+                    self.set_pixel(x, y_floor, color, intensity1);
+                }
+                if (x as usize) < self.width && ((y_floor + 1) as usize) < self.height {
+                    // ✅ ДОБАВЬТЕ
+                    self.set_pixel(x, y_floor + 1, color, intensity2);
+                }
+            }
+            intery += gradient;
+        }
     }
 
     fn set_pixel(&mut self, x: i32, y: i32, color: Color32, intensity: f32) {
-        if x >= 0 && y >= 0 {
+        if x >= 0 && y >= 0 && (x as usize) < self.width && (y as usize) < self.height {
             let background = self[(x as usize, y as usize)];
 
             let bg_r = background.r() as f32;

@@ -56,20 +56,6 @@ impl AthenianApp {
             self.axis_point2,
         );
     }
-
-    /// Преобразовать мировые координаты в экранные
-    fn world_to_screen(&self, point: Point3) -> Pos2 {
-        todo!()
-
-        // let view_proj = self.camera.view_projection_matrix();
-        // let transformed = view_proj.apply_to_point(point);
-
-        // // Преобразуем из NDC (-1..1) в экранные координаты
-        // let screen_x = (transformed.x + 1.0) * 0.5 * self.painter_width;
-        // let screen_y = (1.0 - transformed.y) * 0.5 * self.painter_height;
-
-        // Pos2::new(screen_x, screen_y)
-    }
 }
 
 // --------------------------------------------------
