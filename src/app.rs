@@ -1,5 +1,6 @@
 pub mod logic;
 pub mod ui;
+use g3d::classes3d::surface_generator::SurfaceFunction;
 
 /// Приложение-демонстрация 3D графики.
 pub struct AthenianApp {
@@ -40,6 +41,13 @@ pub struct AthenianApp {
 
     // Камера
     camera_controls: CameraControls,
+
+    pub selected_surface_function: SurfaceFunction,
+    pub surface_x_min: f64,
+    pub surface_x_max: f64,
+    pub surface_y_min: f64,
+    pub surface_y_max: f64,
+    pub surface_divisions: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -94,6 +102,13 @@ impl Default for AthenianApp {
                 move_speed: 0.5,
                 rotate_speed: 0.01,
             },
+
+            selected_surface_function: SurfaceFunction::Paraboloid,
+            surface_x_min: -2.0,
+            surface_x_max: 2.0,
+            surface_y_min: -2.0,
+            surface_y_max: 2.0,
+            surface_divisions: 50,
         }
     }
 }

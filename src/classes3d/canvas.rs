@@ -34,7 +34,8 @@ impl Canvas {
     #[inline]
     /// Проверить границы полотна.
     fn check_bounds(&self, x: usize, y: usize) -> bool {
-        x < self.width && y < self.height && x > 0 && y > 0
+        //x < self.width && y < self.height && x > 0 && y > 0
+        x < self.width && y < self.height
     }
 
     /// Преобразовать холст в ColorImage для дальнейшего использования в egui.

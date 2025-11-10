@@ -16,6 +16,7 @@ pub mod model3;
 pub mod plane;
 pub mod point3;
 pub mod scene;
+pub mod surface_generator;
 pub mod texture;
 pub mod transform3;
 pub mod vec3;

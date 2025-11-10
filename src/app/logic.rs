@@ -1,5 +1,7 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
+use g3d::classes3d::surface_generator::{SurfaceFunction, generate_surface_mesh};
+
 use g3d::{
     Line3, Model3, Point3, Transform3D, Vec3, classes3d::model3::ObjLoadError,
     classes3d::model3::ObjSaveError,
@@ -58,6 +60,7 @@ impl AthenianApp {
     /// Преобразовать мировые координаты в экранные
     fn world_to_screen(&self, point: Point3) -> Pos2 {
         todo!()
+
         // let view_proj = self.camera.view_projection_matrix();
         // let transformed = view_proj.apply_to_point(point);
 
@@ -374,13 +377,16 @@ impl AthenianApp {
         }
 
         // Преобразуем точки профиля в HVec3
-        let profile_hvec: Vec<g3d::HVec3> = params.profile_points
+        let profile_hvec: Vec<g3d::HVec3> = params
+            .profile_points
             .iter()
             .map(|p| g3d::HVec3::from(*p))
             .collect();
 
         // Получаем ось вращения
-        let axis = params.axis_type.to_line(params.custom_axis_start, params.custom_axis_end);
+        let axis = params
+            .axis_type
+            .to_line(params.custom_axis_start, params.custom_axis_end);
 
         // Создаем mesh
         let mesh = g3d::Mesh::create_rotation_model(&profile_hvec, axis, params.segments);
@@ -388,9 +394,12 @@ impl AthenianApp {
 
         // Возвращаем параметры обратно
         self.rotation_params = params;
-        
+
         self.add_model(model);
-        println!("Модель вращения создана с {} сегментами", self.rotation_params.segments);
+        println!(
+            "Модель вращения создана с {} сегментами",
+            self.rotation_params.segments
+        );
     }
 
     /// Добавить точку к профилю вращения
@@ -411,8 +420,12 @@ impl AthenianApp {
     pub fn clear_profile(&mut self) {
         self.rotation_params.profile_points.clear();
         // Добавляем базовые точки
-        self.rotation_params.profile_points.push(g3d::Point3::new(0.0, 1.0, 0.0));
-        self.rotation_params.profile_points.push(g3d::Point3::new(1.0, 0.0, 0.0));
+        self.rotation_params
+            .profile_points
+            .push(g3d::Point3::new(0.0, 1.0, 0.0));
+        self.rotation_params
+            .profile_points
+            .push(g3d::Point3::new(1.0, 0.0, 0.0));
     }
 
     /// Сохранить модель вращения в OBJ
@@ -439,9 +452,34 @@ impl AthenianApp {
         &mut self.rotation_params
     }
 
+    pub fn create_surface_from_function(
+        &mut self,
+        func: SurfaceFunction,
+        x_min: f64,
+        x_max: f64,
+        y_min: f64,
+        y_max: f64,
+        divisions: usize,
+    ) {
+        let mesh =
+            generate_surface_mesh(func, (x_min, x_max), (y_min, y_max), (divisions, divisions));
+
+        let model = g3d::Model3::from_mesh(mesh);
+        self.set_model(model);
+    }
+
+    /// Создать модель из функции двух переменных
+    /// Создать модель из функции двух переменных
     pub fn create_function_model(&mut self) {
-        // TODO: Реализовать создание модели из функции
-        todo!("создание модели из графика функции")
+        let mesh = generate_surface_mesh(
+            self.selected_surface_function,
+            (self.surface_x_min, self.surface_x_max),
+            (self.surface_y_min, self.surface_y_max),
+            (self.surface_divisions, self.surface_divisions),
+        );
+
+        let model = g3d::Model3::from_mesh(mesh);
+        self.set_model(model);
     }
 
     pub fn load_texture(&mut self) {
@@ -559,20 +597,20 @@ impl AxisType {
         match self {
             AxisType::Center(CenterAxis::X) => g3d::Line3::from_points(
                 g3d::Point3::new(0.0, 0.0, 0.0),
-                g3d::Point3::new(1.0, 0.0, 0.0)
+                g3d::Point3::new(1.0, 0.0, 0.0),
             ),
             AxisType::Center(CenterAxis::Y) => g3d::Line3::from_points(
                 g3d::Point3::new(0.0, 0.0, 0.0),
-                g3d::Point3::new(0.0, 1.0, 0.0)
+                g3d::Point3::new(0.0, 1.0, 0.0),
             ),
             AxisType::Center(CenterAxis::Z) => g3d::Line3::from_points(
                 g3d::Point3::new(0.0, 0.0, 0.0),
-                g3d::Point3::new(0.0, 0.0, 1.0)
+                g3d::Point3::new(0.0, 0.0, 1.0),
             ),
             AxisType::Custom => g3d::Line3::from_points(custom_start, custom_end),
         }
     }
-    
+
     pub fn name(&self) -> String {
         match self {
             AxisType::Center(CenterAxis::X) => "Ось X".to_string(),

@@ -1,4 +1,5 @@
 use crate::app::{AthenianApp, logic};
+use g3d::classes3d::surface_generator::SurfaceFunction;
 
 // --------------------------------------------------
 // Построение UI приложения
@@ -28,10 +29,10 @@ impl AthenianApp {
 
                 ui.menu_button("Projection", |ui| {
                     if ui.button("Perspective").clicked() {
-                        self.set_perspective_projection();
+                        //   self.set_perspective_projection();
                     }
                     if ui.button("Isometric").clicked() {
-                        self.set_isometric_projection();
+                        //   self.set_isometric_projection();
                     }
                 });
             });
@@ -118,7 +119,7 @@ impl AthenianApp {
 
             
         if ui.button("Создать вращением").clicked() {
-            self.create_rotation_model();
+            // self.create_rotation_model();
         }
         
         ui.separator();
@@ -126,6 +127,86 @@ impl AthenianApp {
         if ui.button("Создать из функции").clicked() {
             self.create_function_model();
         }
+
+        ui.separator();
+
+        egui::CollapsingHeader::new("График функции двух переменных").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("Функция:");
+                egui::ComboBox::from_id_source("surface_function")
+                    .selected_text(match self.selected_surface_function {
+                        SurfaceFunction::Paraboloid => "Параболоид",
+                        SurfaceFunction::Saddle => "Седло",
+                        SurfaceFunction::Wave => "Волна",
+                        SurfaceFunction::Ripple => "Пульсация",
+                        SurfaceFunction::Gaussian => "Гаусс",
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(
+                            &mut self.selected_surface_function,
+                            SurfaceFunction::Paraboloid,
+                            "Параболоид (z = x² + y²)",
+                        );
+                        ui.selectable_value(
+                            &mut self.selected_surface_function,
+                            SurfaceFunction::Saddle,
+                            "Седло (z = x² - y²)",
+                        );
+                        ui.selectable_value(
+                            &mut self.selected_surface_function,
+                            SurfaceFunction::Wave,
+                            "Волна (z = sin(x)·cos(y))",
+                        );
+                        ui.selectable_value(
+                            &mut self.selected_surface_function,
+                            SurfaceFunction::Ripple,
+                            "Пульсация (z = sin(r)/r)",
+                        );
+                        ui.selectable_value(
+                            &mut self.selected_surface_function,
+                            SurfaceFunction::Gaussian,
+                            "Гаусс (z = e^(-(x²+y²)))",
+                        );
+                    });
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("X:");
+                ui.add(
+                    egui::DragValue::new(&mut self.surface_x_min)
+                        .speed(0.1)
+                        .prefix("от "),
+                );
+                ui.add(
+                    egui::DragValue::new(&mut self.surface_x_max)
+                        .speed(0.1)
+                        .prefix("до "),
+                );
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Y:");
+                ui.add(
+                    egui::DragValue::new(&mut self.surface_y_min)
+                        .speed(0.1)
+                        .prefix("от "),
+                );
+                ui.add(
+                    egui::DragValue::new(&mut self.surface_y_max)
+                        .speed(0.1)
+                        .prefix("до "),
+                );
+            });
+
+            ui.horizontal(|ui| {
+                ui.label("Разбиений:");
+                ui.add(egui::Slider::new(&mut self.surface_divisions, 10..=200).step_by(5.0));
+            });
+
+            if ui.button("🔨 Построить график").clicked() {
+                self.create_function_model();
+            }
+        });
 
         ui.separator();
 
@@ -432,16 +513,16 @@ impl AthenianApp {
         );
 
         if ui.button("Применить материал").clicked() {
-            self.apply_material_to_selected();
+            //      self.apply_material_to_selected();
         }
 
         ui.separator();
         ui.label("Текстуры:");
         if ui.button("Загрузить текстуру...").clicked() {
-            self.load_texture();
+            //   self.load_texture();
         }
         if ui.button("Удалить текстуру").clicked() {
-            self.remove_texture();
+            //  self.remove_texture();
         }
     }
 
