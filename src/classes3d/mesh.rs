@@ -61,21 +61,153 @@ impl Mesh {
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
     pub fn generate_texture_coord(
         vertexes: &Vec<HVec3>,
-        _polygons: &Vec<Polygon3>,
+        polygons: &Vec<Polygon3>,
     ) -> Vec<(f32, f32)> {
         #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, _polygons);
+        Self::assert_polygons(vertexes, polygons);
 
-        // Простая проекция на плоскость XY для текстурных координат
-        vertexes
-            .iter()
-            .map(|v| {
-                // Нормализуем координаты в диапазон [0, 1]
-                let u = (v.x + 1.0) / 2.0;
-                let v = (v.y + 1.0) / 2.0;
-                (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
-            })
-            .collect()
+        // Автоматически выбираем метод развертки на основе геометрии(возможно, реализуем в будущем. Сейчас - planar)
+        if Self::is_cylindrical_shape(vertexes) {
+            Self::generate_texture_coord_cylindrical(vertexes, polygons)
+        } else {
+            Self::generate_texture_coord_planar(vertexes, polygons)
+        }
+    }
+
+    /// Сгенерировать текстурные координаты с цилиндрической разверткой
+    pub fn generate_texture_coord_cylindrical(
+        vertexes: &Vec<HVec3>,
+        polygons: &Vec<Polygon3>,
+    ) -> Vec<(f32, f32)> {
+        //todo
+        todo!()
+    }
+
+    /// Вычислить ограничивающий параллелепипед вершин
+    fn calculate_bounds(vertexes: &Vec<HVec3>) -> (Vec3, Vec3) {
+        if vertexes.is_empty() {
+            return (Vec3::zero(), Vec3::zero());
+        }
+
+        let first = Vec3::from(vertexes[0]);
+        let mut min = first;
+        let mut max = first;
+
+        for vertex in vertexes.iter().skip(1) {
+            let v = Vec3::from(*vertex);
+            min.x = min.x.min(v.x);
+            min.y = min.y.min(v.y);
+            min.z = min.z.min(v.z);
+            max.x = max.x.max(v.x);
+            max.y = max.y.max(v.y);
+            max.z = max.z.max(v.z);
+        }
+
+        (min, max)
+    }
+
+    /// Планарная развертка
+    fn generate_texture_coord_planar(
+        vertexes: &Vec<HVec3>,
+        polygons: &Vec<Polygon3>,
+    ) -> Vec<(f32, f32)> {
+        let mut texture_coords = vec![(0.0, 0.0); vertexes.len()];
+        let mut usage_count = vec![0; vertexes.len()];
+
+        // Для каждого полигона вычисляем свою проекцию
+        for polygon in polygons {
+            let vertex_indices = polygon.get_vertexes();
+
+            if vertex_indices.len() < 3 {
+                continue;
+            }
+
+            // Вычисляем нормаль полигона для определения плоскости проекции
+            let normal = polygon.get_normal(vertexes, None);
+            let (u_axis, v_axis) = Self::get_projection_axes(normal);
+
+            let (min_u, min_v, max_u, max_v) =
+                Self::get_polygon_bounds(vertexes, vertex_indices, u_axis, v_axis);
+
+            // Назначаем UV координаты для вершин этого полигона
+            for &vertex_index in vertex_indices {
+                let vertex = Vec3::from(vertexes[vertex_index]);
+                let u = (vertex.dot(u_axis) - min_u) / (max_u - min_u);
+                let v = (vertex.dot(v_axis) - min_v) / (max_v - min_v);
+
+                // Усредняем координаты для вершин, используемых в нескольких полигонах
+                if usage_count[vertex_index] == 0 {
+                    texture_coords[vertex_index] = (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0));
+                } else {
+                    let (old_u, old_v) = texture_coords[vertex_index];
+                    let count = usage_count[vertex_index] as f32;
+                    let new_u = (old_u * count + u) / (count + 1.0);
+                    let new_v = (old_v * count + v) / (count + 1.0);
+                    texture_coords[vertex_index] = (new_u.clamp(0.0, 1.0), new_v.clamp(0.0, 1.0));
+                }
+
+                usage_count[vertex_index] += 1;
+            }
+        }
+
+        texture_coords
+    }
+
+    /// Определяет оси проекции на основе нормали
+    fn get_projection_axes(normal: Vec3) -> (Vec3, Vec3) {
+        // Выбираем плоскость проекции в зависимости от доминирующей оси нормали
+        let abs_normal = Vec3::new(normal.x.abs(), normal.y.abs(), normal.z.abs());
+
+        if abs_normal.x >= abs_normal.y && abs_normal.x >= abs_normal.z {
+            // Проецируем на плоскость YZ
+            (Vec3::new(0.0, 1.0, 0.0), Vec3::new(0.0, 0.0, 1.0))
+        } else if abs_normal.y >= abs_normal.x && abs_normal.y >= abs_normal.z {
+            // Проецируем на плоскость XZ
+            (Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0))
+        } else {
+            // Проецируем на плоскость XY
+            (Vec3::new(1.0, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0))
+        }
+    }
+
+    /// Вычисляет границы полигона в выбранной плоскости проекции
+    fn get_polygon_bounds(
+        vertexes: &Vec<HVec3>,
+        vertex_indices: &[usize],
+        u_axis: Vec3,
+        v_axis: Vec3,
+    ) -> (f32, f32, f32, f32) {
+        let mut min_u = f32::MAX;
+        let mut min_v = f32::MAX;
+        let mut max_u = f32::MIN;
+        let mut max_v = f32::MIN;
+
+        for &index in vertex_indices {
+            let vertex = Vec3::from(vertexes[index]);
+            let u = vertex.dot(u_axis);
+            let v = vertex.dot(v_axis);
+
+            min_u = min_u.min(u);
+            min_v = min_v.min(v);
+            max_u = max_u.max(u);
+            max_v = max_v.max(v);
+        }
+
+        // Защита от деления на ноль
+        if max_u - min_u < 0.001 {  
+            max_u = min_u + 1.0;
+        }
+        if max_v - min_v < 0.001 {
+            max_v = min_v + 1.0;
+        }
+
+        (min_u, min_v, max_u, max_v)
+    }
+
+    /// Проверить, является ли форма цилиндрической (подходит для вращения)
+    fn is_cylindrical_shape(vertexes: &Vec<HVec3>) -> bool {
+        //TODO
+        false
     }
 
     // --------------------------------------------------
