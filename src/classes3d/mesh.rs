@@ -14,42 +14,47 @@ impl Mesh {
     pub fn generate_normals(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) -> Vec<Vec3> {
         let mut normals = vec![Vec3::new(0.0, 0.0, 0.0); vertexes.len()];
 
+        let mut normals = vec![Vec3::zero(); vertexes.len()];
+        let mut face_count = vec![0; vertexes.len()];
+
+        // Вычисляем центр меша для согласованной ориентации нормалей
+        let mesh_center = Self::calculate_center(vertexes);
+
+        // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
+        // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
         for polygon in polygons {
-            // Вычисляем нормаль прямо здесь, через векторное произведение
-            if polygon.get_vertexes().len() >= 3 {
-                let v0_idx = polygon.get_vertexes()[0];
-                let v1_idx = polygon.get_vertexes()[1];
-                let v2_idx = polygon.get_vertexes()[2];
+            let poly_normal = polygon.get_normal(vertexes, Some(mesh_center));
+            let vertex_indices = polygon.get_vertexes();
 
-                let v0 = Vec3::new(vertexes[v0_idx].x, vertexes[v0_idx].y, vertexes[v0_idx].z);
-                let v1 = Vec3::new(vertexes[v1_idx].x, vertexes[v1_idx].y, vertexes[v1_idx].z);
-                let v2 = Vec3::new(vertexes[v2_idx].x, vertexes[v2_idx].y, vertexes[v2_idx].z);
-
-                let edge1 = v1 - v0;
-                let edge2 = v2 - v0;
-                let mut poly_normal = edge1.cross(edge2);
-
-                let len = poly_normal.length();
-                if len > f32::EPSILON {
-                    poly_normal = poly_normal / len;
-                }
-
-                for &vertex_idx in polygon.get_vertexes() {
-                    if vertex_idx < normals.len() {
-                        normals[vertex_idx] = normals[vertex_idx] + poly_normal;
-                    }
-                }
+            for &vertex_index in vertex_indices {
+                normals[vertex_index] = normals[vertex_index] + poly_normal;
+                face_count[vertex_index] += 1;
             }
         }
 
-        for normal in &mut normals {
-            let len = normal.length();
-            if len > f32::EPSILON {
-                *normal = *normal / len;
+        // Усредняем нормали и нормализуем
+        for i in 0..normals.len() {
+            if face_count[i] > 0 {
+                normals[i] = normals[i] * (1.0 / face_count[i] as f32);
+                normals[i] = normals[i].normalize();
             }
         }
 
         normals
+    }
+
+    /// Вычислить центр меша
+    fn calculate_center(vertexes: &Vec<HVec3>) -> Vec3 {
+        if vertexes.is_empty() {
+            return Vec3::zero();
+        }
+
+        let sum: Vec3 = vertexes
+            .iter()
+            .map(|v| Vec3::from(*v))
+            .fold(Vec3::zero(), |acc, v| acc + v);
+
+        sum * (1.0 / vertexes.len() as f32)
     }
 
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
@@ -129,8 +134,6 @@ impl Mesh {
     /// `axis` - ось, вокруг которой происходит вращение
     /// `parts` - количество разбиений
     pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
-        let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
-
         if parts < 3 {
             panic!("Количество разбиений должно быть не менее 3");
         }
@@ -145,8 +148,6 @@ impl Mesh {
 
         // Для каждой точки профиля создаем кольцо вершин
         for profile_point in profile_points {
-            let point_vec = Vec3::new(profile_point.x, profile_point.y, profile_point.z);
-
             // Вращаем точку вокруг оси
             for i in 0..=parts {
                 let angle = angle_step * i as f32;
@@ -639,18 +640,67 @@ impl Polygon3 {
         &self.vertexes
     }
 
-    /// Получить нормаль к полигону.
-    pub fn get_normal(&self) -> Vec3 {
-        if self.vertexes.len() < 3 {
-            return Vec3::new(0.0, 0.0, 1.0);
+    /// Получить нормаль к полигону
+    pub fn get_normal(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
+        let vertex_indices = self.get_vertexes();
+
+        match vertex_indices.len() {
+            0 | 1 | 2 => Vec3::new(0.0, 0.0, 1.0), // Недостаточно вершин
+            _ => self.get_normal_polygon(vertexes, mesh_center),
+        }
+    }
+
+    /// Нормаль для многоугольника
+    fn get_normal_polygon(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
+        let poly_vertex_indices = self.get_vertexes();
+        let mut normal = Vec3::zero();
+
+        for i in 0..poly_vertex_indices.len() {
+            let current = Vec3::from(vertexes[poly_vertex_indices[i]]);
+            let next =
+                Vec3::from(vertexes[poly_vertex_indices[(i + 1) % poly_vertex_indices.len()]]);
+
+            normal.x += (current.y - next.y) * (current.z + next.z);
+            normal.y += (current.z - next.z) * (current.x + next.x);
+            normal.z += (current.x - next.x) * (current.y + next.y);
         }
 
-        let v0_idx = self.vertexes[0];
-        let v1_idx = self.vertexes[1];
-        let v2_idx = self.vertexes[2];
+        // Ориентируем нормаль от центра объекта, если центр предоставлен
+        if let Some(center) = mesh_center {
+            normal = self.orient_polygon_normal_from_center(normal, vertexes, center);
+        }
 
-        // Предполагаем, что вершины будут доступны из контекста
-        // Это временное решение - нормаль должна вычисляться внутри generate_normals
-        Vec3::new(0.0, 0.0, 1.0)
+        if normal.length() > 0.001 {
+            normal.normalize()
+        } else {
+            Vec3::new(0.0, 0.0, 1.0)
+        }
+    }
+
+    /// Ориентирует нормаль многоугольника от центра
+    fn orient_polygon_normal_from_center(
+        &self,
+        normal: Vec3,
+        vertexes: &Vec<HVec3>,
+        center: Vec3,
+    ) -> Vec3 {
+        let vertex_indices = self.get_vertexes();
+
+        // Вычисляем центр многоугольника
+        let mut face_center = Vec3::zero();
+        for &index in vertex_indices {
+            face_center = face_center + Vec3::from(vertexes[index]);
+        }
+        face_center = face_center * (1.0 / vertex_indices.len() as f32);
+
+        // Вектор от центра объекта к центру грани
+        let center_to_face = face_center - center;
+
+        // Если нормаль направлена к центру объекта, разворачиваем её
+        if normal.dot(center_to_face) < 0.0 {
+            -normal
+        } else {
+            normal
+        }
     }
 }
