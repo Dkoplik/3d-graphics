@@ -1,6 +1,9 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
-use g3d::{Line3, Model3, Point3, Transform3D, Vec3};
+use g3d::{
+    Line3, Model3, Point3, Transform3D, Vec3, classes3d::model3::ObjLoadError,
+    classes3d::model3::ObjSaveError,
+};
 
 // --------------------------------------------------
 // Обработка области рисования (холст)
@@ -312,8 +315,53 @@ impl AthenianApp {
     }
 
     pub fn load_obj_file(&mut self) {
-        // TODO: Реализовать загрузку OBJ файлов
-        todo!("загрузка модели из obj")
+        let file_path = rfd::FileDialog::new()
+            .add_filter("OBJ files", &["obj"])
+            .pick_file();
+
+        if let Some(path) = file_path {
+            match Model3::load_from_obj(path.to_str().unwrap()) {
+                Ok(model) => {
+                    self.set_model(model);
+                    println!("Модель успешно загружена");
+                }
+                Err(ObjLoadError::FileNotFound) => {
+                    eprintln!("Файл не найден");
+                }
+                Err(ObjLoadError::InvalidFormat) => {
+                    eprintln!("Неверный формат OBJ файла");
+                }
+                Err(ObjLoadError::UnsupportedFeature) => {
+                    eprintln!("Файл содержит неподдерживаемые функции");
+                }
+            }
+        }
+    }
+
+    pub fn save_obj_file(&mut self) {
+        if let Some(model) = self.get_selected_model() {
+            // Показываем диалог сохранения файла
+            let file_path = rfd::FileDialog::new()
+                .add_filter("OBJ files", &["obj"])
+                .set_file_name("model.obj")
+                .save_file();
+
+            if let Some(path) = file_path {
+                match model.save_to_obj(path.to_str().unwrap()) {
+                    Ok(()) => {
+                        println!("Модель успешно сохранена");
+                    }
+                    Err(ObjSaveError::WriteError) => {
+                        eprintln!("Ошибка записи файла");
+                    }
+                    Err(ObjSaveError::InvalidData) => {
+                        eprintln!("Неверные данные модели");
+                    }
+                }
+            }
+        } else {
+            eprintln!("Нет выбранной модели для сохранения");
+        }
     }
 
     pub fn create_rotation_model(&mut self) {

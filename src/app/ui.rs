@@ -104,6 +104,9 @@ impl AthenianApp {
         if ui.button("Загрузить OBJ...").clicked() {
             self.load_obj_file();
         }
+        if ui.button("Сохранить OBJ...").clicked() {
+            self.save_obj_file();
+        }
         if ui.button("Создать вращением").clicked() {
             self.create_rotation_model();
         }
