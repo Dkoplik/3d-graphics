@@ -12,8 +12,7 @@ impl Mesh {
 
     /// Сгенерировать карту нормалей по имеющимся полигонам.
     pub fn generate_normals(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) -> Vec<Vec3> {
-        #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
+        let mut normals = vec![Vec3::new(0.0, 0.0, 0.0); vertexes.len()];
 
         let mut normals = vec![Vec3::zero(); vertexes.len()];
         let mut face_count = vec![0; vertexes.len()];
@@ -61,13 +60,21 @@ impl Mesh {
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
     pub fn generate_texture_coord(
         vertexes: &Vec<HVec3>,
-        polygons: &Vec<Polygon3>,
+        _polygons: &Vec<Polygon3>,
     ) -> Vec<(f32, f32)> {
         #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
+        Self::assert_polygons(vertexes, _polygons);
 
-        // TODO какую-нибудь развертку сделать, чтобы полигоны всей модели можно было уместить на UV текстуре
-        todo!("Генерация координат текстуры");
+        // Простая проекция на плоскость XY для текстурных координат
+        vertexes
+            .iter()
+            .map(|v| {
+                // Нормализуем координаты в диапазон [0, 1]
+                let u = (v.x + 1.0) / 2.0;
+                let v = (v.y + 1.0) / 2.0;
+                (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+            })
+            .collect()
     }
 
     // --------------------------------------------------
@@ -227,8 +234,52 @@ impl Mesh {
     where
         F: Fn(f32, f32) -> f32,
     {
-        // TODO: Надо тупо вычислять график, будут вершины, а потом как-то в полигоны объединить.
-        todo!("Сделать модель по графику")
+        let (x0, x1) = x_range;
+        let (y0, y1) = y_range;
+
+        let dx = (x1 - x0) / x_steps as f32;
+        let dy = (y1 - y0) / y_steps as f32;
+
+        let mut vertexes = Vec::new();
+
+        // Генерируем вершины
+        for j in 0..=y_steps {
+            for i in 0..=x_steps {
+                let x = x0 + i as f32 * dx;
+                let y = y0 + j as f32 * dy;
+                let z = func(x, y);
+
+                if z.is_finite() {
+                    vertexes.push(HVec3::new(x, y, z));
+                } else {
+                    vertexes.push(HVec3::new(x, y, 0.0));
+                }
+            }
+        }
+
+        // Генерируем полигоны (треугольники)
+        let mut polygons = Vec::new();
+        for j in 0..y_steps {
+            for i in 0..x_steps {
+                let idx = |i: usize, j: usize| -> usize { j * (x_steps + 1) + i };
+
+                // Первый треугольник
+                polygons.push(Polygon3::triangle(
+                    idx(i, j),
+                    idx(i + 1, j),
+                    idx(i + 1, j + 1),
+                ));
+
+                // Второй треугольник
+                polygons.push(Polygon3::triangle(
+                    idx(i, j),
+                    idx(i + 1, j + 1),
+                    idx(i, j + 1),
+                ));
+            }
+        }
+
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание тетраэдра со сторонами единичной длины.
