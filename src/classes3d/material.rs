@@ -41,7 +41,7 @@ impl Material {
     ///
     /// Обращаю внимание, что тут происходит только смешивание текстуры и материала.
     /// Освещение и шейдинг тут никак не учитываются.
-    fn get_uv_color(&self, u: f32, v: f32, blend_mode: TextureBlendMode) -> Color32 {
+    pub fn get_uv_color(&self, u: f32, v: f32, blend_mode: TextureBlendMode) -> Color32 {
         if let Some(texture) = &self.texture {
             blend_mode.blend(texture[(u, v)], self.color)
         } else {
