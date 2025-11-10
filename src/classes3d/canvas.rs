@@ -8,37 +8,24 @@ use std::collections::VecDeque;
 
 use crate::Canvas;
 
-#[derive(Default, PartialEq, Clone, Copy)]
-/// Вариант связности, нужен для заливки.
-pub enum Connectivity {
-    /// 4-х связная заливка
-    FOUR,
-    #[default]
-    /// 8-ми связная заливка
-    EIGHT,
-}
-
-impl Connectivity {
-    pub fn get_name(&self) -> String {
-        match self {
-            Connectivity::FOUR => String::from("4-х связная"),
-            Connectivity::EIGHT => String::from("8-ми связная"),
-        }
-    }
-}
-
-// =============== Реализация холста ===============
-
 impl Default for Canvas {
     fn default() -> Self {
         Self::new(900, 600)
     }
 }
 
+// --------------------------------------------------
+// Создание и базовые методы
+// --------------------------------------------------
+
 impl Canvas {
     pub fn new(width: usize, height: usize) -> Self {
+        debug_assert!(width > 0, "ширина холста не может быть нулевой");
+        debug_assert!(height > 0, "высота холста не может быть нулевой");
+
         Self {
-            pixels: vec![Color32::WHITE; width * height],
+            pixels: vec![Color32::GRAY; width * height],
+            buffer: vec![f32::MAX; width * height],
             width,
             height,
         }
@@ -70,10 +57,40 @@ impl Canvas {
     /// Заполнить весь холст указанным цветом
     pub fn clear(&mut self, color: Color32) {
         self.pixels.fill(color);
+        self.buffer.fill(f32::MAX);
+    }
+
+    /// Проверить и обновить значение z-буфера
+    ///
+    /// Если новое значение z меньше текущего, то возвращает true и обновляет буфер,
+    /// иначе возвращает false.
+    pub fn test_and_set_z(&mut self, x: usize, y: usize, z: f32) -> bool {
+        debug_assert!(
+            x < self.width,
+            "x {} должен быть меньше ширины {}",
+            x,
+            self.width
+        );
+        debug_assert!(
+            y < self.height,
+            "y {} должен быть меньше ширины {}",
+            y,
+            self.height
+        );
+
+        let index = y * self.width + x;
+        if z < self.buffer[index] {
+            self.buffer[index] = z;
+            true
+        } else {
+            false
+        }
     }
 }
 
-// =============== Доступ к отдельным пикселям холста ===============
+// --------------------------------------------------
+// Доступ к отдельным пикселям холста
+// --------------------------------------------------
 
 impl Index<(usize, usize)> for Canvas {
     type Output = Color32;
@@ -95,12 +112,11 @@ impl IndexMut<(usize, usize)> for Canvas {
     }
 }
 
-// =============== Растровые алгоритмы над холстом ===============
+// --------------------------------------------------
+// Заливка
+// --------------------------------------------------
 
-// Задание 1 (всякие заливки)
 impl Canvas {
-    // Сюда можно приватные вспомогательные методы, если нужно
-
     /// Вспомогательная функция для нахождения границ линии
     fn find_line_bounds(&self, x: usize, y: usize, old_color: Color32) -> (usize, usize) {
         let mut left = x;
@@ -335,7 +351,10 @@ impl Canvas {
     }
 }
 
-// Задание 2 (линии)
+// --------------------------------------------------
+// Рисование линий
+// --------------------------------------------------
+
 impl Canvas {
     /// Рисование линии алгоритмом Брезенхема.
     /// pos1 - первая точка линии;
@@ -465,92 +484,21 @@ impl Canvas {
     }
 }
 
-// Задание 3 (растеризация треугольника с градиентом)
-impl Canvas {
-    /// Вычисление барицентрических координат через систему уравнений
-    fn compute_barycentric_coords(
-        &self,
-        p: Pos2,
-        a: Pos2,
-        b: Pos2,
-        c: Pos2,
-    ) -> Option<(f32, f32, f32)> {
-        let det = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+#[derive(Default, PartialEq, Clone, Copy)]
+/// Вариант связности, нужен для заливки.
+pub enum Connectivity {
+    /// 4-х связная заливка
+    FOUR,
+    #[default]
+    /// 8-ми связная заливка
+    EIGHT,
+}
 
-        // Если определитель близок к нулю, треугольник вырожденный
-        if det.abs() < 1e-10 {
-            return None;
-        }
-
-        let alpha = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / det;
-        let beta = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / det;
-        let gamma = 1.0 - alpha - beta;
-
-        Some((alpha, beta, gamma))
-    }
-
-    /// Интерполяция цвета по барицентрическим координатам
-    fn interpolate_color(
-        &self,
-        alpha: f32,
-        beta: f32,
-        gamma: f32,
-        color1: Color32,
-        color2: Color32,
-        color3: Color32,
-    ) -> Color32 {
-        let r = (alpha * color1.r() as f32 + beta * color2.r() as f32 + gamma * color3.r() as f32)
-            .round() as u8;
-        let g = (alpha * color1.g() as f32 + beta * color2.g() as f32 + gamma * color3.g() as f32)
-            .round() as u8;
-        let b = (alpha * color1.b() as f32 + beta * color2.b() as f32 + gamma * color3.b() as f32)
-            .round() as u8;
-        let a = (alpha * color1.a() as f32 + beta * color2.a() as f32 + gamma * color3.a() as f32)
-            .round() as u8;
-
-        Color32::from_rgba_premultiplied(r, g, b, a)
-    }
-
-    /// Градиентная растеризация треугольника через барицентрические координаты.
-    /// pos[1..3] - 3 точки треугольника;
-    /// color[1..3] - цвета соответствующих точек;
-    pub fn draw_gradient_triangle(
-        &mut self,
-        pos1: Pos2,
-        pos2: Pos2,
-        pos3: Pos2,
-        color1: Color32,
-        color2: Color32,
-        color3: Color32,
-    ) {
-        // ограничивающий прямоугольник
-        let min_x = pos1.x.min(pos2.x.min(pos3.x)).floor() as usize;
-        let min_y = pos1.y.min(pos2.y.min(pos3.y)).floor() as usize;
-        let max_x = pos1.x.max(pos2.x.max(pos3.x)).ceil() as usize;
-        let max_y = pos1.y.max(pos2.y.max(pos3.y)).ceil() as usize;
-
-        // цикл по пикселям ограничевающего прямогольника
-        for y in min_y..=max_y {
-            for x in min_x..=max_x {
-                if x >= self.width || y >= self.height {
-                    continue;
-                }
-
-                let pixel_pos = Pos2::new(x as f32, y as f32);
-
-                // барицентрические координаты
-                if let Some((alpha, beta, gamma)) =
-                    self.compute_barycentric_coords(pixel_pos, pos1, pos2, pos3)
-                {
-                    // пиксель внутри треугольника
-                    if alpha >= 0.0 && beta >= 0.0 && gamma >= 0.0 {
-                        // интерполяция цвета
-                        let color =
-                            self.interpolate_color(alpha, beta, gamma, color1, color2, color3);
-                        self[(x, y)] = color;
-                    }
-                }
-            }
+impl Connectivity {
+    pub fn get_name(&self) -> String {
+        match self {
+            Connectivity::FOUR => String::from("4-х связная"),
+            Connectivity::EIGHT => String::from("8-ми связная"),
         }
     }
 }

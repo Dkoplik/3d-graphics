@@ -38,16 +38,14 @@ impl AthenianApp {
         ));
     }
 
-    /// Срендерить сцену.
+    /// Рендеринг сцены с учетом всех настроек
     pub fn render_scene(&mut self) {
-        // Подготавливаем параметры для пользовательской оси
-        let show_custom_axis =
-            self.instrument == crate::app::logic::Instrument::RotateAroundCustomLine;
+        // Рендерим в зависимости от выбранного режима
+        let show_custom_axis = self.instrument == Instrument::RotateAroundCustomLine;
 
         self.scene.render(
             &mut self.canvas,
-            g3d::ProjectionType::Perspective,
-            g3d::RenderType::WireFrame,
+            self.render_options,
             show_custom_axis,
             self.axis_point1,
             self.axis_point2,
@@ -117,32 +115,48 @@ impl AthenianApp {
 
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
-        // Если есть фигура на сцене, применяем преобразования сразу
-        if !self.scene.models.is_empty() {
-            match &self.instrument {
-                Instrument::Move3D => self.move_3d_model(start, end),
-                Instrument::Rotate3D => self.rotate_3d_model(start, end),
-                Instrument::Scale3D => self.scale_3d_model(start, end),
+        let delta_x = (end.x - start.x) / self.display_canvas_width;
+        let delta_y = (end.y - start.y) / self.display_canvas_height;
+
+        let cur_instrument = self.instrument;
+        if let Some(model) = self.get_selected_model_mut() {
+            match cur_instrument {
+                Instrument::Move3D => {
+                    let move_delta = g3d::Vec3::new(delta_x * 5.0, -delta_y * 5.0, 0.0);
+                    model.translate(move_delta);
+                }
+                Instrument::Rotate3D => {
+                    let rotation_x = g3d::Transform3D::rotation_y_rad(delta_x * 2.0);
+                    let rotation_y = g3d::Transform3D::rotation_x_rad(delta_y * 2.0);
+                    model.apply_transform(&rotation_x);
+                    model.apply_transform(&rotation_y);
+                }
+                Instrument::Scale3D => {
+                    let scale_factor = 1.0 + (delta_x + delta_y) * 2.0;
+                    model.scale(scale_factor, scale_factor, scale_factor);
+                }
                 Instrument::RotateAroundX => {
-                    self.rotate_around_axis(AxisType::Center(CenterAxis::X), start, end)
+                    let rotation = g3d::Transform3D::rotation_x_rad(delta_x * 2.0);
+                    model.apply_transform(&rotation);
                 }
                 Instrument::RotateAroundY => {
-                    self.rotate_around_axis(AxisType::Center(CenterAxis::Y), start, end)
+                    let rotation = g3d::Transform3D::rotation_y_rad(delta_x * 2.0);
+                    model.apply_transform(&rotation);
                 }
                 Instrument::RotateAroundZ => {
-                    self.rotate_around_axis(AxisType::Center(CenterAxis::Z), start, end)
+                    let rotation = g3d::Transform3D::rotation_z_rad(delta_x * 2.0);
+                    model.apply_transform(&rotation);
                 }
                 Instrument::RotateAroundCustomLine => {
-                    self.rotate_around_axis(AxisType::Custom, start, end)
+                    // Вращение вокруг произвольной оси обрабатывается отдельно
                 }
-                _ => {}
             }
         }
     }
 }
 
 // --------------------------------------------------
-// Взаимодействие с 3D моделями
+// Взаимодействие с 3D миром
 // --------------------------------------------------
 
 impl AthenianApp {
@@ -165,158 +179,161 @@ impl AthenianApp {
             .and_then(|index| self.scene.models.get(index))
     }
 
-    /// Переместить 3D модель (применяется сразу к выбранной фигуре)
-    fn move_3d_model(&mut self, start: egui::Pos2, end: egui::Pos2) {
-        todo!()
-        // if let Some(_) = self.get_selected_model() {
-        //     let delta_x = (end.x - start.x) / self.painter_width * 4.0;
-        //     let delta_y = (end.y - start.y) / self.painter_height * 4.0;
-
-        //     let translation = Transform3D::translation(delta_x, -delta_y, 0.0);
-        //     if let Some(model) = self.get_selected_model_mut() {
-        //         model.apply_transform(translation);
-        //     }
-        // }
-    }
-
-    /// Повернуть 3D модель (применяется сразу к выбранной фигуре)
-    fn rotate_3d_model(&mut self, start: egui::Pos2, end: egui::Pos2) {
-        todo!()
-        // if let Some(model) = self.get_selected_model() {
-        //     let delta_x = (end.x - start.x) / self.painter_width * std::f32::consts::PI;
-        //     let delta_y = (end.y - start.y) / self.painter_height * std::f32::consts::PI;
-
-        //     let center = model.get_origin();
-
-        //     // Вращение вокруг осей
-        //     let rotation_x = Transform3D::rotation_around_line(
-        //         Line3::new(center, Vec3::new(1.0, 0.0, 0.0)),
-        //         delta_y,
-        //     );
-        //     let rotation_y = Transform3D::rotation_around_line(
-        //         Line3::new(center, Vec3::new(0.0, 1.0, 0.0)),
-        //         delta_x,
-        //     );
-
-        //     let combined_rotation = rotation_x.multiply(rotation_y);
-        //     if let Some(model) = self.get_selected_model_mut() {
-        //         model.apply_transform(combined_rotation);
-        //     }
-        // }
-    }
-
-    /// Масштабировать 3D модель (применяется сразу к выбранной фигуре)
-    fn scale_3d_model(&mut self, start: egui::Pos2, end: egui::Pos2) {
-        todo!()
-        // if let Some(model) = self.get_selected_model() {
-        //     let delta = ((end.x - start.x) + (end.y - start.y))
-        //         / (self.painter_width + self.painter_height);
-        //     let scale_factor = 1.0 + delta * 2.0;
-
-        //     let center = model.get_origin();
-        //     let scale = Transform3D::scale_relative_to_point(
-        //         center,
-        //         scale_factor,
-        //         scale_factor,
-        //         scale_factor,
-        //     );
-
-        //     if let Some(model) = self.get_selected_model_mut() {
-        //         model.apply_transform(scale);
-        //     }
-        // }
-    }
-
-    /// Применить отражение относительно выбранной плоскости.
-    pub fn apply_reflection(&mut self, plane_type: ReflectionPlane) {
-        todo!()
-        // if let Some(model) = self.get_selected_model() {
-        //     let center = model.get_origin();
-
-        //     let reflection = match plane_type {
-        //         ReflectionPlane::XY => Transform3D::reflection_xy(),
-        //         ReflectionPlane::XZ => Transform3D::reflection_xz(),
-        //         ReflectionPlane::YZ => Transform3D::reflection_yz(),
-        //     };
-
-        //     // Применяем отражение относительно центра модели
-        //     let transform = Transform3D::translation(-center.x, -center.y, -center.z)
-        //         .multiply(reflection)
-        //         .multiply(Transform3D::translation(center.x, center.y, center.z));
-
-        //     if let Some(model) = self.get_selected_model_mut() {
-        //         model.apply_transform(transform);
-        //     }
-        // }
-    }
-
-    // Простые методы для добавления многогранников (заменяют текущую фигуру)
     pub fn add_tetrahedron(&mut self) {
-        todo!()
-        // let tetrahedron = Model3::tetrahedron();
-        // self.set_model(tetrahedron);
+        let mesh = g3d::Mesh::tetrahedron();
+        let model = g3d::Model3::from_mesh(mesh);
+        self.add_model(model);
     }
 
     pub fn add_hexahedron(&mut self) {
-        todo!()
-        // let hexahedron = Model3::hexahedron();
-        // self.set_model(hexahedron);
+        let mesh = g3d::Mesh::hexahedron();
+        let model = g3d::Model3::from_mesh(mesh);
+        self.add_model(model);
     }
 
     pub fn add_octahedron(&mut self) {
-        todo!()
-        // let octahedron = Model3::octahedron();
-        // self.set_model(octahedron);
+        let mesh = g3d::Mesh::octahedron();
+        let model = g3d::Model3::from_mesh(mesh);
+        self.add_model(model);
     }
 
     pub fn add_icosahedron(&mut self) {
-        todo!()
-        // let icosahedron = Model3::icosahedron();
-        // self.set_model(icosahedron);
+        let mesh = g3d::Mesh::icosahedron();
+        let model = g3d::Model3::from_mesh(mesh);
+        self.add_model(model);
     }
 
     pub fn add_dodecahedron(&mut self) {
-        todo!()
-        // let dodecahedron = Model3::dodecahedron();
-        // self.set_model(dodecahedron);
+        let mesh = g3d::Mesh::dodecahedron();
+        let model = g3d::Model3::from_mesh(mesh);
+        self.add_model(model);
     }
 
-    /// Повернуть модель вокруг оси (мышью)
-    pub fn rotate_around_axis(&mut self, axis_type: AxisType, start: egui::Pos2, end: egui::Pos2) {
-        todo!()
-        //     if let Some(model) = self.get_selected_model() {
-        //         let line = match axis_type {
-        //             AxisType::Center(center_axis) => {
-        //                 let center = model.get_origin();
-        //                 let axis_vector = match center_axis {
-        //                     CenterAxis::X => Vec3::new(1.0, 0.0, 0.0),
-        //                     CenterAxis::Y => Vec3::new(0.0, 1.0, 0.0),
-        //                     CenterAxis::Z => Vec3::new(0.0, 0.0, 1.0),
-        //                 };
-        //                 Line3::new(center, axis_vector)
-        //             }
-        //             AxisType::Custom => {
-        //                 let point1 =
-        //                     Point3::new(self.axis_point1_x, self.axis_point1_y, self.axis_point1_z);
-        //                 let point2 =
-        //                     Point3::new(self.axis_point2_x, self.axis_point2_y, self.axis_point2_z);
-        //                 let direction = (point2 - point1).normalize();
-        //                 Line3::new(point1, direction)
-        //             }
-        //         };
+    pub fn add_model(&mut self, model: g3d::Model3) {
+        self.scene.models.push(model);
+        self.selected_3d_model_index = Some(self.scene.models.len() - 1);
+    }
 
-        //         // Вычисляем угол вращения на основе перемещения мыши
-        //         let delta_x = (end.x - start.x) / self.painter_width * std::f32::consts::PI;
-        //         let angle = delta_x * 2.0; // Множитель для более плавного вращения
+    pub fn translate_model(&mut self, delta: g3d::Vec3) {
+        if let Some(model) = self.get_selected_model_mut() {
+            model.translate(delta);
+        }
+    }
 
-        //         let rotation = Transform3D::rotation_around_line(line, angle);
+    pub fn rotate_model(&mut self, axis: g3d::Vec3, angle_rad: f32) {
+        if let Some(model) = self.get_selected_model_mut() {
+            model.rotate_around_axis(axis, angle_rad);
+        }
+    }
 
-        //         if let Some(model) = self.get_selected_model_mut() {
-        //             model.apply_transform(rotation);
-        //         }
+    pub fn scale_model(&mut self, factor: f32) {
+        if let Some(model) = self.get_selected_model_mut() {
+            model.scale(factor, factor, factor);
+        }
+    }
 
-        //         println!("Rotated around axis by {:.2} radians", angle);
-        //     }
+    pub fn apply_reflection(&mut self, plane_type: ReflectionPlane) {
+        if let Some(model) = self.get_selected_model_mut() {
+            let reflection = match plane_type {
+                ReflectionPlane::XY => g3d::Transform3D::reflection_xy(),
+                ReflectionPlane::XZ => g3d::Transform3D::reflection_xz(),
+                ReflectionPlane::YZ => g3d::Transform3D::reflection_yz(),
+            };
+            model.apply_transform(&reflection);
+        }
+    }
+
+    pub fn apply_custom_rotation(&mut self) {
+        if self.get_selected_model().is_some() {
+            let axis_line = g3d::Line3::from_points(self.axis_point1, self.axis_point2);
+            let rotation = g3d::Transform3D::rotation_around_line(
+                axis_line,
+                self.angle_of_rotate.to_radians(),
+            );
+            if let Some(model) = self.get_selected_model_mut() {
+                model.apply_transform(&rotation);
+            }
+        }
+    }
+
+    pub fn apply_material_to_selected(&mut self) {
+        // TODO: Применить материал к выбранной модели
+        todo!("Применение материала к моделе")
+    }
+
+    // === ОПЕРАЦИИ С ОСВЕЩЕНИЕМ ===
+
+    pub fn add_light_source(&mut self) {
+        let new_light = g3d::LightSource {
+            position: g3d::Point3::new(3.0, 3.0, 3.0),
+            color: egui::Color32::WHITE,
+            intensity: 1.0,
+        };
+        self.scene.add_light(new_light);
+        self.selected_light_index = Some(self.scene.lights.len() - 1);
+    }
+
+    // === ОПЕРАЦИИ С КАМЕРОЙ ===
+
+    pub fn reset_camera(&mut self) {
+        let camera = &mut self.scene.camera;
+
+        // Обновляем позицию и направление
+        camera.set_position(g3d::Point3::new(10.0, 10.0, 10.0));
+        camera.set_direction(
+            (g3d::Point3::new(0.0, 0.0, 0.0) - camera.get_position()).normalize(),
+            g3d::Vec3::up(),
+        );
+
+        // Обновляем поле зрения
+        camera.set_fov_degrees(60.0);
+    }
+
+    pub fn set_front_view(&mut self) {
+        let camera = &mut self.scene.camera;
+
+        // Обновляем позицию и направление
+        camera.set_position(g3d::Point3::new(0.0, 0.0, 10.0));
+        camera.set_direction(
+            (g3d::Point3::new(0.0, 0.0, 0.0) - camera.get_position()).normalize(),
+            g3d::Vec3::up(),
+        );
+    }
+
+    pub fn set_top_view(&mut self) {
+        let camera = &mut self.scene.camera;
+
+        // Обновляем позицию и направление
+        camera.set_position(g3d::Point3::new(0.0, 10.0, 0.0));
+        camera.set_direction(
+            (g3d::Point3::new(0.0, 0.0, 0.0) - camera.get_position()).normalize(),
+            g3d::Vec3::up(),
+        );
+    }
+
+    pub fn load_obj_file(&mut self) {
+        // TODO: Реализовать загрузку OBJ файлов
+        todo!("загрузка модели из obj")
+    }
+
+    pub fn create_rotation_model(&mut self) {
+        // TODO: Реализовать создание модели вращения
+        todo!("создание модели вращения")
+    }
+
+    pub fn create_function_model(&mut self) {
+        // TODO: Реализовать создание модели из функции
+        todo!("создание модели из графика функции")
+    }
+
+    pub fn load_texture(&mut self) {
+        // TODO: Реализовать загрузку текстур
+        todo!("загрузить текстуру для модели")
+    }
+
+    pub fn remove_texture(&mut self) {
+        // TODO: Удалить текстуру у выбранной модели
+        todo!("удалить текстуру у модели")
     }
 }
 
@@ -347,7 +364,7 @@ impl AthenianApp {
     }
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone, Copy)]
 pub enum Instrument {
     #[default]
     Move3D,

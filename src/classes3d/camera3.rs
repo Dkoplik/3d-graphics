@@ -256,6 +256,39 @@ impl Camera3 {
         self.far_plane = far_plane.max(self.near_plane + 0.1);
     }
 
+    pub fn get_position(&self) -> Point3 {
+        self.local_frame.origin
+    }
+
+    pub fn set_position(&mut self, position: Point3) {
+        self.local_frame.origin = position;
+    }
+
+    pub fn get_direction(&self) -> Vec3 {
+        self.local_frame.x
+    }
+
+    pub fn set_direction(&mut self, direction: Vec3, up: Vec3) {
+        let new_frame = CoordFrame::from_2(
+            direction.normalize(),
+            direction.cross(up).normalize(),
+            self.local_frame.origin,
+        );
+        self.local_frame = new_frame;
+    }
+
+    pub fn move_forward(&mut self, distance: f32) {
+        self.local_frame.origin = self.local_frame.origin + self.forward() * distance;
+    }
+
+    pub fn move_right(&mut self, distance: f32) {
+        self.local_frame.origin = self.local_frame.origin + self.right() * distance;
+    }
+
+    pub fn move_up(&mut self, distance: f32) {
+        self.local_frame.origin = self.local_frame.origin + self.up() * distance;
+    }
+
     // --------------------------------------------------
     // Вспомогательные методы
     // --------------------------------------------------

@@ -8,7 +8,7 @@
 pub mod classes3d;
 
 // ========================================
-// Определение основных структур библиотеки
+// Примитивы библиотеки
 // ========================================
 
 /// Точка в 3D пространстве с координатами `x`, `y`, `z`.
@@ -88,6 +88,10 @@ pub struct Line3 {
     pub direction: Vec3,
 }
 
+// ========================================
+// Абстракции для рендера сцены и объектов
+// ========================================
+
 /// Mesh модели.
 ///
 /// Mesh представляет собой набор вершин (точек) и полигонов.
@@ -108,20 +112,59 @@ pub struct Mesh {
 
     /// Локальные координаты Mesh'а в 3D пространстве.
     local_frame: CoordFrame,
+
+    /// Нормали вершин, используются те же индексы, что и в полигонах.
+    normals: Vec<Vec3>,
+
+    /// Соответствие между UV-координатами текстуры и вершинами
+    texture_coords: Vec<(f32, f32)>,
+}
+
+/// Текстура модели.
+///
+/// Благодаря текстуре модель может быть обёрнута в какую-то картинку вместо сплошного цвета.
+#[derive(Debug, Clone)]
+pub struct Texture {
+    /// Пиксели (цвета) текстуры
+    pub image: Vec<egui::Color32>,
+    /// Ширина текстуры
+    pub width: usize,
+    /// Высота текстуры
+    pub height: usize,
+}
+
+/// Материал модели.
+///
+/// Материал задаёт сплошной цвет модели и его поведение при освещении.
+#[derive(Debug, Clone)]
+pub struct Material {
+    /// Цвет всего объекта
+    pub color: egui::Color32,
+    /// Текстура объекта, если имеется
+    pub texture: Option<Texture>,
+    pub shininess: f32,
+    pub specular_strength: f32,
 }
 
 /// Модель (объект) в 3D пространстве.
+///
+/// По сути просто контейнер для Mesh'а и его материала, где Mesh задаёт форму модели, а материал отображение (цвет).
 #[derive(Debug, Clone)]
 pub struct Model3 {
     /// Mesh модели.
-    mesh: Mesh,
+    pub mesh: Mesh,
+    /// Материал модели.
+    pub material: Material,
 }
 
 /// Точечный источник света.
 ///
 /// Свет от этого источника направлен по все стороны.
+#[derive(Debug, Clone, Copy)]
 pub struct LightSource {
-    position: Point3,
+    pub position: Point3,
+    pub color: egui::Color32,
+    pub intensity: f32,
 }
 
 /// Сцена в 3-х мерном пространстве с 3-х мерными объектами (моделями).
@@ -131,6 +174,10 @@ pub struct Scene {
     pub models: Vec<Model3>,
     /// Камера в 3-х мерной сцене.
     pub camera: Camera3,
+    /// Источики света.
+    pub lights: Vec<LightSource>,
+    /// Цвет глобального освещения (чтобы вся сцена не была тёмной).
+    pub ambient_light: egui::Color32,
 }
 
 /// Камера в 3-х мерном пространстве.
@@ -169,44 +216,15 @@ pub struct Transform3D {
     pub m: [f32; 16],
 }
 
-/// Аффинное 2D преобразование
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Transform2D {
-    // Матрица аффинного преобразования:
-    // [a, d, 0]
-    // [b, e, 0]
-    // [c, f, 1]
-    pub a: f32,
-    pub b: f32,
-    pub c: f32,
-    pub d: f32,
-    pub e: f32,
-    pub f: f32,
-}
-
 /// Холст для рисования 2D объектов.
 ///
 /// Весь рендер (проекция) рисуется на этот холст, после чего этот холст отображается.
+/// Также этот холст содержит в себе z-buffer.
 pub struct Canvas {
+    /// Описание пикселей холста (viewport'а).
     pixels: Vec<egui::Color32>,
+    /// z-buffer для помощи в отрисовке.
+    buffer: Vec<f32>,
     width: usize,
     height: usize,
-}
-
-/// Тип рендера
-#[derive(Default, Debug, Clone, Copy)]
-pub enum RenderType {
-    /// Отображение только каркасов (Mesh-ей) моделей.
-    #[default]
-    WireFrame,
-}
-
-/// Тип проекции камеры.
-#[derive(Default, Debug, Clone, Copy)]
-pub enum ProjectionType {
-    /// Параллельная (ортографическая) проекция.
-    Parallel,
-    /// Перспективная проекция.
-    #[default]
-    Perspective,
 }

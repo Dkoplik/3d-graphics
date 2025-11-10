@@ -3,17 +3,67 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-// --------------------------------------------------
-// Mesh
-// --------------------------------------------------
-
-use crate::{CoordFrame, HVec3, Mesh};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Vec3};
 
 impl Mesh {
-    /// Создать новый Mesh из уже известных вершин и полигонов.
+    // --------------------------------------------------
+    // Вспомогательные статические методы
+    // --------------------------------------------------
+
+    /// Сгенерировать карту нормалей по имеющимся полигонам.
+    pub fn generate_normals(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) -> Vec<Vec3> {
+        #[cfg(debug_assertions)]
+        Self::assert_polygons(vertexes, polygons);
+
+        // TODO надо просто обойти все полигоны и для их вершин посчитать нормали и усреднить, если у одной вершины их несколько
+        todo!("Генерация нормалей");
+    }
+
+    /// Сгенерировать текстурные координаты по имеющимся полигонам.
+    pub fn generate_texture_coord(
+        vertexes: &Vec<HVec3>,
+        polygons: &Vec<Polygon3>,
+    ) -> Vec<(f32, f32)> {
+        #[cfg(debug_assertions)]
+        Self::assert_polygons(vertexes, polygons);
+
+        // TODO какую-нибудь развертку сделать, чтобы полигоны всей модели можно было уместить на UV текстуре
+        todo!("Генерация координат текстуры");
+    }
+
+    // --------------------------------------------------
+    // Конструкторы
+    // --------------------------------------------------
+
+    /// Создать новый Mesh из уже известных данных.
     ///
     /// Локальная система координат этого Mesh'а будет совпадать с глобальной.
-    pub fn new(vertexes: Vec<HVec3>, polygons: Vec<Polygon3>) -> Self {
+    pub fn new(
+        vertexes: Vec<HVec3>,
+        polygons: Vec<Polygon3>,
+        normals: Vec<Vec3>,
+        texture_coords: Vec<(f32, f32)>,
+    ) -> Self {
+        #[cfg(debug_assertions)]
+        {
+            Self::assert_polygons(&vertexes, &polygons);
+            Self::assert_normals(&vertexes, &normals);
+            Self::assert_texture(&vertexes, &texture_coords);
+        }
+
+        Mesh {
+            vertexes,
+            polygons,
+            local_frame: CoordFrame::global(),
+            normals,
+            texture_coords,
+        }
+    }
+
+    /// Создать новый Mesh из вершин и полигонов.
+    ///
+    /// Нормали и координаты текстур будут сгенерированы автоматически.
+    pub fn from_polygons(vertexes: Vec<HVec3>, polygons: Vec<Polygon3>) -> Self {
         #[cfg(debug_assertions)]
         for polygon in polygons.clone() {
             assert!(
@@ -27,11 +77,43 @@ impl Mesh {
             }
         }
 
-        Mesh {
-            vertexes,
-            polygons,
-            local_frame: CoordFrame::global(),
-        }
+        let normals = Self::generate_normals(&vertexes, &polygons);
+        let texture_coords = Self::generate_texture_coord(&vertexes, &polygons);
+        Self::new(vertexes, polygons, normals, texture_coords)
+    }
+
+    /// Создать Mesh как модель вращения.
+    ///
+    /// `profile_points` - изначальные точки, на основе которых строится модель
+    /// `axis` - ось, вокруг которой происходит вращение
+    /// `parts` - количество разбиений
+    pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
+        let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
+
+        // TODO: точки из профиля надо будет вращать вокруг оси (поэтому они HVec3, дабы можно было их менять)
+        // и потом эти точки надо будет как-то в полигоны объединить и создать из этого Mesh.
+        todo!("Сделать модель вращения")
+    }
+
+    /// Создать Mesh как график функции от 2-х переменных
+    ///
+    /// `func` - функция от двух переменных `f(x, y) = z`
+    /// `x_range` - границы отсечения по оси x
+    /// `y_range` - границы отсечения по оси y
+    /// `x_steps` - шаг по оси x
+    /// `y_steps` - шаг по оси y
+    pub fn from_function<F>(
+        func: F,
+        x_range: (f32, f32),
+        y_range: (f32, f32),
+        x_steps: usize,
+        y_steps: usize,
+    ) -> Self
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        // TODO: Надо тупо вычислять график, будут вершины, а потом как-то в полигоны объединить.
+        todo!("Сделать модель по графику")
     }
 
     /// Создание тетраэдра со сторонами единичной длины.
@@ -56,7 +138,7 @@ impl Mesh {
             Polygon3::triangle(1, 3, 2),
         ];
 
-        Self::new(vertexes, polygons)
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание гексаэдра со сторонами единичной длины.
@@ -86,7 +168,7 @@ impl Mesh {
             Polygon3::from_list(&[1, 2, 6, 5]),
         ];
 
-        Self::new(vertexes, polygons)
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание октаэдра со сторонами единичной длины.
@@ -118,7 +200,7 @@ impl Mesh {
             Polygon3::triangle(1, 2, 5), // низ-право-зад
         ];
 
-        Self::new(vertexes, polygons)
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание икосаэдра со сторонами единичной длины.
@@ -177,7 +259,7 @@ impl Mesh {
             Polygon3::triangle(7, 11, 3),
         ];
 
-        Self::new(vertexes, polygons)
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание додекаэдра со сторонами единичной длины.
@@ -235,8 +317,12 @@ impl Mesh {
             Polygon3::from_list(&[6, 15, 7, 19, 18]),
         ];
 
-        Self::new(vertexes, polygons)
+        Self::from_polygons(vertexes, polygons)
     }
+
+    // --------------------------------------------------
+    // setter'ы и getter'ы
+    // --------------------------------------------------
 
     /// Получить систему координат Mesh'а.
     pub fn get_local_frame(&self) -> &CoordFrame {
@@ -255,11 +341,75 @@ impl Mesh {
     pub fn get_polygons(&self) -> &Vec<Polygon3> {
         &self.polygons
     }
-}
 
-// --------------------------------------------------
-// Полигон
-// --------------------------------------------------
+    pub fn get_normals(&self) -> &Vec<Vec3> {
+        &self.normals
+    }
+
+    pub fn get_texture_coords(&self) -> &Vec<(f32, f32)> {
+        &self.texture_coords
+    }
+
+    // --------------------------------------------------
+    // Вспомогательные методы
+    // --------------------------------------------------
+
+    /// Проверка полигонов на корректность.
+    fn assert_polygons(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) {
+        for polygon in polygons {
+            assert!(
+                polygon.get_vertexes().len() >= 3,
+                "Полигон должен быть хотя бы из 3 вершин"
+            );
+            for index in polygon.get_vertexes() {
+                if *index >= vertexes.len() {
+                    panic!("Полигон содержит индекс несуществующей вершины");
+                }
+            }
+        }
+    }
+
+    /// Проверка нормалей на корректность
+    fn assert_normals(vertexes: &Vec<HVec3>, normals: &Vec<Vec3>) {
+        assert!(
+            normals.len() == vertexes.len(),
+            "Количество нормалей {} должно совпадать с количеством вершин {}",
+            normals.len(),
+            vertexes.len()
+        );
+
+        for normal in normals {
+            assert!(
+                (normal.length() - 1.0).abs() < 2.0 * f32::EPSILON,
+                "Нормаль длиной {} должена быть нормированной",
+                normal.length()
+            );
+        }
+    }
+
+    /// Проверка текстурных координат на корректность
+    fn assert_texture(vertexes: &Vec<HVec3>, texture_coords: &Vec<(f32, f32)>) {
+        assert!(
+            texture_coords.len() == vertexes.len(),
+            "Количество текстурных координат {} должно совпадать с количеством вершин {}",
+            texture_coords.len(),
+            vertexes.len()
+        );
+
+        for (u, v) in texture_coords.clone() {
+            assert!(
+                (u >= 0.0) && (u <= 1.0),
+                "коодрината u {} должна быть в диапазоне [0, 1]",
+                u
+            );
+            assert!(
+                (v >= 0.0) && (v <= 1.0),
+                "коодрината v {} должна быть в диапазоне [0, 1]",
+                v
+            );
+        }
+    }
+}
 
 /// Представление одного полигона модели. Только для внутреннего использования.
 /// Дабы избежать копирования вершин, полигоны только хранят индексы вершин из Mesh'а.
@@ -272,6 +422,10 @@ pub struct Polygon3 {
 }
 
 impl Polygon3 {
+    // --------------------------------------------------
+    // Конструкторы
+    // --------------------------------------------------
+
     /// Создание пустого полигона.
     pub fn new() -> Self {
         Self { vertexes: vec![] }
@@ -290,6 +444,10 @@ impl Polygon3 {
             vertexes: vertexes.into(),
         }
     }
+
+    // --------------------------------------------------
+    // Вспомогательные методы
+    // --------------------------------------------------
 
     /// Добавить вершину (точку) в полигон.
     pub fn add_vertex(&mut self, index: usize) {
@@ -314,5 +472,11 @@ impl Polygon3 {
     /// Получить список индексов вершин.
     pub fn get_vertexes(&self) -> &Vec<usize> {
         &self.vertexes
+    }
+
+    /// Получить нормаль к полигону.
+    pub fn get_normal(&self) -> Vec3 {
+        // TODO Тупо через векторное произведение сделать и не забыть нормализовать
+        todo!("Нормаль полигона")
     }
 }
