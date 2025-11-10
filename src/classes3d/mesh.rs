@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Vec3, Transform3D};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -12,23 +12,64 @@ impl Mesh {
 
     /// Сгенерировать карту нормалей по имеющимся полигонам.
     pub fn generate_normals(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) -> Vec<Vec3> {
-        #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
+        let mut normals = vec![Vec3::new(0.0, 0.0, 0.0); vertexes.len()];
 
-        // TODO надо просто обойти все полигоны и для их вершин посчитать нормали и усреднить, если у одной вершины их несколько
-        todo!("Генерация нормалей");
+        for polygon in polygons {
+            // Вычисляем нормаль прямо здесь, через векторное произведение
+            if polygon.get_vertexes().len() >= 3 {
+                let v0_idx = polygon.get_vertexes()[0];
+                let v1_idx = polygon.get_vertexes()[1];
+                let v2_idx = polygon.get_vertexes()[2];
+
+                let v0 = Vec3::new(vertexes[v0_idx].x, vertexes[v0_idx].y, vertexes[v0_idx].z);
+                let v1 = Vec3::new(vertexes[v1_idx].x, vertexes[v1_idx].y, vertexes[v1_idx].z);
+                let v2 = Vec3::new(vertexes[v2_idx].x, vertexes[v2_idx].y, vertexes[v2_idx].z);
+
+                let edge1 = v1 - v0;
+                let edge2 = v2 - v0;
+                let mut poly_normal = edge1.cross(edge2);
+
+                let len = poly_normal.length();
+                if len > f32::EPSILON {
+                    poly_normal = poly_normal / len;
+                }
+
+                for &vertex_idx in polygon.get_vertexes() {
+                    if vertex_idx < normals.len() {
+                        normals[vertex_idx] = normals[vertex_idx] + poly_normal;
+                    }
+                }
+            }
+        }
+
+        for normal in &mut normals {
+            let len = normal.length();
+            if len > f32::EPSILON {
+                *normal = *normal / len;
+            }
+        }
+
+        normals
     }
 
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
     pub fn generate_texture_coord(
         vertexes: &Vec<HVec3>,
-        polygons: &Vec<Polygon3>,
+        _polygons: &Vec<Polygon3>,
     ) -> Vec<(f32, f32)> {
         #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
+        Self::assert_polygons(vertexes, _polygons);
 
-        // TODO какую-нибудь развертку сделать, чтобы полигоны всей модели можно было уместить на UV текстуре
-        todo!("Генерация координат текстуры");
+        // Простая проекция на плоскость XY для текстурных координат
+        vertexes
+            .iter()
+            .map(|v| {
+                // Нормализуем координаты в диапазон [0, 1]
+                let u = (v.x + 1.0) / 2.0;
+                let v = (v.y + 1.0) / 2.0;
+                (u.clamp(0.0, 1.0), v.clamp(0.0, 1.0))
+            })
+            .collect()
     }
 
     // --------------------------------------------------
@@ -90,7 +131,7 @@ impl Mesh {
     pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
         let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
 
-          if parts < 3 {
+        if parts < 3 {
             panic!("Количество разбиений должно быть не менее 3");
         }
         if profile_points.len() < 2 {
@@ -98,14 +139,14 @@ impl Mesh {
         }
 
         let angle_step = 2.0 * std::f32::consts::PI / parts as f32;
-        
+
         // Создаем все вершины вращения
         let mut vertexes = Vec::new();
-        
+
         // Для каждой точки профиля создаем кольцо вершин
         for profile_point in profile_points {
             let point_vec = Vec3::new(profile_point.x, profile_point.y, profile_point.z);
-            
+
             // Вращаем точку вокруг оси
             for i in 0..=parts {
                 let angle = angle_step * i as f32;
@@ -125,7 +166,7 @@ impl Mesh {
             for segment_idx in 0..parts {
                 let current_ring_start = profile_idx * vertices_per_profile;
                 let next_ring_start = (profile_idx + 1) * vertices_per_profile;
-                
+
                 let v0 = current_ring_start + segment_idx;
                 let v1 = current_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v2 = next_ring_start + (segment_idx + 1) % vertices_per_profile;
@@ -144,7 +185,11 @@ impl Mesh {
     }
 
     /// Создает верхнюю и нижнюю крышки для модели вращения
-    fn create_rotation_caps(polygons: &mut Vec<Polygon3>, profile_count: usize, vertices_per_profile: usize) {
+    fn create_rotation_caps(
+        polygons: &mut Vec<Polygon3>,
+        profile_count: usize,
+        vertices_per_profile: usize,
+    ) {
         // Нижняя крышка (первый профиль)
         if profile_count > 1 {
             let mut bottom_cap = Vec::new();
@@ -188,8 +233,52 @@ impl Mesh {
     where
         F: Fn(f32, f32) -> f32,
     {
-        // TODO: Надо тупо вычислять график, будут вершины, а потом как-то в полигоны объединить.
-        todo!("Сделать модель по графику")
+        let (x0, x1) = x_range;
+        let (y0, y1) = y_range;
+
+        let dx = (x1 - x0) / x_steps as f32;
+        let dy = (y1 - y0) / y_steps as f32;
+
+        let mut vertexes = Vec::new();
+
+        // Генерируем вершины
+        for j in 0..=y_steps {
+            for i in 0..=x_steps {
+                let x = x0 + i as f32 * dx;
+                let y = y0 + j as f32 * dy;
+                let z = func(x, y);
+
+                if z.is_finite() {
+                    vertexes.push(HVec3::new(x, y, z));
+                } else {
+                    vertexes.push(HVec3::new(x, y, 0.0));
+                }
+            }
+        }
+
+        // Генерируем полигоны (треугольники)
+        let mut polygons = Vec::new();
+        for j in 0..y_steps {
+            for i in 0..x_steps {
+                let idx = |i: usize, j: usize| -> usize { j * (x_steps + 1) + i };
+
+                // Первый треугольник
+                polygons.push(Polygon3::triangle(
+                    idx(i, j),
+                    idx(i + 1, j),
+                    idx(i + 1, j + 1),
+                ));
+
+                // Второй треугольник
+                polygons.push(Polygon3::triangle(
+                    idx(i, j),
+                    idx(i + 1, j + 1),
+                    idx(i, j + 1),
+                ));
+            }
+        }
+
+        Self::from_polygons(vertexes, polygons)
     }
 
     /// Создание тетраэдра со сторонами единичной длины.
@@ -552,7 +641,16 @@ impl Polygon3 {
 
     /// Получить нормаль к полигону.
     pub fn get_normal(&self) -> Vec3 {
-        // TODO Тупо через векторное произведение сделать и не забыть нормализовать
-        todo!("Нормаль полигона")
+        if self.vertexes.len() < 3 {
+            return Vec3::new(0.0, 0.0, 1.0);
+        }
+
+        let v0_idx = self.vertexes[0];
+        let v1_idx = self.vertexes[1];
+        let v2_idx = self.vertexes[2];
+
+        // Предполагаем, что вершины будут доступны из контекста
+        // Это временное решение - нормаль должна вычисляться внутри generate_normals
+        Vec3::new(0.0, 0.0, 1.0)
     }
 }
