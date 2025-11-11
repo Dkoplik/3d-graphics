@@ -775,7 +775,7 @@ impl Polygon3 {
     /// Получить нормаль к полигону
     pub fn get_normal(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
         let vertex_indices = self.get_vertexes();
-        
+
         // Достаточно 3х вершин для определения плоскости
         if vertex_indices.len() < 3 {
             return Vec3::new(0.0, 0.0, 1.0);
@@ -790,13 +790,13 @@ impl Polygon3 {
         let edge2 = v2 - v0;
 
         // Векторное произведение дает нормаль к плоскости
-        let mut normal = edge1.cross(edge2);
+        let mut normal = edge1.cross_right(edge2);
 
         // Ориентируем нормаль ВНЕ объекта
         if let Some(center) = mesh_center {
             let face_center = (v0 + v1 + v2) * (1.0 / 3.0);
             let center_to_face = face_center - center;
-            
+
             if normal.dot(center_to_face) < 0.0 {
                 normal = -normal;
             }

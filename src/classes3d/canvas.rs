@@ -25,7 +25,7 @@ impl Canvas {
 
         Self {
             pixels: vec![Color32::GRAY; width * height],
-            buffer: vec![f32::MAX; width * height],
+            buffer: vec![f32::MIN; width * height],
             width,
             height,
         }
@@ -58,7 +58,7 @@ impl Canvas {
     /// Заполнить весь холст указанным цветом
     pub fn clear(&mut self, color: Color32) {
         self.pixels.fill(color);
-        self.buffer.fill(f32::MAX);
+        self.buffer.fill(f32::MIN);
     }
 
     /// Проверить и обновить значение z-буфера
