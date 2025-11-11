@@ -4,7 +4,6 @@
 //! для рендера в формате wireframe.
 
 use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
-use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -194,7 +193,7 @@ impl Mesh {
         }
 
         // Защита от деления на ноль
-        if max_u - min_u < 0.001 {  
+        if max_u - min_u < 0.001 {
             max_u = min_u + 1.0;
         }
         if max_v - min_v < 0.001 {
