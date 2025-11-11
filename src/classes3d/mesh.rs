@@ -775,64 +775,37 @@ impl Polygon3 {
     /// Получить нормаль к полигону
     pub fn get_normal(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
         let vertex_indices = self.get_vertexes();
-
-        match vertex_indices.len() {
-            0 | 1 | 2 => Vec3::new(0.0, 0.0, 1.0), // Недостаточно вершин
-            _ => self.get_normal_polygon(vertexes, mesh_center),
-        }
-    }
-
-    /// Нормаль для многоугольника
-    fn get_normal_polygon(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
-        let poly_vertex_indices = self.get_vertexes();
-        let mut normal = Vec3::zero();
-
-        for i in 0..poly_vertex_indices.len() {
-            let current = Vec3::from(vertexes[poly_vertex_indices[i]]);
-            let next =
-                Vec3::from(vertexes[poly_vertex_indices[(i + 1) % poly_vertex_indices.len()]]);
-
-            normal.x += (current.y - next.y) * (current.z + next.z);
-            normal.y += (current.z - next.z) * (current.x + next.x);
-            normal.z += (current.x - next.x) * (current.y + next.y);
+        
+        // Достаточно 3х вершин для определения плоскости
+        if vertex_indices.len() < 3 {
+            return Vec3::new(0.0, 0.0, 1.0);
         }
 
-        // Ориентируем нормаль от центра объекта, если центр предоставлен
+        // Берем первые 3 вершины (можно любые 3 неколлинеарные), так как мы ищем нормаль к плоскости полигона
+        let v0 = Vec3::from(vertexes[vertex_indices[0]]);
+        let v1 = Vec3::from(vertexes[vertex_indices[1]]);
+        let v2 = Vec3::from(vertexes[vertex_indices[2]]);
+
+        let edge1 = v1 - v0;
+        let edge2 = v2 - v0;
+
+        // Векторное произведение дает нормаль к плоскости
+        let mut normal = edge1.cross(edge2);
+
+        // Ориентируем нормаль ВНЕ объекта
         if let Some(center) = mesh_center {
-            normal = self.orient_polygon_normal_from_center(normal, vertexes, center);
+            let face_center = (v0 + v1 + v2) * (1.0 / 3.0);
+            let center_to_face = face_center - center;
+            
+            if normal.dot(center_to_face) < 0.0 {
+                normal = -normal;
+            }
         }
 
-        if normal.length() > 0.001 {
+        if normal.length() > 0.0 {
             normal.normalize()
         } else {
             Vec3::new(0.0, 0.0, 1.0)
-        }
-    }
-
-    /// Ориентирует нормаль многоугольника от центра
-    fn orient_polygon_normal_from_center(
-        &self,
-        normal: Vec3,
-        vertexes: &Vec<HVec3>,
-        center: Vec3,
-    ) -> Vec3 {
-        let vertex_indices = self.get_vertexes();
-
-        // Вычисляем центр многоугольника
-        let mut face_center = Vec3::zero();
-        for &index in vertex_indices {
-            face_center = face_center + Vec3::from(vertexes[index]);
-        }
-        face_center = face_center * (1.0 / vertex_indices.len() as f32);
-
-        // Вектор от центра объекта к центру грани
-        let center_to_face = face_center - center;
-
-        // Если нормаль направлена к центру объекта, разворачиваем её
-        if normal.dot(center_to_face) < 0.0 {
-            -normal
-        } else {
-            normal
         }
     }
 }
