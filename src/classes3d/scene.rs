@@ -282,8 +282,43 @@ impl Scene {
     ///
     /// Возвращает вектор полигонов только с лицевыми гранями.
     fn model_backface_culling(&self, model: &Model3) -> Vec<mesh::Polygon3> {
-        // TODO надо по нормалям полигона смотреть, лицевой он или нет, и в зависимости от этого добавлять в результирующий массив
-        todo!("отсечение нелицевых граней");
+        let vertexes = model.mesh.get_vertexes();
+        let polygons = model.mesh.get_polygons();
+        let mut visible_polygons = Vec::new();
+
+        let mesh_center = Self::calculate_mesh_center(vertexes);
+        let camera_pos = self.camera.get_position();
+
+        let view_direction = (mesh_center - Vec3::from(camera_pos)).normalize();
+
+        for polygon in polygons {
+            let vertex_indices = polygon.get_vertexes();
+            if vertex_indices.len() < 3 {
+                continue;
+            }
+
+            let polygon_normal = polygon.get_normal(vertexes, Some(mesh_center));
+            let dot_product = polygon_normal.dot(view_direction);
+
+            if dot_product > 0.0 {
+                visible_polygons.push(polygon.clone());
+            }
+        }
+
+        visible_polygons
+    }
+
+    fn calculate_mesh_center(vertexes: &Vec<HVec3>) -> Vec3 {
+        if vertexes.is_empty() {
+            return Vec3::zero();
+        }
+
+        let sum: Vec3 = vertexes
+            .iter()
+            .map(|v| Vec3::from(*v))
+            .fold(Vec3::zero(), |acc, v| acc + v);
+
+        sum * (1.0 / vertexes.len() as f32)
     }
 
     /// Реднер каркаса модели.
