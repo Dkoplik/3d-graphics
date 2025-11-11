@@ -51,50 +51,44 @@ impl Vec3 {
 
     /// Получить единичный вектор с направлением "вверх".
     ///
-    /// Координатная система правкорукая (right-handed), направлением вверх считается `+z`, как в `Blender`,
-    /// поэтому вектор имеет вид `(0.0, 0.0, 1.0)`.
+    /// Направлением вверх считается `+y`, поэтому вектор имеет вид `(0.0, 1.0, 0.0)`.
     pub fn up() -> Self {
-        Self::plus_z()
+        Self::plus_y()
     }
 
     /// Получить единичный вектор с направлением "вниз".
     ///
-    /// Координатная система правкорукая (right-handed), направлением вниз считается `-z`, как в `Blender`,
-    /// поэтому вектор имеет вид `(0.0, 0.0, -1.0)`.
+    /// Направлением вниз считается `-y`, поэтому вектор имеет вид `(0.0, -1.0, 0.0)`.
     pub fn down() -> Self {
-        Self::minus_z()
+        Self::minus_y()
     }
 
     /// Получить единичный вектор с направлением "влево".
     ///
-    /// Координатная система правкорукая (right-handed), направлением влево считается `+y`, как в `Blender`,
-    /// поэтому вектор имеет вид `(0.0, 1.0, 0.0)`.
+    /// Направлением влево считается `-x`, поэтому вектор имеет вид `(-1.0, 0.0, 0.0)`.
     pub fn left() -> Self {
-        Self::plus_y()
+        Self::minus_x()
     }
 
     /// Получить единичный вектор с направлением "вправо".
     ///
-    /// Координатная система правкорукая (right-handed), направлением вправо считается `-y`, как в `Blender`,
-    /// поэтому вектор имеет вид `(0.0, -1.0, 0.0)`.
+    /// Направлением вправо считается `+x`, поэтому вектор имеет вид `(1.0, 0.0, 0.0)`.
     pub fn right() -> Self {
-        Self::minus_y()
+        Self::plus_x()
     }
 
     /// Получить единичный вектор с направлением "прямо".
     ///
-    /// Координатная система правкорукая (right-handed), направлением прямо считается `+x`, как в `Blender`,
-    /// поэтому вектор имеет вид `(1.0, 0.0, 0.0)`.
+    /// Направлением прямо считается `+z`, поэтому вектор имеет вид `(0.0, 0.0, 1.0)`.
     pub fn forward() -> Self {
-        Self::plus_x()
+        Self::plus_z()
     }
 
     /// Получить единичный вектор с направлением "назад".
     ///
-    /// Координатная система правкорукая (right-handed), направлением назад считается `-x`, как в `Blender`,
-    /// поэтому вектор имеет вид `(-1.0, 0.0, 0.0)`.
+    /// Направлением назад считается `-z`, поэтому вектор имеет вид `(0.0, 0.0, -1.0)`.
     pub fn backward() -> Self {
-        Self::minus_x()
+        Self::minus_z()
     }
 
     /// Получить проекцию вектора `from` на плоскость XY в **глобальных** координатах.
@@ -136,13 +130,17 @@ impl Vec3 {
         self.cos(other).acos().to_degrees()
     }
 
-    /// Векторное произведение векторов.
-    pub fn cross(self, other: Self) -> Self {
+    /// Векторное произведение векторов для **правой** координатной системы.
+    pub fn cross_right(self, other: Self) -> Self {
         Self {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
             z: self.x * other.y - self.y * other.x,
         }
+    }
+
+    pub fn cross_left(self, other: Self) -> Self {
+        -self.cross_right(other)
     }
 
     /// Получить квадрат длины вектора.
@@ -340,21 +338,25 @@ mod tests {
         let k = Vec3::new(0.0, 0.0, 1.0);
 
         // i × j = k
-        assert_vectors(i.cross(j), k, TOLERANCE);
+        assert_vectors(i.cross_right(j), k, TOLERANCE);
+        assert_vectors(i.cross_left(j), -k, TOLERANCE);
 
         // j × k = i
-        assert_vectors(j.cross(k), i, TOLERANCE);
+        assert_vectors(j.cross_right(k), i, TOLERANCE);
+        assert_vectors(j.cross_left(k), -i, TOLERANCE);
 
         // k × i = j
-        assert_vectors(k.cross(i), j, TOLERANCE);
+        assert_vectors(k.cross_right(i), j, TOLERANCE);
+        assert_vectors(k.cross_left(i), -j, TOLERANCE);
 
         // Антикоммутативность: j × i = -k
-        assert_vectors(j.cross(i), -k, TOLERANCE);
+        assert_vectors(j.cross_right(i), -k, TOLERANCE);
+        assert_vectors(j.cross_left(i), k, TOLERANCE);
 
         // Тест с произвольными векторами
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(4.0, 5.0, 6.0);
-        let result = v1.cross(v2);
+        let result = v1.cross_right(v2);
         let expected = Vec3::new(-3.0, 6.0, -3.0); // (2*6 - 3*5, 3*4 - 1*6, 1*5 - 2*4)
         assert_vectors(result, expected, TOLERANCE);
     }

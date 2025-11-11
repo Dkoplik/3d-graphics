@@ -237,14 +237,14 @@ impl Transform3D {
         let cos_angle = from.dot(to);
 
         // Для численной стабильности
-        if cos_angle >= 1.0 - 1e-9 {
+        if cos_angle >= 1.0 - 1e-7 {
             return Self::identity();
         }
-        if cos_angle <= -1.0 + 1e-9 {
+        if cos_angle <= -1.0 + 1e-7 {
             // 180 градусов - находим ортогональную ось
-            let mut axis = from.cross(Vec3::plus_x());
+            let mut axis = from.cross_right(Vec3::plus_x());
             if axis.length_squared() < 1e-9 {
-                axis = from.cross(Vec3::plus_y());
+                axis = from.cross_right(Vec3::plus_y());
             }
             axis = axis.normalize();
 
@@ -270,7 +270,7 @@ impl Transform3D {
             };
         }
 
-        let axis = from.cross(to).normalize();
+        let axis = from.cross_right(to).normalize();
         let angle = cos_angle.acos();
 
         // Используем существующий метод вращения вокруг оси
@@ -328,7 +328,7 @@ impl Transform3D {
     /// Параметры определяют объем усеченной пирамиды (viewing frustum):
     /// - `left`, `right`: координаты левой и правой плоскостей отсечения
     /// - `bottom`, `top`: координаты нижней и верхней плоскостей отсечения  
-    /// - `near`, `far`: координаты ближней и дальней плоскостей отсечения
+    /// - `near`, `far`: расстояние до ближней и дальней плоскостей отсечения
     ///
     /// После применения этой матрицы, объем преобразуется в нормализованный куб [-1, 1]^3.
     pub fn parallel(left: f32, right: f32, bottom: f32, top: f32, near: f32, far: f32) -> Self {
@@ -356,27 +356,27 @@ impl Transform3D {
             far
         );
 
-        let inv_width = 1.0 / (right - left);
-        let inv_height = 1.0 / (top - bottom);
-        let inv_depth = 1.0 / (far - near);
+        let width = right - left;
+        let height = top - bottom;
+        let depth = far - near;
 
         Self {
             m: [
-                2.0 * inv_width,
+                2.0 / width,
                 0.0,
                 0.0,
                 0.0, // первая строка
                 0.0,
-                2.0 * inv_height,
+                2.0 / height,
                 0.0,
                 0.0, // вторая строка
                 0.0,
                 0.0,
-                -2.0 * inv_depth,
-                0.0, // третья строка (отрицательная для правой системы координат)
-                -(right + left) * inv_width, // четвертая строка (перемещение)
-                -(top + bottom) * inv_height,
-                -(far + near) * inv_depth,
+                2.0 / depth,
+                0.0, // третья строка
+                -(right + left) / width,
+                -(top + bottom) / height,
+                (far + near) / depth,
                 1.0,
             ],
         }
@@ -430,26 +430,26 @@ impl Transform3D {
             aspect
         );
 
-        let f = 1.0 / (fov_rad / 2.0).tan();
-        let range_inv = 1.0 / (near - far);
+        let tan = (fov_rad / 2.0).tan(); // ~ t / n
+        let diff = far - near;
 
         Self {
             m: [
-                f / aspect,
+                1.0 / (aspect * tan),
                 0.0,
                 0.0,
                 0.0, // первая строка
                 0.0,
-                f,
+                1.0 / tan,
                 0.0,
                 0.0, // вторая строка
                 0.0,
                 0.0,
-                (far + near) * range_inv,
+                (far + near) / diff,
                 -1.0, // третья строка
                 0.0,
                 0.0,
-                2.0 * far * near * range_inv,
+                (2.0 * far * near) / diff,
                 0.0, // четвертая строка
             ],
         }
@@ -734,10 +734,10 @@ mod tests {
     fn test_rotation_x_90() {
         // Поворот на 90 градусов вокруг оси X
         let rotation = Transform3D::rotation_x_deg(90.0);
-        let test_vec = HVec3::left();
+        let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::up();
+        let expected = HVec3::down();
 
         assert_hvecs(transformed, expected, TOLERANCE);
     }
@@ -746,10 +746,10 @@ mod tests {
     fn test_rotation_x_180() {
         // Поворот на 180 градусов вокруг оси X
         let rotation = Transform3D::rotation_x_deg(180.0);
-        let test_vec = HVec3::left();
+        let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::right();
+        let expected = HVec3::backward();
 
         assert_hvecs(transformed, expected, TOLERANCE);
     }
@@ -758,7 +758,7 @@ mod tests {
     fn test_rotation_x_360() {
         // Поворот на 360 градусов вокруг оси X
         let rotation = Transform3D::rotation_x_deg(360.0);
-        let test_vec = HVec3::left();
+        let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
 
@@ -772,7 +772,7 @@ mod tests {
         let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::down();
+        let expected = HVec3::right();
 
         assert_hvecs(transformed, expected, TOLERANCE);
     }
@@ -804,10 +804,10 @@ mod tests {
     fn test_rotation_z_90() {
         // Поворот на 90 градусов вокруг оси Z
         let rotation = Transform3D::rotation_z_deg(90.0);
-        let test_vec = HVec3::forward();
+        let test_vec = HVec3::right();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::left();
+        let expected = HVec3::up();
 
         assert_hvecs(transformed, expected, TOLERANCE);
     }
@@ -816,10 +816,10 @@ mod tests {
     fn test_rotation_z_180() {
         // Поворот на 180 градусов вокруг оси Z
         let rotation = Transform3D::rotation_z_deg(180.0);
-        let test_vec = HVec3::forward();
+        let test_vec = HVec3::right();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::backward();
+        let expected = HVec3::left();
 
         assert_hvecs(transformed, expected, TOLERANCE);
     }
@@ -828,7 +828,7 @@ mod tests {
     fn test_rotation_z_360() {
         // Поворот на 360 градусов вокруг оси Z
         let rotation = Transform3D::rotation_z_deg(360.0);
-        let test_vec = HVec3::forward();
+        let test_vec = HVec3::right();
 
         let transformed = rotation.apply_to_hvec(test_vec);
 
@@ -924,6 +924,52 @@ mod tests {
     }
 
     #[test]
+    fn test_rotation_aligning_forward_to_right() {
+        let from = Vec3::forward();
+        let to = Vec3::right();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
+
+        // 3-ий вектор
+        let vec = Vec3::right();
+        // если "вперёд" было повёрнуто направо, то "право" должно стать "назад"
+        let transformed = transform.apply_to_hvec(vec.into());
+        assert_hvecs(transformed, HVec3::backward(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotation_aligning_complex_to_basis() {
+        let from = Vec3::new(2.0, 3.0, 4.0).normalize();
+        let to = Vec3::left();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotation_aligning_basis_to_complex() {
+        let from = Vec3::left();
+        let to = Vec3::new(2.0, 3.0, 4.0).normalize();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotation_aligning_complex_to_complex() {
+        let from = Vec3::new(2.0, 3.0, 4.0).normalize();
+        let to = Vec3::new(-6.0, 3.0, -1.0).normalize();
+
+        let transform = Transform3D::rotation_aligning(from, to);
+        let transformed = transform.apply_to_hvec(from.into());
+        assert_hvecs(transformed, to.into(), TOLERANCE);
+    }
+
+    #[test]
     fn test_reflection_plane_xy() {
         // Отражение относительно плоскости XY
         let plane_yz = Plane::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_z());
@@ -962,9 +1008,9 @@ mod tests {
     #[test]
     fn test_rotation_around_line_x_90() {
         // Поворот вокруг оси X (должен совпадать с rotation_x)
-        let x_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_x());
+        let x_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::forward());
         let rotation = Transform3D::rotation_around_line(x_axis, (90.0 as f32).to_radians());
-        let test_vec = HVec3::left();
+        let test_vec = HVec3::right();
 
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::up();
@@ -975,12 +1021,12 @@ mod tests {
     #[test]
     fn test_rotation_around_line_y_90() {
         // Поворот вокруг оси Y (должен совпадать с rotation_y)
-        let y_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_y());
+        let y_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::up());
         let rotation = Transform3D::rotation_around_line(y_axis, (90.0 as f32).to_radians());
         let test_vec = HVec3::forward();
 
         let transformed = rotation.apply_to_hvec(test_vec);
-        let expected = HVec3::up();
+        let expected = HVec3::right();
 
         assert_hvecs(transformed, expected, TOLERANCE);
     }
@@ -988,9 +1034,9 @@ mod tests {
     #[test]
     fn test_rotation_around_line_z_90() {
         // Поворот вокруг оси X (должен совпадать с rotation_x)
-        let z_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::plus_z());
+        let z_axis = Line3::new(Point3::new(0.0, 0.0, 0.0), Vec3::forward());
         let rotation = Transform3D::rotation_around_line(z_axis, (90.0 as f32).to_radians());
-        let test_vec = HVec3::forward();
+        let test_vec = HVec3::up();
 
         let transformed = rotation.apply_to_hvec(test_vec);
         let expected = HVec3::left();

@@ -60,7 +60,7 @@ impl Scene {
             models: Vec::new(),
             camera,
             lights: Vec::new(),
-            ambient_light: Color32::BLACK, // TODO точно ли это хороший вариант?
+            ambient_light: Color32::BLACK,
         }
     }
 

@@ -50,8 +50,12 @@ impl Model3 {
     /// Просто синтаксический сахар для более удобных операций над моделькой.
     pub fn set_position(&mut self, position: Point3) {
         let current_frame = *self.mesh.get_local_frame();
-        let new_frame =
-            CoordFrame::new(current_frame.x, current_frame.y, current_frame.z, position);
+        let new_frame = CoordFrame::new(
+            current_frame.forward(),
+            current_frame.right(),
+            current_frame.up(),
+            position,
+        );
         *self.mesh.get_local_frame_mut() = new_frame;
     }
 
