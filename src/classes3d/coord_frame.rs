@@ -170,6 +170,10 @@ impl CoordFrame {
         self.up = Vec3::from(vec_transform.apply_to_hvec(self.up.into())).normalize();
         self.right = Vec3::from(vec_transform.apply_to_hvec(self.right.into())).normalize();
 
+        // избавляемся от ошибок для сохранения ортогональности
+        self.up = self.right.cross_left(self.forward).normalize();
+        self.right = self.forward.cross_left(self.up).normalize();
+
         debug_assert!(
             (self.forward.length() - 1.0).abs() < 2.0 * f32::EPSILON,
             "Базис self.forward длиной {} должен быть нормирован",
