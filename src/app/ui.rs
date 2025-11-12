@@ -541,16 +541,16 @@ impl AthenianApp {
         );
 
         if ui.button("Применить материал").clicked() {
-            //      self.apply_material_to_selected();
+            self.apply_material_to_selected();
         }
 
         ui.separator();
         ui.label("Текстуры:");
         if ui.button("Загрузить текстуру...").clicked() {
-            //   self.load_texture();
+              self.load_texture();
         }
         if ui.button("Удалить текстуру").clicked() {
-            //  self.remove_texture();
+             self.remove_texture();
         }
     }
 

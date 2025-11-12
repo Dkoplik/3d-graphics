@@ -6,6 +6,9 @@ use g3d::{
     Line3, Model3, Point3, Transform3D, Vec3, classes3d::model3::ObjLoadError,
     classes3d::model3::ObjSaveError,
 };
+use image::{GenericImageView, ImageFormat};
+use std::fs::File;
+use std::io::BufReader;
 
 // --------------------------------------------------
 // Обработка области рисования (холст)
@@ -249,8 +252,14 @@ impl AthenianApp {
     }
 
     pub fn apply_material_to_selected(&mut self) {
-        // TODO: Применить материал к выбранной модели
-        todo!("Применение материала к моделе")
+        let temp_material = self.current_material.clone();
+
+        if let Some(model) = self.get_selected_model_mut() {
+            model.material = temp_material;
+            println!("Материал применен к выбранной модели");
+        } else {
+            eprintln!("Нет выбранной модели для применения материала");
+        }
     }
 
     // === ОПЕРАЦИИ С ОСВЕЩЕНИЕМ ===
@@ -469,13 +478,64 @@ impl AthenianApp {
     }
 
     pub fn load_texture(&mut self) {
-        // TODO: Реализовать загрузку текстур
-        todo!("загрузить текстуру для модели")
+        let file_path = rfd::FileDialog::new()
+            .add_filter("Image files", &["png", "jpg", "jpeg", "bmp", "tga"])
+            .pick_file();
+
+        if let Some(path) = file_path {
+            match self.load_texture_from_file(path.to_str().unwrap()) {
+                Ok(texture) => {
+                    if let Some(model) = self.get_selected_model_mut() {
+                        model.material.texture = Some(texture);
+                        println!("Текстура успешно загружена и применена к модели");
+                    } else {
+                        // Если нет выбранной модели, сохраняем текстуру в текущий материал
+                        self.current_material.texture = Some(texture);
+                        println!("Текстура загружена в текущий материал");
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Ошибка загрузки текстуры: {}", e);
+                }
+            }
+        }
+    }
+
+    // Вспомогательный метод для загрузки текстуры из файла
+    fn load_texture_from_file(&self, file_path: &str) -> Result<g3d::Texture, String> {
+        let file = File::open(file_path).map_err(|e| format!("Не удалось открыть файл: {}", e))?;
+        let reader = BufReader::new(file);
+
+        let img = image::load(
+            reader,
+            ImageFormat::from_path(file_path)
+                .map_err(|e| format!("Неверный формат изображения: {}", e))?,
+        )
+        .map_err(|e| format!("Ошибка загрузки изображения: {}", e))?;
+
+        let (width, height) = img.dimensions();
+        let rgba_img = img.to_rgba8();
+
+        // Конвертируем пиксели в Color32
+        let mut pixels = Vec::with_capacity((width * height) as usize);
+
+        for pixel in rgba_img.pixels() {
+            let color =
+                egui::Color32::from_rgba_premultiplied(pixel[0], pixel[1], pixel[2], pixel[3]);
+            pixels.push(color);
+        }
+
+        Ok(g3d::Texture::new(pixels, width as usize, height as usize))
     }
 
     pub fn remove_texture(&mut self) {
-        // TODO: Удалить текстуру у выбранной модели
-        todo!("удалить текстуру у модели")
+        if let Some(model) = self.get_selected_model_mut() {
+            model.material.texture = None;
+            println!("Текстура удалена у выбранной модели");
+        } else {
+            self.current_material.texture = None;
+            println!("Текстура удалена из текущего материала");
+        }
     }
 }
 
