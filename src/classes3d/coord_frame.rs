@@ -3,44 +3,26 @@ use crate::{CoordFrame, Point3, Transform3D, Vec3};
 impl CoordFrame {
     /// Создать новую координатную систему по 3-м базисам и точке, из которой эти базисы выходят.
     /// Базисы должны быть **ортонормированными**.
-    pub fn new(forward: Vec3, right: Vec3, up: Vec3, origin: Point3) -> Self {
+    pub fn new(mut forward: Vec3, mut right: Vec3, up: Vec3, origin: Point3) -> Self {
         debug_assert!(
-            (forward.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис forward длиной {} должен быть нормирован",
-            forward.length()
+            !forward.approx_equal(Vec3::zero(), 1e-7),
+            "вектор forward не может быть нулевым"
         );
         debug_assert!(
-            (right.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис right длиной {} должен быть нормирован",
-            right.length()
+            !right.approx_equal(Vec3::zero(), 1e-7),
+            "вектор right не может быть нулевым"
         );
         debug_assert!(
-            (up.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис up длиной {} должен быть нормирован",
-            up.length()
+            !up.approx_equal(Vec3::zero(), 1e-7),
+            "вектор up не может быть нулевым"
         );
 
-        debug_assert!(
-            forward.dot(right).abs() < 2.0 * f32::EPSILON,
-            "Базисы forward {:?} и right{:?} должны быть ортогональными, но их произведение равно {}",
-            forward,
-            right,
-            forward.dot(right)
-        );
-        debug_assert!(
-            forward.dot(up).abs() < 2.0 * f32::EPSILON,
-            "Базисы forward {:?} и up{:?} должны быть ортогональными, но их произведение равно {}",
-            forward,
-            up,
-            forward.dot(up)
-        );
-        debug_assert!(
-            right.dot(up).abs() < 2.0 * f32::EPSILON,
-            "Базисы right {:?} и up{:?} должны быть ортогональными, но их произведение равно {}",
-            right,
-            up,
-            right.dot(up)
-        );
+        forward = forward.normalize();
+        right = right.normalize();
+
+        // убедиться в ортогональности базисов (возможно накопление ошибок)
+        let up = right.cross_left(forward).normalize();
+        let right = forward.cross_left(up).normalize();
 
         Self {
             forward,
@@ -53,27 +35,9 @@ impl CoordFrame {
     /// Создать новую **левую** координатную систему по 2-м векторам и точке.
     ///
     /// 3-ий вектор строится автоматически перпендикулярно 2-м указанным. 2 заданных вектора
-    /// должны быть **ортонормированными**.
+    /// должны быть **ортогональными**.
     pub fn from_2(forward: Vec3, up: Vec3, origin: Point3) -> Self {
-        debug_assert!(
-            (forward.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис forward длиной {} должен быть нормирован",
-            forward.length()
-        );
-        debug_assert!(
-            (up.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис up длиной {} должен быть нормирован",
-            up.length()
-        );
-        debug_assert!(
-            forward.dot(up).abs() < 2.0 * f32::EPSILON,
-            "Базисы forward {:?} и up{:?} должны быть ортогональными, но их произведение равно {}",
-            forward,
-            up,
-            forward.dot(up)
-        );
-
-        let right = forward.cross_left(up).normalize();
+        let right = forward.cross_left(up);
         Self::new(forward, right, up, origin)
     }
 
