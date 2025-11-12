@@ -281,7 +281,7 @@ impl Mesh {
         // Для каждой точки профиля создаем кольцо вершин
         for profile_point in profile_points {
             // Вращаем точку вокруг оси
-            for i in 0..=parts {
+            for i in 0..parts {
                 let angle = angle_step * i as f32;
                 let rotation = Transform3D::rotation_around_line(axis, angle);
                 let rotated_point = rotation.apply_to_hvec(*profile_point);
@@ -292,7 +292,7 @@ impl Mesh {
         // Создаем полигоны
         let mut polygons = Vec::new();
         let profile_count = profile_points.len();
-        let vertices_per_profile = parts + 1;
+        let vertices_per_profile = parts;
 
         // Создаем полигоны между соседними профилями
         for profile_idx in 0..profile_count - 1 {
@@ -304,10 +304,7 @@ impl Mesh {
                 let v1 = current_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v2 = next_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v3 = next_ring_start + segment_idx;
-
-                // Создаем два треугольника для каждого квада
-                polygons.push(Polygon3::triangle(v0, v1, v2));
-                polygons.push(Polygon3::triangle(v0, v2, v3));
+                polygons.push(Polygon3::from_list(&[v0, v1, v2, v3]));
             }
         }
 
