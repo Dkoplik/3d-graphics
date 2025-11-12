@@ -2,6 +2,7 @@ use crate::{
     Camera3, Canvas, HVec3, LightSource, Model3, Point3, Scene, Transform3D, Vec3, classes3d::mesh,
 };
 use egui::{Color32, Pos2};
+use image::codecs::tiff;
 
 /// Тип рендера (как отображать объекты?)
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
@@ -402,37 +403,43 @@ impl Scene {
         z_buffer_enabled: bool,
     ) -> usize {
         for polygon in polygons {
-            let vertex_indices = polygon.get_vertexes();
+            for triangle in triangulate_polygon(&polygon.get_vertexes()) {
+                // проекция вершин треугольника
+                let v0 = projected_vertexes[triangle.0];
+                let v1 = projected_vertexes[triangle.1];
+                let v2 = projected_vertexes[triangle.2];
 
-            // Вершины полигона
-            let poly_vertices: Vec<Vec3> = vertex_indices
-                .iter()
-                .map(|&idx| projected_vertexes[idx])
-                .collect();
+                // текстурные UV-координаты вершин треугольника
+                let tx0 = model.mesh.get_texture_coords()[triangle.0];
+                let tx1 = model.mesh.get_texture_coords()[triangle.1];
+                let tx2 = model.mesh.get_texture_coords()[triangle.2];
 
-            // Текстурные координаты полигона
-            let texture_coords: Vec<(f32, f32)> = vertex_indices
-                .iter()
-                .map(|&idx| model.mesh.get_texture_coords()[idx])
-                .collect();
+                let min_x = v0.x.min(v1.x.min(v2.x)) as usize;
+                let max_x = v0.x.max(v1.x.max(v2.x)) as usize;
+                let min_y = v0.y.min(v1.y.min(v2.y)) as usize;
+                let max_y = v0.y.max(v1.y.max(v2.y)) as usize;
 
-            // TODO это костыль, надо сделать потом нормальное наложение текстуры без освещения
-            let base_color = if let Some((u, v)) = texture_coords.first() {
-                model.material.get_uv_color(*u, *v)
-            } else {
-                model.material.color
-            };
+                for y in min_y..=max_y {
+                    for x in min_x..=max_x {
+                        if x < 0 || y < 0 || x >= canvas.width || y >= canvas.height {
+                            continue;
+                        }
 
-            // Заполнение треугольников
-            if vertex_indices.len() == 3 {
-                self.fill_triangle(&poly_vertices, base_color, canvas, z_buffer_enabled);
-            } else {
-                self.triangulate_and_fill_polygon(
-                    &poly_vertices,
-                    base_color,
-                    canvas,
-                    z_buffer_enabled,
-                );
+                        let p = Point3::new(x as f32, y as f32, 0.0);
+                        let bary = self.barycentric_coordinates(&[v0, v1, v2], p);
+
+                        let z = bary.x * v0.z + bary.y * v1.z + bary.z * v2.z;
+                        if z_buffer_enabled && !canvas.test_and_set_z(x, y, z) {
+                            continue;
+                        }
+
+                        let u = bary.x * tx0.0 + bary.y * tx1.0 + bary.z * tx2.0;
+                        let v = bary.x * tx0.1 + bary.y * tx1.1 + bary.z * tx2.1;
+
+                        let base_color = model.material.get_uv_color(u, v);
+                        canvas[(x, y)] = base_color;
+                    }
+                }
             }
         }
 
@@ -451,52 +458,50 @@ impl Scene {
         canvas: &mut Canvas,
         z_buffer_enabled: bool,
     ) {
-        // освещённость вершин
-        let vertex_intensities = self.calculate_vertex_lighting(model);
+        // освещённость всех вершин модели
+        let light_colors = self.calculate_vertex_lighting(model);
 
         for polygon in polygons {
-            let vertex_indices = polygon.get_vertexes();
+            for triangle in triangulate_polygon(&polygon.get_vertexes()) {
+                // проекция вершин треугольника
+                let v0 = projected_vertexes[triangle.0];
+                let v1 = projected_vertexes[triangle.1];
+                let v2 = projected_vertexes[triangle.2];
 
-            if vertex_indices.len() < 3 {
-                continue;
-            }
+                // освещённость вершин треугольника
+                let light0 = light_colors[triangle.0];
+                let light1 = light_colors[triangle.1];
+                let light2 = light_colors[triangle.2];
 
-            // вершины полигона
-            let poly_vertices: Vec<Vec3> = vertex_indices
-                .iter()
-                .map(|&idx| projected_vertexes[idx])
-                .collect();
+                let min_x = v0.x.min(v1.x.min(v2.x)) as usize;
+                let max_x = v0.x.max(v1.x.max(v2.x)) as usize;
+                let min_y = v0.y.min(v1.y.min(v2.y)) as usize;
+                let max_y = v0.y.max(v1.y.max(v2.y)) as usize;
 
-            let poly_intensities: Vec<f32> = vertex_indices
-                .iter()
-                .map(|&idx| vertex_intensities[idx])
-                .collect();
+                for y in min_y..=max_y {
+                    for x in min_x..=max_x {
+                        if x < 0 || y < 0 || x >= canvas.width || y >= canvas.height {
+                            continue;
+                        }
 
-            // текстурные координаты
-            let texture_coords: Vec<(f32, f32)> = vertex_indices
-                .iter()
-                .map(|&idx| model.mesh.get_texture_coords()[idx])
-                .collect();
+                        let p = Point3::new(x as f32, y as f32, 0.0);
+                        let bary = self.barycentric_coordinates(&[v0, v1, v2], p);
 
-            // отрисовка треугольников
-            if vertex_indices.len() == 3 {
-                self.fill_triangle_gouraud(
-                    &poly_vertices,
-                    &poly_intensities,
-                    &texture_coords,
-                    model,
-                    canvas,
-                    z_buffer_enabled,
-                );
-            } else {
-                self.triangulate_and_fill_gouraud(
-                    &poly_vertices,
-                    &poly_intensities,
-                    &texture_coords,
-                    model,
-                    canvas,
-                    z_buffer_enabled,
-                );
+                        let z = bary.x * v0.z + bary.y * v1.z + bary.z * v2.z;
+                        if z_buffer_enabled && !canvas.test_and_set_z(x, y, z) {
+                            continue;
+                        }
+
+                        let base_color = canvas[(x, y)];
+                        // освещённость текселя
+                        let light = light0.linear_multiply(bary.x)
+                            + light1.linear_multiply(bary.y)
+                            + light2.linear_multiply(bary.z);
+
+                        let color = base_color + light;
+                        canvas[(x, y)] = color;
+                    }
+                }
             }
         }
     }
@@ -513,6 +518,96 @@ impl Scene {
         canvas: &mut Canvas,
         z_buffer_enabled: bool,
     ) {
+        // нормали в глобальных координатах
+        let global_vertex_normals: Vec<Vec3> = model
+            .mesh
+            .get_normals()
+            .iter()
+            .map(|&v| {
+                Vec3::from(
+                    HVec3::from(v)
+                        .apply_transform(&model.mesh.get_local_frame().local_to_global_matrix()),
+                )
+                .normalize()
+            })
+            .collect();
+
+        // позиции вершин в глобальной системе
+        let global_vertex_positions: Vec<Vec3> = model
+            .mesh
+            .get_vertexes()
+            .iter()
+            .map(|&v| {
+                Vec3::from(
+                    v.apply_transform(&model.mesh.get_local_frame().local_to_global_matrix()),
+                )
+            })
+            .collect();
+
+        for polygon in polygons {
+            for triangle in triangulate_polygon(&polygon.get_vertexes()) {
+                // проекция вершин треугольника
+                let v0 = projected_vertexes[triangle.0];
+                let v1 = projected_vertexes[triangle.1];
+                let v2 = projected_vertexes[triangle.2];
+
+                // глобальные нормали вершин треугольника
+                let normal0 = global_vertex_normals[triangle.0];
+                let normal1 = global_vertex_normals[triangle.1];
+                let normal2 = global_vertex_normals[triangle.2];
+
+                // глобальные позиции вершин треугольника
+                let pos0 = global_vertex_positions[triangle.0];
+                let pos1 = global_vertex_positions[triangle.1];
+                let pos2 = global_vertex_positions[triangle.2];
+
+                let min_x = v0.x.min(v1.x.min(v2.x)) as usize;
+                let max_x = v0.x.max(v1.x.max(v2.x)) as usize;
+                let min_y = v0.y.min(v1.y.min(v2.y)) as usize;
+                let max_y = v0.y.max(v1.y.max(v2.y)) as usize;
+
+                for y in min_y..=max_y {
+                    for x in min_x..=max_x {
+                        if x < 0 || y < 0 || x >= canvas.width || y >= canvas.height {
+                            continue;
+                        }
+
+                        let p = Point3::new(x as f32, y as f32, 0.0);
+                        let bary = self.barycentric_coordinates(&[v0, v1, v2], p);
+
+                        let z = bary.x * v0.z + bary.y * v1.z + bary.z * v2.z;
+                        if z_buffer_enabled && !canvas.test_and_set_z(x, y, z) {
+                            continue;
+                        }
+
+                        // Интерполируем нормали и позиции
+                        let normal = normal0 * bary.x + normal1 * bary.y + normal2 * bary.z;
+                        normal.normalize()
+                        let pos = pos0 * bary.x + pos1 * bary.y + pos2 * bary.z;
+            
+                        let light_dir 
+            // Вычисляем векторы
+            lightDir = normalize(light.position - interpPosition)
+            viewDir = normalize(camera.position - interpPosition)
+            reflectDir = reflect(-lightDir, interpNormal)
+            
+            // Диффузная составляющая
+            diffuse = max(dot(interpNormal, lightDir), 0.0)
+            
+            // Спекулярная составляющая
+            specular = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess)
+            
+            // Финальный цвет
+            ambientColor = material.ambient * light.color
+            diffuseColor = material.diffuse * diffuse * light.color
+            specularColor = material.specular * specular * light.color
+            
+            pixelColor = ambientColor + diffuseColor + specularColor
+                        canvas[(x, y)] = color;
+                    }
+                }
+            }
+        }
         // нормали вершин и их позиции
         let vertex_normals = model.mesh.get_normals();
         let vertex_positions: Vec<Vec3> = model
@@ -574,42 +669,56 @@ impl Scene {
         }
     }
 
-    fn calculate_vertex_lighting(&self, model: &Model3) -> Vec<f32> {
-        let vertex_normals = model.mesh.get_normals();
-        let vertex_positions: Vec<Vec3> = model
+    fn calculate_vertex_lighting(&self, model: &Model3) -> Vec<Color32> {
+        // нормали в глобальных координатах
+        let global_vertex_normals: Vec<Vec3> = model
+            .mesh
+            .get_normals()
+            .iter()
+            .map(|&v| {
+                Vec3::from(
+                    HVec3::from(v)
+                        .apply_transform(&model.mesh.get_local_frame().local_to_global_matrix()),
+                )
+                .normalize()
+            })
+            .collect();
+
+        // позиции вершин в глобальной системе
+        let global_vertex_positions: Vec<Vec3> = model
             .mesh
             .get_vertexes()
             .iter()
-            .map(|&v| Vec3::from(v))
+            .map(|&v| {
+                Vec3::from(
+                    v.apply_transform(&model.mesh.get_local_frame().local_to_global_matrix()),
+                )
+            })
             .collect();
 
-        let mut intensities = Vec::with_capacity(vertex_normals.len());
+        let mut colors = Vec::with_capacity(global_vertex_normals.len());
 
-        for i in 0..vertex_normals.len() {
-            let normal = vertex_normals[i];
-            let position = vertex_positions[i];
+        for i in 0..global_vertex_normals.len() {
+            let normal = global_vertex_normals[i];
+            let position = global_vertex_positions[i];
 
             // глобальный свет
-            let mut total_intensity = 0.3; // TODO костыль?
+            let mut light_color = self.ambient_light.linear_multiply(0.1);
 
             // Влияние каждого источника
             for light in &self.lights {
                 let light_dir = (light.position - Point3::from(position)).normalize();
-                let distance = (light.position - Point3::from(position)).length();
-
                 let diffuse = normal.dot(light_dir).max(0.0);
-                let attenuation = 1.0 / (1.0 + distance * 0.1);
-
-                total_intensity += diffuse * attenuation * light.intensity;
+                light_color = light_color + light.color.linear_multiply(light.intensity * diffuse);
             }
 
-            intensities.push(total_intensity.min(1.0).max(0.0));
+            colors.push(light_color);
         }
 
-        intensities
+        colors
     }
 
-    fn fill_triangle(
+    fn fill_triangle_solid(
         &self,
         vertices: &[Vec3],
         color: Color32,
@@ -748,23 +857,34 @@ impl Scene {
     }
 
     /// Находит барицентрические координаты по 3-м точкам.
-    fn barycentric_coordinates(&self, p: Pos2, a: Vec3, b: Vec3, c: Vec3) -> (f32, f32, f32) {
-        let v0 = Vec3::new(b.x - a.x, b.y - a.y, 0.0);
-        let v1 = Vec3::new(c.x - a.x, c.y - a.y, 0.0);
-        let v2 = Vec3::new(p.x - a.x, p.y - a.y, 0.0);
+    /// `triangle` - полигон-треугольник, по которому строятся координаты
+    /// `point` - точка, для которой нужны координаты
+    ///
+    /// Поскольку это уже в проекции на экран, z-координата не учитывается.
+    ///
+    /// Возвращает координаты в виде Point3.
+    fn barycentric_coordinates(&self, triangle: &[Vec3], point: Point3) -> Point3 {
+        let mut v0 = triangle[1] - triangle[0];
+        let mut v1 = triangle[2] - triangle[0];
+        let mut v2 = Vec3::from(point) - triangle[0];
+
+        // z-координата предозначеня для буфера, точки уже в проекции
+        v0.z = 0.0;
+        v1.z = 0.0;
+        v2.z = 0.0;
 
         let d00 = v0.dot(v0);
         let d01 = v0.dot(v1);
         let d11 = v1.dot(v1);
         let d20 = v2.dot(v0);
         let d21 = v2.dot(v1);
-        let denom = d00 * d11 - d01 * d01;
 
+        let denom = d00 * d11 - d01 * d01;
         let v = (d11 * d20 - d01 * d21) / denom;
         let w = (d00 * d21 - d01 * d20) / denom;
         let u = 1.0 - v - w;
 
-        (u, v, w)
+        Point3::new(u, v, w)
     }
 
     fn apply_lighting_color(&self, color: Color32, intensity: f32) -> Color32 {
@@ -895,6 +1015,28 @@ impl Default for Scene {
     fn default() -> Self {
         Self::new(Camera3::default())
     }
+}
+
+/// Триангуляция полигона.
+/// `polygon` - полигон, заданный индексами вершин.
+///
+/// Пока что примитивная веерная триангуляция.
+fn triangulate_polygon(polygon: &[usize]) -> Vec<(usize, usize, usize)> {
+    #[cfg(debug_assertions)]
+    {
+        if polygon.len() < 3 {
+            eprintln!(
+                "Warning: триангуляция полигона с {} вершинами",
+                polygon.len()
+            );
+        }
+    }
+
+    let mut triangles = vec![];
+    for i in 1..polygon.len() - 1 {
+        triangles.push((polygon[0], polygon[i], polygon[i + 1]));
+    }
+    triangles
 }
 
 fn reflect(incident: Vec3, normal: Vec3) -> Vec3 {
