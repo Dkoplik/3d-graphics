@@ -63,7 +63,7 @@ impl Canvas {
 
     /// Проверить и обновить значение z-буфера
     ///
-    /// Если новое значение z меньше текущего, то возвращает true и обновляет буфер,
+    /// Если новое значение z больше текущего, то возвращает true и обновляет буфер,
     /// иначе возвращает false.
     pub fn test_and_set_z(&mut self, x: usize, y: usize, z: f32) -> bool {
         debug_assert!(
@@ -80,12 +80,33 @@ impl Canvas {
         );
 
         let index = y * self.width + x;
-        if z < self.buffer[index] {
+        if z > self.buffer[index] {
             self.buffer[index] = z;
             true
         } else {
             false
         }
+    }
+
+    /// Проверить значение z-буфера
+    ///
+    /// Если новое значение z больше либо равно текущему, то возвращает true.
+    pub fn test_z(&self, x: usize, y: usize, z: f32) -> bool {
+        debug_assert!(
+            x < self.width,
+            "x {} должен быть меньше ширины {}",
+            x,
+            self.width
+        );
+        debug_assert!(
+            y < self.height,
+            "y {} должен быть меньше ширины {}",
+            y,
+            self.height
+        );
+
+        let index = y * self.width + x;
+        z >= self.buffer[index]
     }
 }
 

@@ -45,6 +45,11 @@ impl Model3 {
         self.apply_transform(&scale_transform);
     }
 
+    /// Текущая позиция модели
+    pub fn get_position(&self) -> Point3 {
+        self.mesh.get_local_frame().origin
+    }
+
     /// Поставить модель в новую позицию.
     ///
     /// Просто синтаксический сахар для более удобных операций над моделькой.

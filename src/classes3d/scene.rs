@@ -80,6 +80,8 @@ impl Scene {
     }
 
     /// Нарисовать сцену на холст со всеми нужными преобразованиями.
+    ///
+    /// Возвращает количество отрисованных вершин и полигонов.
     pub fn render(
         &self,
         canvas: &mut Canvas,
@@ -87,7 +89,7 @@ impl Scene {
         show_custom_axis: bool,
         axis_point1: Point3,
         axis_point2: Point3,
-    ) {
+    ) -> (usize, usize) {
         // Стереть прошлый кадр.
         canvas.clear(Color32::GRAY);
 
@@ -108,6 +110,11 @@ impl Scene {
             );
         }
 
+        // количество отрисованных вершин
+        let mut vertex_count = 0;
+        // количество отрисованных полигонов.
+        let mut polygon_count = 0;
+
         // Отрисовка каждой модели
         for model in &self.models {
             // Проекция вершин модели
@@ -119,13 +126,14 @@ impl Scene {
             } else {
                 model.mesh.polygons.clone()
             };
+            let polygons = self.skip_out_of_camera_polygons(model, polygons);
 
-            match render_options.render_type {
+            let (model_vertexes, model_polygons) = match render_options.render_type {
                 RenderType::WireFrame => {
                     self.render_model_wireframe(&projected_vertexes, &polygons, canvas)
                 }
                 RenderType::Solid => {
-                    self.render_solid(
+                    let (vertex_cnt, polygon_cnt) = self.render_solid(
                         &projected_vertexes,
                         &polygons,
                         model,
@@ -149,9 +157,14 @@ impl Scene {
                             render_options.z_buffer_enabled,
                         ),
                     }
+                    (vertex_cnt, polygon_cnt)
                 }
-            }
+            };
+            vertex_count += model_vertexes;
+            polygon_count += model_polygons;
         }
+
+        (vertex_count, polygon_count)
     }
 
     // --------------------------------------------------
@@ -277,6 +290,29 @@ impl Scene {
             .collect()
     }
 
+    /// Удаляет из вектора полигонов те полигоны, которые полностью (со всеми вершинами)
+    /// находятся вне камеры.
+    fn skip_out_of_camera_polygons(
+        &self,
+        model: &Model3,
+        mut polygons: Vec<mesh::Polygon3>,
+    ) -> Vec<mesh::Polygon3> {
+        let vertexes = model.mesh.get_vertexes();
+        polygons.retain(|polygon| {
+            for &index in polygon.get_vertexes() {
+                let vertex = vertexes[index];
+                if (vertex.x < -1.0 || vertex.x > 1.0)
+                    && (vertex.y < -1.0 || vertex.y > 1.0)
+                    && (vertex.z < -1.0 || vertex.z > 1.0)
+                {
+                    return false;
+                }
+            }
+            true
+        });
+        polygons
+    }
+
     /// Отсечение нелицевых граней модели
     /// `model` - сама модель.
     ///
@@ -327,10 +363,13 @@ impl Scene {
         projected_vertexes: &Vec<Vec3>,
         polygons: &Vec<mesh::Polygon3>,
         canvas: &mut Canvas,
-    ) {
+    ) -> (usize, usize) {
+        let mut model_vertexes = 0;
+        let model_polygons = polygons.len();
         // Рисуем рёбра
         for polygon in polygons {
             // Вершины полигона
+            model_vertexes += polygon.get_vertexes().len();
             let points: Vec<Vec3> = polygon
                 .get_vertexes()
                 .iter()
@@ -352,8 +391,13 @@ impl Scene {
             let pos = Pos2::new(vertex.x, vertex.y);
             canvas.circle_filled(pos, 3.0, Color32::WHITE);
         }
+
+        (model_vertexes, model_polygons)
     }
 
+    /// Рендер цельного объекта, с гранями вместо границ и с учётом материала и текстуры.
+    ///
+    /// Этот этап рендера не учитывает освещение, поэтому без шейдинга.
     fn render_solid(
         &self,
         projected_vertexes: &Vec<Vec3>,
@@ -361,12 +405,46 @@ impl Scene {
         model: &Model3,
         canvas: &mut Canvas,
         z_buffer_enabled: bool,
-    ) {
-        // TODO Тут просто отрисовка моделей без учёта освещения.
-        // Обращаю внимание, что материал модели уже имеет удобный метод для получения цвета
-        // с учётом материала и текстуры
-        // Также обращаю внимание, что функция может применяться как с z_buffer'ом, так и без него. Сам z_buffer заложен в Canvas.
-        todo!("рендер цельной модели");
+    ) -> (usize, usize) {
+        let mut model_vertexes = 0;
+        let model_polygons = polygons.len();
+        for polygon in polygons {
+            let vertex_indices = polygon.get_vertexes();
+            model_vertexes += vertex_indices.len();
+
+            // Вершины полигона
+            let poly_vertices: Vec<Vec3> = vertex_indices
+                .iter()
+                .map(|&idx| projected_vertexes[idx])
+                .collect();
+
+            // Текстурные координаты полигона
+            let texture_coords: Vec<(f32, f32)> = vertex_indices
+                .iter()
+                .map(|&idx| model.mesh.get_texture_coords()[idx])
+                .collect();
+
+            // TODO это костыль, надо сделать потом нормальное наложение текстуры без освещения
+            let base_color = if let Some((u, v)) = texture_coords.first() {
+                model.material.get_uv_color(*u, *v)
+            } else {
+                model.material.color
+            };
+
+            // Заполнение треугольников
+            if vertex_indices.len() == 3 {
+                self.fill_triangle(&poly_vertices, base_color, canvas, z_buffer_enabled);
+            } else {
+                self.triangulate_and_fill_polygon(
+                    &poly_vertices,
+                    base_color,
+                    canvas,
+                    z_buffer_enabled,
+                );
+            }
+        }
+
+        (model_vertexes, model_polygons)
     }
 
     /// Шейдинг Гуро для модели Ламберта.
@@ -381,8 +459,54 @@ impl Scene {
         canvas: &mut Canvas,
         z_buffer_enabled: bool,
     ) {
-        // TODO
-        todo!("Шейдинг Гуро для модели Ламберта")
+        // освещённость вершин
+        let vertex_intensities = self.calculate_vertex_lighting(model);
+
+        for polygon in polygons {
+            let vertex_indices = polygon.get_vertexes();
+
+            if vertex_indices.len() < 3 {
+                continue;
+            }
+
+            // вершины полигона
+            let poly_vertices: Vec<Vec3> = vertex_indices
+                .iter()
+                .map(|&idx| projected_vertexes[idx])
+                .collect();
+
+            let poly_intensities: Vec<f32> = vertex_indices
+                .iter()
+                .map(|&idx| vertex_intensities[idx])
+                .collect();
+
+            // текстурные координаты
+            let texture_coords: Vec<(f32, f32)> = vertex_indices
+                .iter()
+                .map(|&idx| model.mesh.get_texture_coords()[idx])
+                .collect();
+
+            // отрисовка треугольников
+            if vertex_indices.len() == 3 {
+                self.fill_triangle_gouraud(
+                    &poly_vertices,
+                    &poly_intensities,
+                    &texture_coords,
+                    model,
+                    canvas,
+                    z_buffer_enabled,
+                );
+            } else {
+                self.triangulate_and_fill_gouraud(
+                    &poly_vertices,
+                    &poly_intensities,
+                    &texture_coords,
+                    model,
+                    canvas,
+                    z_buffer_enabled,
+                );
+            }
+        }
     }
 
     /// Шейдинг Фонга для модели туншейдинг.
@@ -397,8 +521,381 @@ impl Scene {
         canvas: &mut Canvas,
         z_buffer_enabled: bool,
     ) {
-        // TODO
-        todo!("Шейдинг Фонга для модели туншейдинг")
+        // нормали вершин и их позиции
+        let vertex_normals = model.mesh.get_normals();
+        let vertex_positions: Vec<Vec3> = model
+            .mesh
+            .get_vertexes()
+            .iter()
+            .map(|&v| Vec3::from(v))
+            .collect();
+
+        for polygon in polygons {
+            let vertex_indices = polygon.get_vertexes();
+
+            if vertex_indices.len() < 3 {
+                continue;
+            }
+
+            // вершины полигона
+            let poly_vertices: Vec<Vec3> = vertex_indices
+                .iter()
+                .map(|&idx| projected_vertexes[idx])
+                .collect();
+
+            let poly_normals: Vec<Vec3> = vertex_indices
+                .iter()
+                .map(|&idx| vertex_normals[idx])
+                .collect();
+
+            let poly_positions: Vec<Vec3> = vertex_indices
+                .iter()
+                .map(|&idx| vertex_positions[idx])
+                .collect();
+
+            let texture_coords: Vec<(f32, f32)> = vertex_indices
+                .iter()
+                .map(|&idx| model.mesh.get_texture_coords()[idx])
+                .collect();
+
+            if vertex_indices.len() == 3 {
+                self.fill_triangle_phong(
+                    &poly_vertices,
+                    &poly_normals,
+                    &poly_positions,
+                    &texture_coords,
+                    model,
+                    canvas,
+                    z_buffer_enabled,
+                );
+            } else {
+                self.triangulate_and_fill_phong(
+                    &poly_vertices,
+                    &poly_normals,
+                    &poly_positions,
+                    &texture_coords,
+                    model,
+                    canvas,
+                    z_buffer_enabled,
+                );
+            }
+        }
+    }
+
+    fn calculate_vertex_lighting(&self, model: &Model3) -> Vec<f32> {
+        let vertex_normals = model.mesh.get_normals();
+        let vertex_positions: Vec<Vec3> = model
+            .mesh
+            .get_vertexes()
+            .iter()
+            .map(|&v| Vec3::from(v))
+            .collect();
+
+        let mut intensities = Vec::with_capacity(vertex_normals.len());
+
+        for i in 0..vertex_normals.len() {
+            let normal = vertex_normals[i];
+            let position = vertex_positions[i];
+
+            // глобальный свет
+            let mut total_intensity = 0.3; // TODO костыль?
+
+            // Влияние каждого источника
+            for light in &self.lights {
+                let light_dir = (light.position - Point3::from(position)).normalize();
+                let distance = (light.position - Point3::from(position)).length();
+
+                let diffuse = normal.dot(light_dir).max(0.0);
+                let attenuation = 1.0 / (1.0 + distance * 0.1);
+
+                total_intensity += diffuse * attenuation * light.intensity;
+            }
+
+            intensities.push(total_intensity.min(1.0).max(0.0));
+        }
+
+        intensities
+    }
+
+    fn fill_triangle(
+        &self,
+        vertices: &[Vec3],
+        color: Color32,
+        canvas: &mut Canvas,
+        z_buffer_enabled: bool,
+    ) {
+        let [v0, v1, v2] = [vertices[0], vertices[1], vertices[2]];
+
+        let min_x = v0.x.min(v1.x.min(v2.x)) as i32;
+        let max_x = v0.x.max(v1.x.max(v2.x)) as i32;
+        let min_y = v0.y.min(v1.y.min(v2.y)) as i32;
+        let max_y = v0.y.max(v1.y.max(v2.y)) as i32;
+
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                if x < 0 || y < 0 || x >= canvas.width as i32 || y >= canvas.height as i32 {
+                    continue;
+                }
+
+                let p = Pos2::new(x as f32, y as f32);
+                let bary = self.barycentric_coordinates(p, v0, v1, v2);
+
+                if bary.0 >= 0.0 && bary.1 >= 0.0 && bary.2 >= 0.0 {
+                    let z = v0.z * bary.0 + v1.z * bary.1 + v2.z * bary.2;
+
+                    if z_buffer_enabled {
+                        if canvas.test_and_set_z(x as usize, y as usize, z) {
+                            canvas[(x as usize, y as usize)] = color;
+                        }
+                    } else {
+                        canvas[(x as usize, y as usize)] = color;
+                    }
+                }
+            }
+        }
+    }
+
+    fn fill_triangle_gouraud(
+        &self,
+        vertices: &[Vec3],
+        intensities: &[f32],
+        texture_coords: &[(f32, f32)],
+        model: &Model3,
+        canvas: &mut Canvas,
+        z_buffer_enabled: bool,
+    ) {
+        let [v0, v1, v2] = [vertices[0], vertices[1], vertices[2]];
+        let [i0, i1, i2] = [intensities[0], intensities[1], intensities[2]];
+        let [uv0, uv1, uv2] = [texture_coords[0], texture_coords[1], texture_coords[2]];
+
+        let min_x = v0.x.min(v1.x.min(v2.x)) as i32;
+        let max_x = v0.x.max(v1.x.max(v2.x)) as i32;
+        let min_y = v0.y.min(v1.y.min(v2.y)) as i32;
+        let max_y = v0.y.max(v1.y.max(v2.y)) as i32;
+
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                if x < 0 || y < 0 || x >= canvas.width as i32 || y >= canvas.height as i32 {
+                    continue;
+                }
+
+                let p = Pos2::new(x as f32, y as f32);
+                let bary = self.barycentric_coordinates(p, v0, v1, v2);
+
+                if bary.0 >= 0.0 && bary.1 >= 0.0 && bary.2 >= 0.0 {
+                    let z = v0.z * bary.0 + v1.z * bary.1 + v2.z * bary.2;
+                    let intensity = i0 * bary.0 + i1 * bary.1 + i2 * bary.2;
+                    let u = uv0.0 * bary.0 + uv1.0 * bary.1 + uv2.0 * bary.2;
+                    let v = uv0.1 * bary.0 + uv1.1 * bary.1 + uv2.1 * bary.2;
+
+                    let base_color = model.material.get_uv_color(u, v);
+                    let shaded_color = self.apply_lighting_color(base_color, intensity);
+
+                    if z_buffer_enabled {
+                        if canvas.test_z(x as usize, y as usize, z) {
+                            canvas[(x as usize, y as usize)] = shaded_color;
+                        }
+                    } else {
+                        canvas[(x as usize, y as usize)] = shaded_color;
+                    }
+                }
+            }
+        }
+    }
+
+    fn fill_triangle_phong(
+        &self,
+        vertices: &[Vec3],
+        normals: &[Vec3],
+        positions: &[Vec3],
+        texture_coords: &[(f32, f32)],
+        model: &Model3,
+        canvas: &mut Canvas,
+        z_buffer_enabled: bool,
+    ) {
+        let [v0, v1, v2] = [vertices[0], vertices[1], vertices[2]];
+        let [n0, n1, n2] = [normals[0], normals[1], normals[2]];
+        let [p0, p1, p2] = [positions[0], positions[1], positions[2]];
+        let [uv0, uv1, uv2] = [texture_coords[0], texture_coords[1], texture_coords[2]];
+
+        let min_x = v0.x.min(v1.x.min(v2.x)) as i32;
+        let max_x = v0.x.max(v1.x.max(v2.x)) as i32;
+        let min_y = v0.y.min(v1.y.min(v2.y)) as i32;
+        let max_y = v0.y.max(v1.y.max(v2.y)) as i32;
+
+        for y in min_y..=max_y {
+            for x in min_x..=max_x {
+                if x < 0 || y < 0 || x >= canvas.width as i32 || y >= canvas.height as i32 {
+                    continue;
+                }
+
+                let screen_pos = Pos2::new(x as f32, y as f32);
+                let bary = self.barycentric_coordinates(screen_pos, v0, v1, v2);
+
+                if bary.0 >= 0.0 && bary.1 >= 0.0 && bary.2 >= 0.0 {
+                    let z = v0.z * bary.0 + v1.z * bary.1 + v2.z * bary.2;
+                    let normal = (n0 * bary.0 + n1 * bary.1 + n2 * bary.2).normalize();
+                    let world_pos = p0 * bary.0 + p1 * bary.1 + p2 * bary.2;
+                    let u = uv0.0 * bary.0 + uv1.0 * bary.1 + uv2.0 * bary.2;
+                    let v = uv0.1 * bary.0 + uv1.1 * bary.1 + uv2.1 * bary.2;
+
+                    let base_color = model.material.get_uv_color(u, v);
+                    let shaded_color =
+                        self.calculate_phong_lighting(base_color, normal, world_pos, model);
+
+                    if z_buffer_enabled {
+                        if canvas.test_z(x as usize, y as usize, z) {
+                            canvas[(x as usize, y as usize)] = shaded_color;
+                        }
+                    } else {
+                        canvas[(x as usize, y as usize)] = shaded_color;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Находит барицентрические координаты по 3-м точкам.
+    fn barycentric_coordinates(&self, p: Pos2, a: Vec3, b: Vec3, c: Vec3) -> (f32, f32, f32) {
+        let v0 = Vec3::new(b.x - a.x, b.y - a.y, 0.0);
+        let v1 = Vec3::new(c.x - a.x, c.y - a.y, 0.0);
+        let v2 = Vec3::new(p.x - a.x, p.y - a.y, 0.0);
+
+        let d00 = v0.dot(v0);
+        let d01 = v0.dot(v1);
+        let d11 = v1.dot(v1);
+        let d20 = v2.dot(v0);
+        let d21 = v2.dot(v1);
+        let denom = d00 * d11 - d01 * d01;
+
+        let v = (d11 * d20 - d01 * d21) / denom;
+        let w = (d00 * d21 - d01 * d20) / denom;
+        let u = 1.0 - v - w;
+
+        (u, v, w)
+    }
+
+    fn apply_lighting_color(&self, color: Color32, intensity: f32) -> Color32 {
+        let r = (color.r() as f32 * intensity) as u8;
+        let g = (color.g() as f32 * intensity) as u8;
+        let b = (color.b() as f32 * intensity) as u8;
+        Color32::from_rgb(r, g, b)
+    }
+
+    fn calculate_phong_lighting(
+        &self,
+        base_color: Color32,
+        normal: Vec3,
+        position: Vec3,
+        model: &Model3,
+    ) -> Color32 {
+        let mut final_color = base_color;
+
+        let ambient_strength = 0.1;
+        final_color = self.mix_colors(final_color, self.ambient_light, ambient_strength);
+
+        for light in &self.lights {
+            let light_dir = (light.position - Point3::from(position)).normalize();
+            let view_dir = (self.camera.get_position() - Point3::from(position)).normalize();
+            let reflect_dir = reflect(-light_dir, normal);
+
+            let diff = normal.dot(light_dir).max(0.0);
+            let diffuse = self.mix_colors(Color32::BLACK, light.color, diff);
+
+            let spec = reflect_dir
+                .dot(view_dir)
+                .max(0.0)
+                .powf(model.material.shininess);
+            let specular = self.mix_colors(
+                Color32::BLACK,
+                light.color,
+                spec * model.material.specular_strength,
+            );
+
+            // Combine
+            final_color = self.add_colors(final_color, diffuse);
+            final_color = self.add_colors(final_color, specular);
+        }
+
+        final_color
+    }
+
+    fn mix_colors(&self, a: Color32, b: Color32, factor: f32) -> Color32 {
+        let r = (a.r() as f32 * (1.0 - factor) + b.r() as f32 * factor) as u8;
+        let g = (a.g() as f32 * (1.0 - factor) + b.g() as f32 * factor) as u8;
+        let b_val = (a.b() as f32 * (1.0 - factor) + b.b() as f32 * factor) as u8;
+        Color32::from_rgb(r, g, b_val)
+    }
+
+    fn add_colors(&self, a: Color32, b: Color32) -> Color32 {
+        let r = (a.r() as u16 + b.r() as u16).min(255) as u8;
+        let g = (a.g() as u16 + b.g() as u16).min(255) as u8;
+        let b_val = (a.b() as u16 + b.b() as u16).min(255) as u8;
+        Color32::from_rgb(r, g, b_val)
+    }
+
+    fn triangulate_and_fill_polygon(
+        &self,
+        vertices: &[Vec3],
+        color: Color32,
+        canvas: &mut Canvas,
+        z_buffer_enabled: bool,
+    ) {
+        for i in 1..vertices.len() - 1 {
+            let triangle = [vertices[0], vertices[i], vertices[i + 1]];
+            self.fill_triangle(&triangle, color, canvas, z_buffer_enabled);
+        }
+    }
+
+    fn triangulate_and_fill_gouraud(
+        &self,
+        vertices: &[Vec3],
+        intensities: &[f32],
+        texture_coords: &[(f32, f32)],
+        model: &Model3,
+        canvas: &mut Canvas,
+        z_buffer_enabled: bool,
+    ) {
+        for i in 1..vertices.len() - 1 {
+            let triangle_verts = [vertices[0], vertices[i], vertices[i + 1]];
+            let triangle_ints = [intensities[0], intensities[i], intensities[i + 1]];
+            let triangle_uvs = [texture_coords[0], texture_coords[i], texture_coords[i + 1]];
+            self.fill_triangle_gouraud(
+                &triangle_verts,
+                &triangle_ints,
+                &triangle_uvs,
+                model,
+                canvas,
+                z_buffer_enabled,
+            );
+        }
+    }
+
+    fn triangulate_and_fill_phong(
+        &self,
+        vertices: &[Vec3],
+        normals: &[Vec3],
+        positions: &[Vec3],
+        texture_coords: &[(f32, f32)],
+        model: &Model3,
+        canvas: &mut Canvas,
+        z_buffer_enabled: bool,
+    ) {
+        for i in 1..vertices.len() - 1 {
+            let triangle_verts = [vertices[0], vertices[i], vertices[i + 1]];
+            let triangle_norms = [normals[0], normals[i], normals[i + 1]];
+            let triangle_pos = [positions[0], positions[i], positions[i + 1]];
+            let triangle_uvs = [texture_coords[0], texture_coords[i], texture_coords[i + 1]];
+            self.fill_triangle_phong(
+                &triangle_verts,
+                &triangle_norms,
+                &triangle_pos,
+                &triangle_uvs,
+                model,
+                canvas,
+                z_buffer_enabled,
+            );
+        }
     }
 }
 
@@ -406,4 +903,8 @@ impl Default for Scene {
     fn default() -> Self {
         Self::new(Camera3::default())
     }
+}
+
+fn reflect(incident: Vec3, normal: Vec3) -> Vec3 {
+    incident - normal * 2.0 * incident.dot(normal)
 }

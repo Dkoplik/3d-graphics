@@ -30,6 +30,7 @@ impl Default for Material {
         Self {
             color: Color32::WHITE,
             texture: None,
+            blend_mode: TextureBlendMode::default(),
             shininess: 32.0,
             specular_strength: 0.5,
         }
@@ -41,9 +42,9 @@ impl Material {
     ///
     /// Обращаю внимание, что тут происходит только смешивание текстуры и материала.
     /// Освещение и шейдинг тут никак не учитываются.
-    pub fn get_uv_color(&self, u: f32, v: f32, blend_mode: TextureBlendMode) -> Color32 {
+    pub fn get_uv_color(&self, u: f32, v: f32) -> Color32 {
         if let Some(texture) = &self.texture {
-            blend_mode.blend(texture[(u, v)], self.color)
+            self.blend_mode.blend(texture[(u, v)], self.color)
         } else {
             self.color
         }

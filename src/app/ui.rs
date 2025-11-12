@@ -60,6 +60,12 @@ impl AthenianApp {
                                 self.show_model_controls(ui);
                             });
 
+                        if let Some(_) = self.selected_3d_model_index {
+                            egui::CollapsingHeader::new("Текущая модель").show(ui, |ui| {
+                                self.show_current_model_controls(ui);
+                            });
+                        }
+
                         egui::CollapsingHeader::new("Внешний вид").show(ui, |ui| {
                             self.show_rendering_controls(ui);
                         });
@@ -76,7 +82,7 @@ impl AthenianApp {
             });
     }
 
-    /// Показать управление моделями.
+    /// Показать создание моделей.
     fn show_model_controls(&mut self, ui: &mut egui::Ui) {
         ui.label("Примитивы:");
         ui.horizontal(|ui| {
@@ -117,13 +123,12 @@ impl AthenianApp {
                 self.show_rotation_model_controls(ui);
             });
 
-            
         if ui.button("Создать вращением").clicked() {
-            // self.create_rotation_model();
+            self.create_rotation_model();
         }
-        
+
         ui.separator();
-        
+
         if ui.button("Создать из функции").clicked() {
             self.create_function_model();
         }
@@ -133,7 +138,7 @@ impl AthenianApp {
         egui::CollapsingHeader::new("График функции двух переменных").show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label("Функция:");
-                egui::ComboBox::from_id_source("surface_function")
+                egui::ComboBox::from_id_salt("surface_function")
                     .selected_text(match self.selected_surface_function {
                         SurfaceFunction::Paraboloid => "Параболоид",
                         SurfaceFunction::Saddle => "Седло",
@@ -203,7 +208,7 @@ impl AthenianApp {
                 ui.add(egui::Slider::new(&mut self.surface_divisions, 10..=200).step_by(5.0));
             });
 
-            if ui.button("🔨 Построить график").clicked() {
+            if ui.button("Построить график").clicked() {
                 self.create_function_model();
             }
         });
@@ -213,11 +218,13 @@ impl AthenianApp {
         // Выбор текущей модели
         if !self.scene.models.is_empty() {
             ui.label("Выбранная модель:");
+            let cur_model = if let Some(index) = self.selected_3d_model_index {
+                format!("{}", index)
+            } else {
+                "не выбрана".into()
+            };
             egui::ComboBox::from_label("")
-                .selected_text(format!(
-                    "Модель {}",
-                    self.selected_3d_model_index.unwrap_or(0)
-                ))
+                .selected_text(format!("Модель {}", cur_model))
                 .show_ui(ui, |ui| {
                     for (i, _) in self.scene.models.iter().enumerate() {
                         ui.selectable_value(
@@ -227,10 +234,13 @@ impl AthenianApp {
                         );
                     }
                 });
-
-            self.show_transform_controls(ui);
-            self.show_material_controls(ui);
         }
+    }
+
+    /// Показать управление выбранной моделью
+    fn show_current_model_controls(&mut self, ui: &mut egui::Ui) {
+        self.show_transform_controls(ui);
+        self.show_material_controls(ui);
     }
 
     /// Показать элементы управления преобразованиями.
@@ -273,28 +283,16 @@ impl AthenianApp {
                 );
             });
 
-        // Числовое управление преобразованиями
-        ui.label("Числовое управление:");
+        // Перемещение
+        let mut new_pos = self.get_selected_model().unwrap().get_position();
+        ui.label("Перемещение:");
         ui.horizontal(|ui| {
-            if ui.button("X+").clicked() {
-                self.translate_model(g3d::Vec3::new(0.5, 0.0, 0.0));
-            }
-            if ui.button("X-").clicked() {
-                self.translate_model(g3d::Vec3::new(-0.5, 0.0, 0.0));
-            }
-            if ui.button("Y+").clicked() {
-                self.translate_model(g3d::Vec3::new(0.0, 0.5, 0.0));
-            }
-            if ui.button("Y-").clicked() {
-                self.translate_model(g3d::Vec3::new(0.0, -0.5, 0.0));
-            }
-            if ui.button("Z+").clicked() {
-                self.translate_model(g3d::Vec3::new(0.0, 0.0, 0.5));
-            }
-            if ui.button("Z-").clicked() {
-                self.translate_model(g3d::Vec3::new(0.0, 0.0, -0.5));
-            }
+            ui.add(egui::DragValue::new(&mut new_pos.x).speed(0.1).prefix("X"));
+            ui.add(egui::DragValue::new(&mut new_pos.y).speed(0.1).prefix("Y"));
+            ui.add(egui::DragValue::new(&mut new_pos.z).speed(0.1).prefix("Z"));
         });
+        let delta_vec = new_pos - self.get_selected_model().unwrap().get_position();
+        self.translate_model(delta_vec);
 
         ui.horizontal(|ui| {
             if ui.button("Масштаб +").clicked() {
@@ -381,40 +379,40 @@ impl AthenianApp {
     fn show_rotation_model_controls(&mut self, ui: &mut egui::Ui) {
         // Сначала обрабатываем UI элементы, которые не требуют вызовов self
         self.show_rotation_params_ui(ui);
-        
+
         // Затем обрабатываем кнопки действий
         self.show_rotation_actions(ui);
     }
-    
+
     fn show_rotation_params_ui(&mut self, ui: &mut egui::Ui) {
         let rotation_params = &mut self.rotation_params;
-        
+
         ui.label("Модель вращения:");
-        
+
         // Выбор оси вращения
         ui.label("Ось вращения:");
         egui::ComboBox::from_label("")
             .selected_text(rotation_params.axis_type.name())
             .show_ui(ui, |ui| {
                 ui.selectable_value(
-                    &mut rotation_params.axis_type, 
-                    logic::AxisType::Center(logic::CenterAxis::X), 
-                    "Ось X"
+                    &mut rotation_params.axis_type,
+                    logic::AxisType::Center(logic::CenterAxis::X),
+                    "Ось X",
                 );
                 ui.selectable_value(
-                    &mut rotation_params.axis_type, 
-                    logic::AxisType::Center(logic::CenterAxis::Y), 
-                    "Ось Y"
+                    &mut rotation_params.axis_type,
+                    logic::AxisType::Center(logic::CenterAxis::Y),
+                    "Ось Y",
                 );
                 ui.selectable_value(
-                    &mut rotation_params.axis_type, 
-                    logic::AxisType::Center(logic::CenterAxis::Z), 
-                    "Ось Z"
+                    &mut rotation_params.axis_type,
+                    logic::AxisType::Center(logic::CenterAxis::Z),
+                    "Ось Z",
                 );
                 ui.selectable_value(
-                    &mut rotation_params.axis_type, 
-                    logic::AxisType::Custom, 
-                    "Произвольная ось"
+                    &mut rotation_params.axis_type,
+                    logic::AxisType::Custom,
+                    "Произвольная ось",
                 );
             });
 
@@ -423,15 +421,39 @@ impl AthenianApp {
             ui.horizontal(|ui| {
                 ui.vertical(|ui| {
                     ui.label("Начало:");
-                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_start.x).speed(0.1).prefix("X:"));
-                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_start.y).speed(0.1).prefix("Y:"));
-                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_start.z).speed(0.1).prefix("Z:"));
+                    ui.add(
+                        egui::DragValue::new(&mut rotation_params.custom_axis_start.x)
+                            .speed(0.1)
+                            .prefix("X:"),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut rotation_params.custom_axis_start.y)
+                            .speed(0.1)
+                            .prefix("Y:"),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut rotation_params.custom_axis_start.z)
+                            .speed(0.1)
+                            .prefix("Z:"),
+                    );
                 });
                 ui.vertical(|ui| {
                     ui.label("Конец:");
-                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_end.x).speed(0.1).prefix("X:"));
-                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_end.y).speed(0.1).prefix("Y:"));
-                    ui.add(egui::DragValue::new(&mut rotation_params.custom_axis_end.z).speed(0.1).prefix("Z:"));
+                    ui.add(
+                        egui::DragValue::new(&mut rotation_params.custom_axis_end.x)
+                            .speed(0.1)
+                            .prefix("X:"),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut rotation_params.custom_axis_end.y)
+                            .speed(0.1)
+                            .prefix("Y:"),
+                    );
+                    ui.add(
+                        egui::DragValue::new(&mut rotation_params.custom_axis_end.z)
+                            .speed(0.1)
+                            .prefix("Z:"),
+                    );
                 });
             });
         }
@@ -456,14 +478,20 @@ impl AthenianApp {
         }
 
         // Информация о профиле
-        ui.label(format!("Количество точек профиля: {}", rotation_params.profile_points.len()));
+        ui.label(format!(
+            "Количество точек профиля: {}",
+            rotation_params.profile_points.len()
+        ));
 
         // Предупреждение если недостаточно точек
         if rotation_params.profile_points.len() < 2 {
-            ui.colored_label(egui::Color32::RED, "Профиль должен содержать хотя бы 2 точки");
+            ui.colored_label(
+                egui::Color32::RED,
+                "Профиль должен содержать хотя бы 2 точки",
+            );
         }
     }
-    
+
     fn show_rotation_actions(&mut self, ui: &mut egui::Ui) {
         // Управление точками профиля
         ui.label("Точки профиля:");
@@ -488,7 +516,7 @@ impl AthenianApp {
             if ui.button("Создать модель вращения").clicked() {
                 self.create_rotation_model();
             }
-            
+
             if ui.button("Сохранить модель").clicked() {
                 self.save_rotation_model();
             }

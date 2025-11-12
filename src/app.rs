@@ -42,12 +42,12 @@ pub struct AthenianApp {
     // Камера
     camera_controls: CameraControls,
 
-    pub selected_surface_function: SurfaceFunction,
-    pub surface_x_min: f64,
-    pub surface_x_max: f64,
-    pub surface_y_min: f64,
-    pub surface_y_max: f64,
-    pub surface_divisions: usize,
+    selected_surface_function: SurfaceFunction,
+    surface_x_min: f64,
+    surface_x_max: f64,
+    surface_y_min: f64,
+    surface_y_max: f64,
+    surface_divisions: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]

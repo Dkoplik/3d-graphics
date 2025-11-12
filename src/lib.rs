@@ -136,6 +136,8 @@ pub struct Material {
     pub color: egui::Color32,
     /// Текстура объекта, если имеется
     pub texture: Option<Texture>,
+    /// Как совмещать текстуру с цветом материала
+    pub blend_mode: classes3d::material::TextureBlendMode,
     pub shininess: f32,
     pub specular_strength: f32,
 }
