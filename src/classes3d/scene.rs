@@ -125,7 +125,7 @@ impl Scene {
             } else {
                 model.mesh.polygons.clone()
             };
-            let polygons = self.skip_out_of_camera_polygons(model, polygons);
+            //let polygons = self.skip_out_of_camera_polygons(model, polygons);
 
             let model_polygons = match render_options.render_type {
                 RenderType::WireFrame => {
