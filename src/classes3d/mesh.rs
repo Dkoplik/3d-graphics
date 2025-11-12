@@ -559,61 +559,67 @@ impl Mesh {
 
     /// Создание додекаэдра со сторонами единичной длины.
     pub fn dodecahedron() -> Self {
-        // Золотое сечение
-        let phi = (1.0 + (5.0_f32).sqrt()) / 2.0;
-        let inv_phi = 1.0 / phi;
+    let phi = (1.0 + (5.0_f32).sqrt()) / 2.0;
+    let inv_phi = 1.0 / phi;
 
-        let vertexes = vec![
-            // (±1, ±1, ±1)
-            HVec3::new(1.0, 1.0, 1.0),    // 0
-            HVec3::new(1.0, 1.0, -1.0),   // 1
-            HVec3::new(1.0, -1.0, 1.0),   // 2
-            HVec3::new(1.0, -1.0, -1.0),  // 3
-            HVec3::new(-1.0, 1.0, 1.0),   // 4
-            HVec3::new(-1.0, 1.0, -1.0),  // 5
-            HVec3::new(-1.0, -1.0, 1.0),  // 6
-            HVec3::new(-1.0, -1.0, -1.0), // 7
-            // (0, ±1/φ, ±φ)
-            HVec3::new(0.0, inv_phi, phi),   // 8
-            HVec3::new(0.0, inv_phi, -phi),  // 9
-            HVec3::new(0.0, -inv_phi, phi),  // 10
-            HVec3::new(0.0, -inv_phi, -phi), // 11
-            // (±1/φ, ±φ, 0)
-            HVec3::new(inv_phi, phi, 0.0),   // 12
-            HVec3::new(inv_phi, -phi, 0.0),  // 13
-            HVec3::new(-inv_phi, phi, 0.0),  // 14
-            HVec3::new(-inv_phi, -phi, 0.0), // 15
-            // (±φ, 0, ±1/φ)
-            HVec3::new(phi, 0.0, inv_phi),   // 16
-            HVec3::new(phi, 0.0, -inv_phi),  // 17
-            HVec3::new(-phi, 0.0, inv_phi),  // 18
-            HVec3::new(-phi, 0.0, -inv_phi), // 19
-        ];
+    let mut vertexes = vec![
+        // (±1, ±1, ±1)
+        HVec3::new(1.0, 1.0, 1.0),    // 0
+        HVec3::new(1.0, 1.0, -1.0),   // 1
+        HVec3::new(1.0, -1.0, 1.0),   // 2
+        HVec3::new(1.0, -1.0, -1.0),  // 3
+        HVec3::new(-1.0, 1.0, 1.0),   // 4
+        HVec3::new(-1.0, 1.0, -1.0),  // 5
+        HVec3::new(-1.0, -1.0, 1.0),  // 6
+        HVec3::new(-1.0, -1.0, -1.0), // 7
+        
+        // (0, ±φ, ±1/φ)
+        HVec3::new(0.0, phi, inv_phi),   // 8
+        HVec3::new(0.0, phi, -inv_phi),  // 9
+        HVec3::new(0.0, -phi, inv_phi),  // 10
+        HVec3::new(0.0, -phi, -inv_phi), // 11
+        
+        // (±1/φ, 0, ±φ)
+        HVec3::new(inv_phi, 0.0, phi),   // 12
+        HVec3::new(-inv_phi, 0.0, phi),  // 13
+        HVec3::new(inv_phi, 0.0, -phi),  // 14
+        HVec3::new(-inv_phi, 0.0, -phi), // 15
+        
+        // (±φ, ±1/φ, 0)
+        HVec3::new(phi, inv_phi, 0.0),   // 16
+        HVec3::new(-phi, inv_phi, 0.0),  // 17
+        HVec3::new(phi, -inv_phi, 0.0),  // 18
+        HVec3::new(-phi, -inv_phi, 0.0), // 19
+    ];
 
-        // Нормализуем вершины
-        let vertexes: Vec<HVec3> = vertexes
-            .into_iter()
-            .map(|p| {
-                let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
-                HVec3::new(p.x / len, p.y / len, p.z / len)
-            })
-            .collect();
+    vertexes = vertexes
+        .into_iter()
+        .map(|p| {
+            let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
+            HVec3::new(p.x / len, p.y / len, p.z / len)
+        })
+        .collect();
 
-        let polygons = vec![
-            Polygon3::from_list(&[0, 8, 10, 2, 16]),
-            Polygon3::from_list(&[0, 16, 17, 1, 12]),
-            Polygon3::from_list(&[0, 12, 14, 4, 8]),
-            Polygon3::from_list(&[1, 9, 11, 3, 17]),
-            Polygon3::from_list(&[2, 10, 6, 15, 13]),
-            Polygon3::from_list(&[3, 11, 7, 15, 13]),
-            Polygon3::from_list(&[3, 13, 2, 16, 17]),
-            Polygon3::from_list(&[4, 18, 19, 5, 14]),
-            Polygon3::from_list(&[5, 19, 7, 11, 9]),
-            Polygon3::from_list(&[6, 15, 7, 19, 18]),
-        ];
+    let polygons = vec![
+        Polygon3::from_list(&[0, 12, 2, 18, 16]),
+        Polygon3::from_list(&[0, 16, 1, 9, 8]),
+        Polygon3::from_list(&[0, 8, 4, 13, 12]),
+        
+        Polygon3::from_list(&[10, 2, 12, 13, 6]),
+        Polygon3::from_list(&[10, 6, 19, 7, 11]),
+        Polygon3::from_list(&[10, 11, 3, 18, 2]),
+        
+        Polygon3::from_list(&[5, 17, 4, 8, 9]),
+        Polygon3::from_list(&[5, 9, 1, 14, 15]),
+        Polygon3::from_list(&[5, 15, 7, 19, 17]),
+        
+        Polygon3::from_list(&[3, 14, 1, 16, 18]),
+        Polygon3::from_list(&[3, 11, 7, 15, 14]),
+        Polygon3::from_list(&[4, 17, 19, 6, 13]),
+    ];
 
-        Self::from_polygons(vertexes, polygons)
-    }
+    Self::from_polygons(vertexes, polygons)
+}
 
     // --------------------------------------------------
     // setter'ы и getter'ы
