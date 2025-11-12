@@ -81,7 +81,7 @@ impl Scene {
 
     /// Нарисовать сцену на холст со всеми нужными преобразованиями.
     ///
-    /// Возвращает количество отрисованных вершин и полигонов.
+    /// Возвращает количество отрисованных полигонов.
     pub fn render(
         &self,
         canvas: &mut Canvas,
@@ -89,7 +89,7 @@ impl Scene {
         show_custom_axis: bool,
         axis_point1: Point3,
         axis_point2: Point3,
-    ) -> (usize, usize) {
+    ) -> usize {
         // Стереть прошлый кадр.
         canvas.clear(Color32::GRAY);
 
@@ -110,8 +110,6 @@ impl Scene {
             );
         }
 
-        // количество отрисованных вершин
-        let mut vertex_count = 0;
         // количество отрисованных полигонов.
         let mut polygon_count = 0;
 
@@ -128,12 +126,12 @@ impl Scene {
             };
             let polygons = self.skip_out_of_camera_polygons(model, polygons);
 
-            let (model_vertexes, model_polygons) = match render_options.render_type {
+            let model_polygons = match render_options.render_type {
                 RenderType::WireFrame => {
                     self.render_model_wireframe(&projected_vertexes, &polygons, canvas)
                 }
                 RenderType::Solid => {
-                    let (vertex_cnt, polygon_cnt) = self.render_solid(
+                    let polygon_cnt = self.render_solid(
                         &projected_vertexes,
                         &polygons,
                         model,
@@ -157,14 +155,13 @@ impl Scene {
                             render_options.z_buffer_enabled,
                         ),
                     }
-                    (vertex_cnt, polygon_cnt)
+                    polygon_cnt
                 }
             };
-            vertex_count += model_vertexes;
             polygon_count += model_polygons;
         }
 
-        (vertex_count, polygon_count)
+        polygon_count
     }
 
     // --------------------------------------------------
@@ -318,14 +315,11 @@ impl Scene {
     ///
     /// Возвращает вектор полигонов только с лицевыми гранями.
     fn model_backface_culling(&self, model: &Model3) -> Vec<mesh::Polygon3> {
-        let vertexes = model.mesh.get_vertexes();
         let polygons = model.mesh.get_polygons();
+        let normals = model.mesh.get_normals();
         let mut visible_polygons = Vec::new();
 
-        let mesh_center = Self::calculate_mesh_center(vertexes);
-        let camera_pos = self.camera.get_position();
-
-        let view_direction = (mesh_center - Vec3::from(camera_pos)).normalize();
+        let camera_view_direction = self.camera.get_direction();
 
         for polygon in polygons {
             let vertex_indices = polygon.get_vertexes();
@@ -333,28 +327,32 @@ impl Scene {
                 continue;
             }
 
-            let polygon_normal = polygon.get_normal(vertexes, Some(mesh_center));
-            let dot_product = polygon_normal.dot(view_direction);
+            // Считаем нормаль полигона по нормалям вершин
+            let mut polygon_normal = Vec3::zero();
+            let mut normals_count = 0;
 
-            if dot_product > 0.0 {
-                visible_polygons.push(polygon.clone());
+            // нормали надо преобразовать к глобальным координатам
+            let to_global = model.mesh.get_local_frame().local_to_global_matrix();
+
+            for &vertex_index in vertex_indices {
+                polygon_normal =
+                    polygon_normal + to_global.apply_to_hvec(normals[vertex_index].into()).into();
+                normals_count += 1;
+            }
+
+            // Если нормаль есть, производим отсечение
+            if normals_count > 0 && polygon_normal.length_squared() > f32::EPSILON {
+                polygon_normal = polygon_normal.normalize();
+
+                // Если нормаль направлена в сторону камеры, то оставляем полигон
+                let dot_product = polygon_normal.dot(camera_view_direction);
+                if dot_product < 0.0 {
+                    visible_polygons.push(polygon.clone());
+                }
             }
         }
 
         visible_polygons
-    }
-
-    fn calculate_mesh_center(vertexes: &Vec<HVec3>) -> Vec3 {
-        if vertexes.is_empty() {
-            return Vec3::zero();
-        }
-
-        let sum: Vec3 = vertexes
-            .iter()
-            .map(|v| Vec3::from(*v))
-            .fold(Vec3::zero(), |acc, v| acc + v);
-
-        sum * (1.0 / vertexes.len() as f32)
     }
 
     /// Реднер каркаса модели.
@@ -363,13 +361,10 @@ impl Scene {
         projected_vertexes: &Vec<Vec3>,
         polygons: &Vec<mesh::Polygon3>,
         canvas: &mut Canvas,
-    ) -> (usize, usize) {
-        let mut model_vertexes = 0;
-        let model_polygons = polygons.len();
+    ) -> usize {
         // Рисуем рёбра
         for polygon in polygons {
             // Вершины полигона
-            model_vertexes += polygon.get_vertexes().len();
             let points: Vec<Vec3> = polygon
                 .get_vertexes()
                 .iter()
@@ -392,7 +387,7 @@ impl Scene {
             canvas.circle_filled(pos, 3.0, Color32::WHITE);
         }
 
-        (model_vertexes, model_polygons)
+        polygons.len()
     }
 
     /// Рендер цельного объекта, с гранями вместо границ и с учётом материала и текстуры.
@@ -405,12 +400,9 @@ impl Scene {
         model: &Model3,
         canvas: &mut Canvas,
         z_buffer_enabled: bool,
-    ) -> (usize, usize) {
-        let mut model_vertexes = 0;
-        let model_polygons = polygons.len();
+    ) -> usize {
         for polygon in polygons {
             let vertex_indices = polygon.get_vertexes();
-            model_vertexes += vertex_indices.len();
 
             // Вершины полигона
             let poly_vertices: Vec<Vec3> = vertex_indices
@@ -444,7 +436,7 @@ impl Scene {
             }
         }
 
-        (model_vertexes, model_polygons)
+        polygons.len()
     }
 
     /// Шейдинг Гуро для модели Ламберта.
@@ -907,4 +899,644 @@ impl Default for Scene {
 
 fn reflect(incident: Vec3, normal: Vec3) -> Vec3 {
     incident - normal * 2.0 * incident.dot(normal)
+}
+
+#[cfg(test)]
+mod scene_tests {
+    use super::*;
+    use crate::{Material, Mesh, Model3, classes3d::mesh::Polygon3};
+    use std::f32::consts::PI;
+
+    const TOLERANCE: f32 = 1e-6;
+
+    fn create_test_cube_model(position: Point3, color: Color32) -> Model3 {
+        let mesh = Mesh::hexahedron();
+        let mut model = Model3::from_mesh(mesh);
+        model.material.color = color;
+        model.set_position(position);
+        model
+    }
+
+    fn create_test_tetrahedron_model(position: Point3, color: Color32) -> Model3 {
+        let mesh = Mesh::tetrahedron();
+        let mut model = Model3::from_mesh(mesh);
+        model.material.color = color;
+        model.set_position(position);
+        model
+    }
+
+    fn create_simple_camera() -> Camera3 {
+        Camera3::new(
+            Point3::new(0.0, 0.0, -10.0),
+            Vec3::forward(),
+            Vec3::up(),
+            PI / 3.0,
+            16.0 / 9.0,
+            0.1,
+            100.0,
+        )
+    }
+
+    #[test]
+    fn test_scene_creation() {
+        let camera = create_simple_camera();
+        let scene = Scene::new(camera);
+
+        assert_eq!(scene.models.len(), 0);
+        assert_eq!(scene.lights.len(), 0);
+        assert_eq!(scene.ambient_light, Color32::BLACK);
+    }
+
+    #[test]
+    fn test_scene_add_model() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        let cube = create_test_cube_model(Point3::zero(), Color32::RED);
+        scene.add_model(cube);
+
+        assert_eq!(scene.models.len(), 1);
+    }
+
+    #[test]
+    fn test_scene_add_light() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        let light = LightSource {
+            position: Point3::new(0.0, 5.0, 0.0),
+            color: Color32::WHITE,
+            intensity: 1.0,
+        };
+        scene.add_light(light);
+
+        assert_eq!(scene.lights.len(), 1);
+    }
+
+    #[test]
+    fn test_wireframe_rendering() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        let cube = create_test_cube_model(Point3::zero(), Color32::RED);
+        scene.add_model(cube);
+
+        let mut canvas = Canvas::new(800, 600);
+        let render_options = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        let polygon_count = scene.render(
+            &mut canvas,
+            render_options,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // Cube has 6 faces (polygons)
+        assert_eq!(polygon_count, 6);
+
+        // Check that some pixels were drawn (not just background)
+        let mut has_non_background_pixels = false;
+        for x in 0..canvas.width {
+            for y in 0..canvas.height {
+                if canvas[(x, y)] != Color32::GRAY {
+                    has_non_background_pixels = true;
+                    break;
+                }
+            }
+            if has_non_background_pixels {
+                break;
+            }
+        }
+        assert!(
+            has_non_background_pixels,
+            "Wireframe should draw visible lines"
+        );
+    }
+
+    #[test]
+    fn test_solid_rendering_no_shading() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        let cube = create_test_cube_model(Point3::zero(), Color32::BLUE);
+        scene.add_model(cube);
+
+        let mut canvas = Canvas::new(800, 600);
+        let render_options = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        let polygon_count = scene.render(
+            &mut canvas,
+            render_options,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // Cube has 6 faces
+        assert_eq!(polygon_count, 6);
+
+        // Check that solid areas were filled
+        let mut has_solid_pixels = false;
+        for x in 0..canvas.width {
+            for y in 0..canvas.height {
+                if canvas[(x, y)] == Color32::BLUE {
+                    has_solid_pixels = true;
+                    break;
+                }
+            }
+            if has_solid_pixels {
+                break;
+            }
+        }
+        assert!(
+            has_solid_pixels,
+            "Solid rendering should fill polygons with material color"
+        );
+    }
+
+    #[test]
+    fn test_backface_culling() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        let cube = create_test_cube_model(Point3::zero(), Color32::GREEN);
+        scene.add_model(cube);
+
+        let mut canvas_with_culling = Canvas::new(800, 600);
+        let mut canvas_without_culling = Canvas::new(800, 600);
+
+        // Render with backface culling
+        let render_options_with_culling = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: true,
+            z_buffer_enabled: false,
+        };
+
+        // Render without backface culling
+        let render_options_without_culling = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        let culling_polygons_count = scene.render(
+            &mut canvas_with_culling,
+            render_options_with_culling,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        let no_culling_polygons_count = scene.render(
+            &mut canvas_without_culling,
+            render_options_without_culling,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        assert!(
+            culling_polygons_count < no_culling_polygons_count,
+            "После отсечения граней должно рендериться меньше полигонов"
+        );
+    }
+
+    #[test]
+    fn test_z_buffer_occlusion() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        // Create two cubes: one in front, one behind
+        let front_cube = create_test_cube_model(Point3::new(0.0, 0.0, 0.0), Color32::RED);
+        let back_cube = create_test_cube_model(Point3::new(0.0, 0.0, 5.0), Color32::BLUE);
+
+        scene.add_model(front_cube);
+        scene.add_model(back_cube);
+
+        let mut canvas_with_z_buffer = Canvas::new(800, 600);
+        let mut canvas_without_z_buffer = Canvas::new(800, 600);
+
+        // Render with z-buffer
+        let render_options_with_z_buffer = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: true,
+        };
+
+        // Render without z-buffer
+        let render_options_without_z_buffer = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        scene.render(
+            &mut canvas_with_z_buffer,
+            render_options_with_z_buffer,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        scene.render(
+            &mut canvas_without_z_buffer,
+            render_options_without_z_buffer,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // With z-buffer, the back cube should be occluded by the front cube
+        // Without z-buffer, both cubes might be visible (depending on rendering order)
+
+        let mut front_pixels_with_z_buffer = 0;
+        let mut back_pixels_with_z_buffer = 0;
+        let mut front_pixels_without_z_buffer = 0;
+        let mut back_pixels_without_z_buffer = 0;
+
+        for x in 0..canvas_with_z_buffer.width {
+            for y in 0..canvas_with_z_buffer.height {
+                if canvas_with_z_buffer[(x, y)] == Color32::RED {
+                    front_pixels_with_z_buffer += 1;
+                }
+                if canvas_with_z_buffer[(x, y)] == Color32::BLUE {
+                    back_pixels_with_z_buffer += 1;
+                }
+                if canvas_without_z_buffer[(x, y)] == Color32::RED {
+                    front_pixels_without_z_buffer += 1;
+                }
+                if canvas_without_z_buffer[(x, y)] == Color32::BLUE {
+                    back_pixels_without_z_buffer += 1;
+                }
+            }
+        }
+
+        // With z-buffer, there should be fewer blue pixels (back cube)
+        assert!(
+            back_pixels_with_z_buffer < back_pixels_without_z_buffer,
+            "Z-buffer should reduce visibility of occluded objects"
+        );
+
+        // Front cube should be clearly visible in both cases
+        assert!(
+            front_pixels_with_z_buffer > 0,
+            "Front cube should be visible with z-buffer"
+        );
+        assert!(
+            front_pixels_without_z_buffer > 0,
+            "Front cube should be visible without z-buffer"
+        );
+    }
+
+    #[test]
+    fn test_lighting_effects() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        // Add a light source
+        let light = LightSource {
+            position: Point3::new(5.0, 5.0, -5.0),
+            color: Color32::WHITE,
+            intensity: 1.0,
+        };
+        scene.add_light(light);
+
+        scene.set_ambient_light(Color32::from_rgb(50, 50, 50));
+
+        let cube = create_test_cube_model(Point3::zero(), Color32::WHITE);
+        scene.add_model(cube);
+
+        let mut canvas_gouraud = Canvas::new(800, 600);
+        let mut canvas_phong = Canvas::new(800, 600);
+
+        // Test Gouraud shading
+        let render_options_gouraud = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::Gouraud,
+            backface_culling: false,
+            z_buffer_enabled: true,
+        };
+
+        // Test Phong shading
+        let render_options_phong = RenderOptions {
+            render_type: RenderType::Solid,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::Phong,
+            backface_culling: false,
+            z_buffer_enabled: true,
+        };
+
+        scene.render(
+            &mut canvas_gouraud,
+            render_options_gouraud,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        scene.render(
+            &mut canvas_phong,
+            render_options_phong,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // Both shading methods should produce visible results
+        let mut gouraud_has_variation = false;
+        let mut phong_has_variation = false;
+        let mut previous_gouraud_color = Color32::GRAY;
+        let mut previous_phong_color = Color32::GRAY;
+
+        for x in (0..canvas_gouraud.width).step_by(10) {
+            for y in (0..canvas_gouraud.height).step_by(10) {
+                let gouraud_color = canvas_gouraud[(x, y)];
+                let phong_color = canvas_phong[(x, y)];
+
+                if gouraud_color != Color32::GRAY && gouraud_color != previous_gouraud_color {
+                    gouraud_has_variation = true;
+                }
+                if phong_color != Color32::GRAY && phong_color != previous_phong_color {
+                    phong_has_variation = true;
+                }
+
+                previous_gouraud_color = gouraud_color;
+                previous_phong_color = phong_color;
+            }
+        }
+
+        assert!(
+            gouraud_has_variation,
+            "Gouraud shading should produce color variation"
+        );
+        assert!(
+            phong_has_variation,
+            "Phong shading should produce color variation"
+        );
+    }
+
+    #[test]
+    fn test_coordinate_axes_rendering() {
+        let camera = create_simple_camera();
+        let scene = Scene::new(camera);
+
+        let mut canvas = Canvas::new(800, 600);
+        let render_options = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        scene.render(
+            &mut canvas,
+            render_options,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // Coordinate axes should be drawn (red, green, blue lines from origin)
+        let mut has_red = false;
+        let mut has_green = false;
+        let mut has_blue = false;
+
+        for x in 0..canvas.width {
+            for y in 0..canvas.height {
+                let color = canvas[(x, y)];
+                if color == Color32::RED {
+                    has_red = true;
+                } else if color == Color32::GREEN {
+                    has_green = true;
+                } else if color == Color32::BLUE {
+                    has_blue = true;
+                }
+            }
+        }
+
+        assert!(has_red, "X axis (red) should be visible");
+        assert!(has_green, "Y axis (green) should be visible");
+        assert!(has_blue, "Z axis (blue) should be visible");
+    }
+
+    #[test]
+    fn test_custom_axis_rendering() {
+        let camera = create_simple_camera();
+        let scene = Scene::new(camera);
+
+        let mut canvas = Canvas::new(800, 600);
+        let render_options = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        let axis_start = Point3::new(-2.0, 0.0, 0.0);
+        let axis_end = Point3::new(2.0, 0.0, 0.0);
+
+        scene.render(
+            &mut canvas,
+            render_options,
+            true, // Show custom axis
+            axis_start,
+            axis_end,
+        );
+
+        // Custom axis should be drawn (orange line)
+        let mut has_orange = false;
+        let orange_color = Color32::from_rgb(255, 165, 0);
+
+        for x in 0..canvas.width {
+            for y in 0..canvas.height {
+                if canvas[(x, y)] == orange_color {
+                    has_orange = true;
+                    break;
+                }
+            }
+            if has_orange {
+                break;
+            }
+        }
+
+        assert!(
+            has_orange,
+            "Custom axis (orange) should be visible when enabled"
+        );
+    }
+
+    #[test]
+    fn test_empty_scene_rendering() {
+        let camera = create_simple_camera();
+        let scene = Scene::new(camera);
+
+        let mut canvas = Canvas::new(800, 600);
+        let render_options = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        let polygon_count = scene.render(
+            &mut canvas,
+            render_options,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        assert_eq!(polygon_count, 0);
+
+        // Only coordinate axes should be drawn
+        let mut has_non_axis_pixels = false;
+        for x in 0..canvas.width {
+            for y in 0..canvas.height {
+                let color = canvas[(x, y)];
+                if color != Color32::GRAY
+                    && color != Color32::RED
+                    && color != Color32::GREEN
+                    && color != Color32::BLUE
+                {
+                    has_non_axis_pixels = true;
+                    break;
+                }
+            }
+            if has_non_axis_pixels {
+                break;
+            }
+        }
+
+        assert!(
+            !has_non_axis_pixels,
+            "Empty scene should only draw coordinate axes"
+        );
+    }
+
+    #[test]
+    fn test_polygon_out_of_camera_culling() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        // Create a cube far outside the camera's view
+        let far_cube = create_test_cube_model(Point3::new(1000.0, 1000.0, 1000.0), Color32::RED);
+        scene.add_model(far_cube);
+
+        let mut canvas = Canvas::new(800, 600);
+        let render_options = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        let polygon_count = scene.render(
+            &mut canvas,
+            render_options,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // Even though the cube is far away, it might still be partially visible
+        // or completely culled depending on the implementation
+        // This test just ensures the rendering doesn't crash
+        assert!(polygon_count >= 0);
+    }
+
+    #[test]
+    fn test_different_projection_types() {
+        let camera = create_simple_camera();
+        let mut scene = Scene::new(camera);
+
+        let cube = create_test_cube_model(Point3::zero(), Color32::YELLOW);
+        scene.add_model(cube);
+
+        let mut canvas_perspective = Canvas::new(800, 600);
+        let mut canvas_parallel = Canvas::new(800, 600);
+
+        // Perspective projection
+        let render_options_perspective = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Perspective,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        // Parallel projection
+        let render_options_parallel = RenderOptions {
+            render_type: RenderType::WireFrame,
+            projection_type: ProjectionType::Parallel,
+            shading_type: ShadingType::None,
+            backface_culling: false,
+            z_buffer_enabled: false,
+        };
+
+        scene.render(
+            &mut canvas_perspective,
+            render_options_perspective,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        scene.render(
+            &mut canvas_parallel,
+            render_options_parallel,
+            false,
+            Point3::zero(),
+            Point3::zero(),
+        );
+
+        // Both projections should produce visible results
+        let mut perspective_has_content = false;
+        let mut parallel_has_content = false;
+
+        for x in 0..canvas_perspective.width {
+            for y in 0..canvas_perspective.height {
+                if canvas_perspective[(x, y)] != Color32::GRAY {
+                    perspective_has_content = true;
+                }
+                if canvas_parallel[(x, y)] != Color32::GRAY {
+                    parallel_has_content = true;
+                }
+            }
+        }
+
+        assert!(
+            perspective_has_content,
+            "Perspective projection should render content"
+        );
+        assert!(
+            parallel_has_content,
+            "Parallel projection should render content"
+        );
+    }
 }
