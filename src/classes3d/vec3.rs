@@ -160,6 +160,11 @@ impl Vec3 {
         self / len
     }
 
+    /// Является ли вектор нормализованным.
+    pub fn is_normalized(&self) -> bool {
+        self.length_squared() <= 2.0 * f32::EPSILON
+    }
+
     /// Приблизительное сравнение векторов на равенство.
     ///
     /// # Arguments
@@ -274,7 +279,7 @@ impl From<HVec3> for Vec3 {
     fn from(value: HVec3) -> Self {
         debug_assert_ne!(
             value.w, 0.0,
-            "компонента однородности равна 0, невозможно преобразовать HVec3 в Vec3"
+            "компонента однородности равна 0, Vec3 будет состоять из NaN"
         );
 
         Self {

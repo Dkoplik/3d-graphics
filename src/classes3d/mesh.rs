@@ -643,15 +643,36 @@ impl Mesh {
         &mut self.local_frame
     }
 
-    pub fn get_vertexes(&self) -> &Vec<HVec3> {
-        &self.vertexes
+    /// Применить преобразование над Mesh'ем.
+    ///
+    /// По сути, является тупо синтаксическим сахаром для `self.get_local_frame_mut().apply_transform(transform)`.
+    pub fn apply_transform(&mut self, transform: &Transform3D) {
+        self.get_local_frame_mut().apply_transform(transform)
     }
 
-    pub fn get_polygons(&self) -> &Vec<Polygon3> {
-        &self.polygons
+    /// Возвращает итератор вершин Mesh'а в **локальных** координатах.
+    pub fn get_local_vertexes(&self) -> std::slice::Iter<'_, HVec3> {
+        self.vertexes.iter()
     }
 
-    pub fn get_normals(&self) -> &Vec<Vec3> {
+    /// Возвращает итератор вершин Mesh'а в **глобальных** координатах.
+    pub fn get_global_vertexes(&self) -> std::slice::Iter<'_, HVec3> {
+        self.vertexes
+            .iter()
+            .cloned()
+            .map(|v| v.apply_transform(&self.local_frame.local_to_global_matrix()))
+            .collect()
+    }
+
+    /// Возвращает итератор на полигоны.
+    ///
+    /// Полигон представляет собой набор индексов вершин.
+    pub fn get_polygons(&self) -> std::slice::Iter<'_, Polygon3> {
+        self.polygons.iter()
+    }
+
+    /// Возвращает итератор нормалей вершин Mesh'а в **локальных** координатах.
+    pub fn get_local_normals(&self) -> std::slice::Iter<'_, Vec3> {
         #[cfg(debug_assertions)]
         if self.normals.len() != self.vertexes.len() {
             eprintln!(
@@ -659,10 +680,29 @@ impl Mesh {
             );
         }
 
-        &self.normals
+        self.normals.iter()
     }
 
-    pub fn get_texture_coords(&self) -> &Vec<(f32, f32)> {
+    /// Возвращает итератор нормалей вершин Mesh'а в **глобальных** координатах.
+    pub fn get_global_normals(&self) -> std::slice::Iter<'_, Vec3> {
+        #[cfg(debug_assertions)]
+        if self.normals.len() != self.vertexes.len() {
+            eprintln!(
+                "Warning: используются нормали модели, но их количество не совпадает с количеством вершин"
+            );
+        }
+
+        self.normals
+            .iter()
+            .cloned()
+            .map(|n| HVec3::from(n)) // HVec3 для трансормации векторов нормалей
+            .map(|hvec| hvec.apply_transform(&self.local_frame.local_to_global_matrix())) // в глобальные
+            .map(|hvec| Vec3::from(hvec)) // обратно в обычный вектор
+            .collect()
+    }
+
+    /// Получить итератор на текстурные координаты модели.
+    pub fn get_texture_coords(&self) -> std::slice::Iter<'_, (f32, f32)> {
         #[cfg(debug_assertions)]
         if self.texture_coords.len() != self.vertexes.len() {
             eprintln!(
@@ -670,7 +710,7 @@ impl Mesh {
             );
         }
 
-        &self.texture_coords
+        self.texture_coords.iter()
     }
 
     // --------------------------------------------------

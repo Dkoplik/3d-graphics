@@ -166,13 +166,14 @@ impl CoordFrame {
         self.origin = new_origin;
 
         let vec_transform = Transform3D::translation_vec(-translation).multiply(*transform);
-        self.forward = Vec3::from(vec_transform.apply_to_hvec(self.forward.into())).normalize();
-        self.up = Vec3::from(vec_transform.apply_to_hvec(self.up.into())).normalize();
-        self.right = Vec3::from(vec_transform.apply_to_hvec(self.right.into())).normalize();
+        self.forward = Vec3::from(vec_transform.apply_to_hvec(self.forward.into()));
+        self.up = Vec3::from(vec_transform.apply_to_hvec(self.up.into()));
+        self.right = Vec3::from(vec_transform.apply_to_hvec(self.right.into()));
 
-        // избавляемся от ошибок для сохранения ортогональности
+        // избавляемся от ошибок для сохранения ортонормированности базиса
         self.up = self.right.cross_left(self.forward).normalize();
         self.right = self.forward.cross_left(self.up).normalize();
+        self.forward = self.forward.normalize();
 
         debug_assert!(
             (self.forward.length() - 1.0).abs() < 2.0 * f32::EPSILON,

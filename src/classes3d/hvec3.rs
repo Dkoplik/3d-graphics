@@ -1,5 +1,7 @@
 //! Реализация структуры `HVec3`.
 
+use std::ops::{Mul, MulAssign};
+
 use crate::{HVec3, Point3, Transform3D, Vec3};
 
 impl HVec3 {
@@ -121,7 +123,7 @@ impl HVec3 {
 
     /// Применить преобразование к текущемы однородному вектору `HVec3`. Эта операция **создаёт новый** вектор.
     ///
-    /// Операция выполняет произведение **строчного** вектора `hvec` на матрицу преобразования:
+    /// Операция выполняет произведение **строчного** вектора `HVec3` на матрицу преобразования:
     /// ```txt
     ///                 | m11 m12 m13 m14 |
     /// (x, y, z, w) x  | m21 m22 m23 m24 | = (x_new, y_new, z_new, w_new)
@@ -133,6 +135,38 @@ impl HVec3 {
     /// одну и ту же матрицу.
     pub fn apply_transform(self, transform: &Transform3D) -> Self {
         transform.apply_to_hvec(self)
+    }
+}
+
+impl Mul<Transform3D> for HVec3 {
+    type Output = HVec3;
+
+    /// Применить преобразование `Transform3D` к однородному вектору `HVec3`.
+    ///
+    /// Операция выполняет произведение **строчного** вектора `HVec3` на матрицу преобразования:
+    /// ```txt
+    ///                 | m11 m12 m13 m14 |
+    /// (x, y, z, w) x  | m21 m22 m23 m24 | = (x_new, y_new, z_new, w_new)
+    ///                 | m31 m32 m33 m34 |
+    ///                 | m41 m42 m43 m44 |
+    /// ```
+    fn mul(self, rhs: Transform3D) -> Self::Output {
+        rhs.apply_to_hvec(self)
+    }
+}
+
+impl MulAssign<Transform3D> for HVec3 {
+    /// Применить преобразование `Transform3D` к однородному вектору `HVec3`.
+    ///
+    /// Операция выполняет произведение **строчного** вектора `HVec3` на матрицу преобразования:
+    /// ```txt
+    ///                 | m11 m12 m13 m14 |
+    /// (x, y, z, w) x  | m21 m22 m23 m24 | = (x_new, y_new, z_new, w_new)
+    ///                 | m31 m32 m33 m34 |
+    ///                 | m41 m42 m43 m44 |
+    /// ```
+    fn mul_assign(&mut self, rhs: Transform3D) {
+        *self = rhs.apply_to_hvec(*self);
     }
 }
 
@@ -179,12 +213,20 @@ mod tests {
 
     #[test]
     fn test_apply_translate_transform() {
-        let vec = HVec3::new(1.0, 2.0, 3.0);
+        let mut vec = HVec3::new(1.0, 2.0, 3.0);
 
         let transform = Transform3D::translation_uniform(1.0);
-        let vec_transformed = vec.apply_transform(&transform);
+        let mut vec_transformed = vec.apply_transform(&transform);
 
         let expected = HVec3::new(2.0, 3.0, 4.0);
         assert_hvecs(vec_transformed, expected, TOLERANCE);
+
+        // через умножение
+        vec_transformed = vec * transform;
+        assert_hvecs(vec_transformed, expected, TOLERANCE);
+
+        // через присваивающее умножение
+        vec *= transform;
+        assert_hvecs(vec, expected, TOLERANCE);
     }
 }

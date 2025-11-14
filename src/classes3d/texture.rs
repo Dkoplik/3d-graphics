@@ -1,58 +1,50 @@
 //! Реализация текстуры для 3D модели
 
-use std::ops::Index;
-
+use crate::Texture;
 use egui::Color32;
 
-use crate::Texture;
-
 impl Texture {
-    /// Создать новую текстуру по набору пикселей и размерам текстуры.
-    pub fn new(image: Vec<Color32>, width: usize, height: usize) -> Self {
-        debug_assert!(width > 0, "ширина холста не может быть нулевой");
-        debug_assert!(height > 0, "высота холста не может быть нулевой");
-        debug_assert_eq!(
-            image.len(),
-            width * height,
-            "размер буфера текстуры {} не совпадает с размером {}x{}",
-            image.len(),
-            width,
-            height
+    /// Получить цвет текстуры в пикселе по UV-координатам.
+    pub fn get_pixel_color(&self, u: f32, v: f32) -> Color32 {
+        let (x, y) = self.transform_uv(u, v);
+
+        // sanity check
+        debug_assert!(
+            self.check_bounds(x, y),
+            "Выход за границы текстуры: x={} y={}",
+            x,
+            y
         );
 
-        Self {
-            image,
-            width,
-            height,
-        }
+        pixel_to_color(*self.0.get_pixel(x, y))
     }
 
     /// Проверить границы текстуры.
     #[inline]
-    fn check_bounds(&self, x: usize, y: usize) -> bool {
-        x < self.width && y < self.height && x > 0 && y > 0
+    fn check_bounds(&self, x: u32, y: u32) -> bool {
+        x < self.0.width() && y < self.0.height() && x > 0 && y > 0
     }
 
     /// Преобразовать UV-координаты в целочисленные
     #[inline]
-    fn transform_uv(&self, u: f32, v: f32) -> (usize, usize) {
-        let x = (u * self.width as f32).round() as usize;
-        let y = (v * self.height as f32).round() as usize;
+    fn transform_uv(&self, u: f32, v: f32) -> (u32, u32) {
+        debug_assert!(
+            0.0 <= u && u <= 1.0,
+            "текстурная координата u={} должна быть между 0.0 и 1.0",
+            u
+        );
+        debug_assert!(
+            0.0 <= v && v <= 1.0,
+            "текстурная координата v={} должна быть между 0.0 и 1.0",
+            v
+        );
+
+        let x = (u * self.0.width() as f32).round() as u32;
+        let y = (v * self.0.height() as f32).round() as u32;
         (x, y)
     }
 }
 
-// --------------------------------------------------
-// Доступ к отдельным пикселям UV-текстуры
-// --------------------------------------------------
-
-impl Index<(f32, f32)> for Texture {
-    type Output = Color32;
-
-    /// Получить пиксель текстуры по UV-координатам
-    fn index(&self, index: (f32, f32)) -> &Self::Output {
-        let (x, y) = self.transform_uv(index.0, index.1);
-        debug_assert!(self.check_bounds(x, y));
-        &self.image[y * self.width + x]
-    }
+fn pixel_to_color(pixel: image::Rgb<u8>) -> Color32 {
+    Color32::from_rgb(pixel[0], pixel[1], pixel[2])
 }

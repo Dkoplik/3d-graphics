@@ -118,14 +118,7 @@ pub struct Mesh {
 ///
 /// Благодаря текстуре модель может быть обёрнута в какую-то картинку вместо сплошного цвета.
 #[derive(Debug, Clone)]
-pub struct Texture {
-    /// Пиксели (цвета) текстуры
-    pub image: Vec<egui::Color32>,
-    /// Ширина текстуры
-    pub width: usize,
-    /// Высота текстуры
-    pub height: usize,
-}
+pub struct Texture(image::RgbImage);
 
 /// Материал модели.
 ///
@@ -172,8 +165,6 @@ pub struct Scene {
     pub camera: Camera3,
     /// Источики света.
     pub lights: Vec<LightSource>,
-    /// Цвет глобального освещения (чтобы вся сцена не была тёмной).
-    pub ambient_light: egui::Color32,
 }
 
 /// Камера в 3-х мерном пространстве.
@@ -223,4 +214,14 @@ pub struct Canvas {
     buffer: Vec<f32>,
     width: usize,
     height: usize,
+}
+
+/// Структура для отрисовки сцены. Содержит в себе параметры рендера.
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub struct SceneRenderer {
+    pub render_type: classes3d::scene_renderer::RenderType,
+    pub projection_type: classes3d::scene_renderer::ProjectionType,
+    pub shading_type: classes3d::scene_renderer::ShadingType,
+    pub backface_culling: bool,
+    pub z_buffer_enabled: bool,
 }

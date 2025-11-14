@@ -13,57 +13,6 @@ impl Model3 {
         }
     }
 
-    /// Применить трансформацию к объекту.
-    ///
-    /// Так как за положение в пространстве отвечает Mesh, по факту, этот метод просто
-    /// передаёт трансформацию в Mesh.
-    pub fn apply_transform(&mut self, transform: &Transform3D) {
-        self.mesh.get_local_frame_mut().apply_transform(transform);
-    }
-
-    /// Сместить модель на вектор `delta`.
-    ///
-    /// Просто синтаксический сахар для более удобных операций над моделькой.
-    pub fn translate(&mut self, delta: Vec3) {
-        let translation = Transform3D::translation_vec(delta);
-        self.apply_transform(&translation);
-    }
-
-    /// Повернуть модель относительно оси.
-    ///
-    /// Просто синтаксический сахар для более удобных операций над моделькой.
-    pub fn rotate_around_axis(&mut self, axis: Vec3, angle_rad: f32) {
-        let rotation = Transform3D::rotation_around_axis(axis, angle_rad);
-        self.apply_transform(&rotation);
-    }
-
-    /// Масштабирование модели.
-    ///
-    /// Просто синтаксический сахар для более удобных операций над моделькой.
-    pub fn scale(&mut self, sx: f32, sy: f32, sz: f32) {
-        let scale_transform = Transform3D::scale(sx, sy, sz);
-        self.apply_transform(&scale_transform);
-    }
-
-    /// Текущая позиция модели
-    pub fn get_position(&self) -> Point3 {
-        self.mesh.get_local_frame().origin
-    }
-
-    /// Поставить модель в новую позицию.
-    ///
-    /// Просто синтаксический сахар для более удобных операций над моделькой.
-    pub fn set_position(&mut self, position: Point3) {
-        let current_frame = *self.mesh.get_local_frame();
-        let new_frame = CoordFrame::new(
-            current_frame.forward(),
-            current_frame.right(),
-            current_frame.up(),
-            position,
-        );
-        *self.mesh.get_local_frame_mut() = new_frame;
-    }
-
     /// Загузить и создать модель из .obj файла
     ///
     /// По идее, .obj файла должно хватить для всей информации о Mesh модели,
@@ -247,6 +196,117 @@ impl Model3 {
             (y * scale).round() as i32,
             (z * scale).round() as i32,
         )
+    }
+
+    // --------------------------------------------------
+    // Синтаксический сахар для преобразований
+    // --------------------------------------------------
+
+    /// Применить трансформацию к объекту.
+    ///
+    /// Так как за положение в пространстве отвечает Mesh, по факту, этот метод просто
+    /// передаёт трансформацию в Mesh.
+    pub fn apply_transform(&mut self, transform: &Transform3D) {
+        self.mesh.get_local_frame_mut().apply_transform(transform);
+    }
+
+    /// Сдвинуть Mesh на вектор `delta`.
+    pub fn translate(&mut self, delta: Vec3) {
+        self.apply_transform(&Transform3D::translation_vec(delta));
+    }
+
+    /// Сдвинуть Mesh по оси X.
+    pub fn move_x(&mut self, dx: f32) {
+        self.apply_transform(&Transform3D::translation(dx, 0.0, 0.0));
+    }
+
+    /// Сдвинуть Mesh по оси Y.
+    pub fn move_y(&mut self, dy: f32) {
+        self.apply_transform(&Transform3D::translation(0.0, dy, 0.0));
+    }
+
+    /// Сдвинуть Mesh по оси Z.
+    pub fn move_z(&mut self, dz: f32) {
+        self.apply_transform(&Transform3D::translation(0.0, 0.0, dz));
+    }
+
+    /// Повернуть модель из направления `from` в направление `to`.
+    pub fn rotate(&mut self, from: Vec3, to: Vec3) {
+        self.apply_transform(&Transform3D::rotation_aligning(from, to));
+    }
+
+    /// Повернуть модель вокруг **локальной** оси X.
+    pub fn rotate_local_x(&mut self, angle: f32) {
+        self.apply_transform(&Transform3D::rotation_around_axis(
+            self.mesh.local_frame.right(),
+            angle,
+        ));
+    }
+
+    /// Повернуть модель вокруг **локальной** оси Y.
+    pub fn rotate_local_y(&mut self, angle: f32) {
+        self.apply_transform(&Transform3D::rotation_around_axis(
+            self.mesh.local_frame.up(),
+            angle,
+        ));
+    }
+
+    /// Повернуть модель вокруг **локальной** оси Z.
+    pub fn rotate_local_z(&mut self, angle: f32) {
+        self.apply_transform(&Transform3D::rotation_around_axis(
+            self.mesh.local_frame.forward(),
+            angle,
+        ));
+    }
+
+    pub fn uniform_scale(&mut self, scale: f32) {
+        self.apply_transform(&Transform3D::scale_uniform(scale));
+    }
+
+    /// Отразить модель в плоскости XY относительно **локальных координат**.
+    pub fn reflect_local_xy(&mut self) {
+        let to_zero = Transform3D::translation_vec(-Vec3::from(self.mesh.local_frame.position()));
+        let reflect = Transform3D::reflection_xy();
+        let to_origin = Transform3D::translation_vec(Vec3::from(self.mesh.local_frame.position()));
+        let transform = to_zero * reflect * to_origin;
+        self.apply_transform(&transform);
+    }
+
+    /// Отразить модель в плоскости XZ относительно **локальных координат**.
+    pub fn reflect_local_xz(&mut self) {
+        let to_zero = Transform3D::translation_vec(-Vec3::from(self.mesh.local_frame.position()));
+        let reflect = Transform3D::reflection_xz();
+        let to_origin = Transform3D::translation_vec(Vec3::from(self.mesh.local_frame.position()));
+        let transform = to_zero * reflect * to_origin;
+        self.apply_transform(&transform);
+    }
+
+    /// Отразить модель в плоскости YZ относительно **локальных координат**.
+    pub fn reflect_local_yz(&mut self) {
+        let to_zero = Transform3D::translation_vec(-Vec3::from(self.mesh.local_frame.position()));
+        let reflect = Transform3D::reflection_yz();
+        let to_origin = Transform3D::translation_vec(Vec3::from(self.mesh.local_frame.position()));
+        let transform = to_zero * reflect * to_origin;
+        self.apply_transform(&transform);
+    }
+
+    /// Текущая позиция модели
+    pub fn get_position(&self) -> Point3 {
+        self.mesh.get_local_frame().origin
+    }
+
+    /// Поставить модель в новую позицию.
+    ///
+    /// Просто синтаксический сахар для более удобных операций над моделькой.
+    pub fn set_position(&mut self, position: Point3) {
+        let current_frame = *self.mesh.get_local_frame();
+        let new_frame = CoordFrame::new(
+            current_frame.forward(),
+            current_frame.right(),
+            current_frame.up(),
+            position,
+        );
+        *self.mesh.get_local_frame_mut() = new_frame;
     }
 }
 

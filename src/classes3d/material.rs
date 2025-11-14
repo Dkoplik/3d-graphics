@@ -16,7 +16,7 @@ pub enum TextureBlendMode {
 
 impl TextureBlendMode {
     /// Смешать пиксель текстуры и материала.
-    pub fn blend(&self, texture_color: Color32, material_color: Color32) -> Color32 {
+    fn blend(&self, texture_color: Color32, material_color: Color32) -> Color32 {
         match self {
             Self::Replace => texture_color,
             Self::Modulate => texture_color * material_color,
@@ -43,10 +43,20 @@ impl Material {
     /// Обращаю внимание, что тут происходит только смешивание текстуры и материала.
     /// Освещение и шейдинг тут никак не учитываются.
     pub fn get_uv_color(&self, u: f32, v: f32) -> Color32 {
+        let (u, v) = self.cycle_texture(u, v);
         if let Some(texture) = &self.texture {
-            self.blend_mode.blend(texture[(u, v)], self.color)
+            self.blend_mode
+                .blend(texture.get_pixel_color(u, v), self.color)
         } else {
             self.color
         }
+    }
+
+    /// Если UV-координаты выходят за границы текстуры, то зацикливаем её.
+    fn cycle_texture(&self, u: f32, v: f32) -> (f32, f32) {
+        // зацикливаем текстуру при выходе за границы
+        let new_u = if u == 1.0 { 1.0 } else { u.fract() };
+        let new_v = if v == 1.0 { 1.0 } else { v.fract() };
+        (new_u, new_v)
     }
 }
