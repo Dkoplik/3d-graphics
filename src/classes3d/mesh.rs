@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Point3, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -651,28 +651,27 @@ impl Mesh {
     }
 
     /// Возвращает итератор вершин Mesh'а в **локальных** координатах.
-    pub fn get_local_vertexes(&self) -> std::slice::Iter<'_, HVec3> {
-        self.vertexes.iter()
+    pub fn get_local_vertexes(&self) -> impl Iterator<Item = HVec3> {
+        self.vertexes.iter().copied()
     }
 
     /// Возвращает итератор вершин Mesh'а в **глобальных** координатах.
-    pub fn get_global_vertexes(&self) -> std::slice::Iter<'_, HVec3> {
+    pub fn get_global_vertexes(&self) -> impl Iterator<Item = HVec3> {
         self.vertexes
             .iter()
-            .cloned()
+            .copied()
             .map(|v| v.apply_transform(&self.local_frame.local_to_global_matrix()))
-            .collect()
     }
 
     /// Возвращает итератор на полигоны.
     ///
     /// Полигон представляет собой набор индексов вершин.
-    pub fn get_polygons(&self) -> std::slice::Iter<'_, Polygon3> {
+    pub fn get_polygons(&self) -> impl Iterator<Item = &Polygon3> {
         self.polygons.iter()
     }
 
     /// Возвращает итератор нормалей вершин Mesh'а в **локальных** координатах.
-    pub fn get_local_normals(&self) -> std::slice::Iter<'_, Vec3> {
+    pub fn get_local_normals(&self) -> impl Iterator<Item = Vec3> {
         #[cfg(debug_assertions)]
         if self.normals.len() != self.vertexes.len() {
             eprintln!(
@@ -680,11 +679,11 @@ impl Mesh {
             );
         }
 
-        self.normals.iter()
+        self.normals.iter().copied()
     }
 
     /// Возвращает итератор нормалей вершин Mesh'а в **глобальных** координатах.
-    pub fn get_global_normals(&self) -> std::slice::Iter<'_, Vec3> {
+    pub fn get_global_normals(&self) -> impl Iterator<Item = Vec3> {
         #[cfg(debug_assertions)]
         if self.normals.len() != self.vertexes.len() {
             eprintln!(
@@ -694,15 +693,14 @@ impl Mesh {
 
         self.normals
             .iter()
-            .cloned()
+            .copied()
             .map(|n| HVec3::from(n)) // HVec3 для трансормации векторов нормалей
             .map(|hvec| hvec.apply_transform(&self.local_frame.local_to_global_matrix())) // в глобальные
             .map(|hvec| Vec3::from(hvec)) // обратно в обычный вектор
-            .collect()
     }
 
-    /// Получить итератор на текстурные координаты модели.
-    pub fn get_texture_coords(&self) -> std::slice::Iter<'_, (f32, f32)> {
+    /// Получить текстурные координаты модели.
+    pub fn get_texture_coords(&self) -> &Vec<(f32, f32)> {
         #[cfg(debug_assertions)]
         if self.texture_coords.len() != self.vertexes.len() {
             eprintln!(
@@ -710,7 +708,7 @@ impl Mesh {
             );
         }
 
-        self.texture_coords.iter()
+        &self.texture_coords
     }
 
     // --------------------------------------------------
@@ -818,9 +816,42 @@ impl Polygon3 {
         self.vertexes.len() == 3
     }
 
+    pub fn is_rectangle(&self) -> bool {
+        self.vertexes.len() == 4
+    }
+
+    /// Полигон является хотя бы треугольником.
+    ///
+    /// Иными словами, в нём хотя бы 3 вершины.
+    pub fn is_valid(&self) -> bool {
+        self.vertexes.len() >= 3
+    }
+
     /// Получить список индексов вершин.
     pub fn get_vertexes(&self) -> &Vec<usize> {
         &self.vertexes
+    }
+
+    pub fn is_point_in_convex_polygon(&self, vertexes: &Vec<Vec3>, point: Vec3) -> bool {
+        let vert_index = self.get_vertexes();
+        let n = vert_index.len();
+        let mut sign = 0.0;
+
+        for i in 0..n {
+            let j = (i + 1) % n;
+            let edge = vertexes[vert_index[j]] - vertexes[vert_index[i]];
+            let to_point = point - vertexes[vert_index[i]];
+
+            let cross = edge.dot(to_point);
+
+            if i == 0 {
+                sign = cross;
+            } else if cross * sign < 0.0 {
+                return false; // Разные знаки - точка снаружи
+            }
+        }
+
+        true
     }
 
     /// Получить нормаль к полигону

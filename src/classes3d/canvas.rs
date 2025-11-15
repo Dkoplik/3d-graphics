@@ -1,6 +1,9 @@
 //! Реализация холста для 2D рисования.
 
-use std::ops::{Index, IndexMut};
+use std::{
+    mem::swap,
+    ops::{Index, IndexMut},
+};
 
 use egui::{Color32, ColorImage, Pos2, Vec2};
 
@@ -107,6 +110,18 @@ impl Canvas {
 
         let index = y * self.width + x;
         z >= self.buffer[index]
+    }
+
+    /// Инверитровать изображение по оси Y.
+    pub fn invert_y(&mut self) {
+        for y in 0..(self.height / 2) {
+            let op_y = self.height - y - 1;
+            for x in 0..self.width {
+                let tmp = self[(x, y)];
+                self[(x, y)] = self[(x, op_y)];
+                self[(x, op_y)] = tmp;
+            }
+        }
     }
 }
 

@@ -168,7 +168,7 @@ pub struct Scene {
 }
 
 /// Камера в 3-х мерном пространстве.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct Camera3 {
     /// Координатная система камеры.
     ///
@@ -219,9 +219,16 @@ pub struct Canvas {
 /// Структура для отрисовки сцены. Содержит в себе параметры рендера.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub struct SceneRenderer {
-    pub render_type: classes3d::scene_renderer::RenderType,
+    /// Отрисовывать ли каркас модели.
+    pub render_wireframe: bool,
+    /// Отрисовывать ли грани модели.
+    pub render_solid: bool,
+    /// Тип проекции на камеру.
     pub projection_type: classes3d::scene_renderer::ProjectionType,
+    /// Тип шейдинга. Ни на что не влияет, если `render_solid = false`.
     pub shading_type: classes3d::scene_renderer::ShadingType,
+    /// Производить ли отсечение нелицевых граней.
     pub backface_culling: bool,
+    /// Использовать ли z-buffer для упорядочивания граней.
     pub z_buffer_enabled: bool,
 }

@@ -5,6 +5,10 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
 impl Model3 {
+    // --------------------------------------------------
+    // Конструкторы
+    // --------------------------------------------------
+
     /// Создать модель из Mesh'а, материал дефолтный.
     pub fn from_mesh(mesh: Mesh) -> Self {
         Model3 {
@@ -17,7 +21,7 @@ impl Model3 {
     ///
     /// По идее, .obj файла должно хватить для всей информации о Mesh модели,
     /// но при этом материал и текстура там вроде не хранятся.
-    pub fn load_from_obj(file_path: &str) -> Result<Model3, ObjLoadError> {
+    pub fn load_from_obj(file_path: &str) -> Result<Self, ObjLoadError> {
         let path = Path::new(file_path);
         if !path.exists() {
             return Err(ObjLoadError::FileNotFound);
@@ -230,8 +234,14 @@ impl Model3 {
         self.apply_transform(&Transform3D::translation(0.0, 0.0, dz));
     }
 
-    /// Повернуть модель из направления `from` в направление `to`.
+    /// Повернуть модель из направления `from` в направление `to` в **локальных** координатах.
+    ///
+    /// Сами `from` и `to` указываются в **глобальных** координатах.
     pub fn rotate(&mut self, from: Vec3, to: Vec3) {
+        // привести к локальным координатам модели
+        let to_local = self.mesh.get_local_frame().global_to_local_matrix();
+        let from = Vec3::from(to_local.apply_to_hvec(from.into())).normalize();
+        let to = Vec3::from(to_local.apply_to_hvec(to.into())).normalize();
         self.apply_transform(&Transform3D::rotation_aligning(from, to));
     }
 
