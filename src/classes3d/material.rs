@@ -1,9 +1,9 @@
 use crate::Material;
-
 use egui::Color32;
+use std::fmt::Display;
 
 /// Взаимодействие между текстурой и цветом материала.
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum TextureBlendMode {
     /// Текстура полностью заменяет цвет материала.
     Replace,
@@ -25,14 +25,22 @@ impl TextureBlendMode {
     }
 }
 
+impl Display for TextureBlendMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Replace => f.write_str("Замена"),
+            Self::Modulate => f.write_str("Умножение"),
+            Self::Additive => f.write_str("Сложение"),
+        }
+    }
+}
+
 impl Default for Material {
     fn default() -> Self {
         Self {
             color: Color32::WHITE,
             texture: None,
             blend_mode: TextureBlendMode::default(),
-            shininess: 32.0,
-            specular_strength: 0.5,
         }
     }
 }

@@ -1,9 +1,6 @@
 //! Реализация холста для 2D рисования.
 
-use std::{
-    mem::swap,
-    ops::{Index, IndexMut},
-};
+use std::ops::{Index, IndexMut};
 
 use egui::{Color32, ColorImage, Pos2, Vec2};
 

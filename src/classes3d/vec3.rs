@@ -162,7 +162,7 @@ impl Vec3 {
 
     /// Является ли вектор нормализованным.
     pub fn is_normalized(&self) -> bool {
-        self.length_squared() <= 2.0 * f32::EPSILON
+        self.length_squared() - 1.0 <= 2.0 * f32::EPSILON
     }
 
     /// Приблизительное сравнение векторов на равенство.

@@ -1,5 +1,4 @@
-use crate::app::{AthenianApp, logic};
-use g3d::classes3d::surface_generator::SurfaceFunction;
+use crate::app::{AthenianApp, logic, ui};
 
 // --------------------------------------------------
 // Построение UI приложения
@@ -12,7 +11,6 @@ impl eframe::App for AthenianApp {
         self.show_left_panel(ctx);
         self.show_bottom_panel(ctx);
         self.show_central_panel(ctx);
-        self.handle_camera_input(ctx);
     }
 }
 
@@ -26,15 +24,6 @@ impl AthenianApp {
                         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
                     }
                 });
-
-                ui.menu_button("Projection", |ui| {
-                    if ui.button("Perspective").clicked() {
-                        //   self.set_perspective_projection();
-                    }
-                    if ui.button("Isometric").clicked() {
-                        //   self.set_isometric_projection();
-                    }
-                });
             });
         });
     }
@@ -43,7 +32,7 @@ impl AthenianApp {
     fn show_left_panel(&mut self, ctx: &egui::Context) {
         egui::SidePanel::left("left_panel")
             .resizable(false)
-            .min_width(250.0)
+            .min_width(400.0)
             .show(ctx, |ui| {
                 ui.vertical(|ui| {
                     if ui.button("Стереть всё").clicked() {
@@ -60,13 +49,13 @@ impl AthenianApp {
                                 self.show_model_controls(ui);
                             });
 
-                        if let Some(_) = self.selected_3d_model_index {
+                        if let Some(_) = self.get_selected_model_mut() {
                             egui::CollapsingHeader::new("Текущая модель").show(ui, |ui| {
                                 self.show_current_model_controls(ui);
                             });
                         }
 
-                        egui::CollapsingHeader::new("Внешний вид").show(ui, |ui| {
+                        egui::CollapsingHeader::new("Рендер").show(ui, |ui| {
                             self.show_rendering_controls(ui);
                         });
 
@@ -108,109 +97,25 @@ impl AthenianApp {
         ui.separator();
 
         ui.label("Загрузка моделей:");
-        if ui.button("Загрузить OBJ...").clicked() {
+        if ui.button("Загрузить OBJ").clicked() {
             self.load_obj_file();
         }
-        if ui.button("Сохранить OBJ...").clicked() {
+        if ui.button("Сохранить OBJ").clicked() {
             self.save_obj_file();
         }
 
         ui.separator();
 
-        egui::CollapsingHeader::new("Создание моделей вращения")
+        egui::CollapsingHeader::new("Создание модели вращения")
             .default_open(false)
             .show(ui, |ui| {
                 self.show_rotation_model_controls(ui);
             });
 
-        if ui.button("Создать вращением").clicked() {
-            self.create_rotation_model();
-        }
-
-        ui.separator();
-
-        if ui.button("Создать из функции").clicked() {
-            self.create_function_model();
-        }
-
         ui.separator();
 
         egui::CollapsingHeader::new("График функции двух переменных").show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.label("Функция:");
-                egui::ComboBox::from_id_salt("surface_function")
-                    .selected_text(match self.selected_surface_function {
-                        SurfaceFunction::Paraboloid => "Параболоид",
-                        SurfaceFunction::Saddle => "Седло",
-                        SurfaceFunction::Wave => "Волна",
-                        SurfaceFunction::Ripple => "Пульсация",
-                        SurfaceFunction::Gaussian => "Гаусс",
-                    })
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(
-                            &mut self.selected_surface_function,
-                            SurfaceFunction::Paraboloid,
-                            "Параболоид (z = x² + y²)",
-                        );
-                        ui.selectable_value(
-                            &mut self.selected_surface_function,
-                            SurfaceFunction::Saddle,
-                            "Седло (z = x² - y²)",
-                        );
-                        ui.selectable_value(
-                            &mut self.selected_surface_function,
-                            SurfaceFunction::Wave,
-                            "Волна (z = sin(x)·cos(y))",
-                        );
-                        ui.selectable_value(
-                            &mut self.selected_surface_function,
-                            SurfaceFunction::Ripple,
-                            "Пульсация (z = sin(r)/r)",
-                        );
-                        ui.selectable_value(
-                            &mut self.selected_surface_function,
-                            SurfaceFunction::Gaussian,
-                            "Гаусс (z = e^(-(x²+y²)))",
-                        );
-                    });
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("X:");
-                ui.add(
-                    egui::DragValue::new(&mut self.surface_x_min)
-                        .speed(0.1)
-                        .prefix("от "),
-                );
-                ui.add(
-                    egui::DragValue::new(&mut self.surface_x_max)
-                        .speed(0.1)
-                        .prefix("до "),
-                );
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Y:");
-                ui.add(
-                    egui::DragValue::new(&mut self.surface_y_min)
-                        .speed(0.1)
-                        .prefix("от "),
-                );
-                ui.add(
-                    egui::DragValue::new(&mut self.surface_y_max)
-                        .speed(0.1)
-                        .prefix("до "),
-                );
-            });
-
-            ui.horizontal(|ui| {
-                ui.label("Разбиений:");
-                ui.add(egui::Slider::new(&mut self.surface_divisions, 10..=200).step_by(5.0));
-            });
-
-            if ui.button("Построить график").clicked() {
-                self.create_function_model();
-            }
+            self.show_function_model_controls(ui);
         });
 
         ui.separator();
@@ -234,144 +139,6 @@ impl AthenianApp {
                         );
                     }
                 });
-        }
-    }
-
-    /// Показать управление выбранной моделью
-    fn show_current_model_controls(&mut self, ui: &mut egui::Ui) {
-        self.show_transform_controls(ui);
-        self.show_material_controls(ui);
-    }
-
-    /// Показать элементы управления преобразованиями.
-    fn show_transform_controls(&mut self, ui: &mut egui::Ui) {
-        ui.label("Преобразования:");
-
-        egui::ComboBox::from_label("Инструмент")
-            .selected_text(self.instrument.to_string())
-            .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    &mut self.instrument,
-                    logic::Instrument::Move3D,
-                    "Перемещение",
-                );
-                ui.selectable_value(
-                    &mut self.instrument,
-                    logic::Instrument::Rotate3D,
-                    "Вращение",
-                );
-                ui.selectable_value(&mut self.instrument, logic::Instrument::Scale3D, "Масштаб");
-                ui.selectable_value(
-                    &mut self.instrument,
-                    logic::Instrument::RotateAroundX,
-                    "Вращение X",
-                );
-                ui.selectable_value(
-                    &mut self.instrument,
-                    logic::Instrument::RotateAroundY,
-                    "Вращение Y",
-                );
-                ui.selectable_value(
-                    &mut self.instrument,
-                    logic::Instrument::RotateAroundZ,
-                    "Вращение Z",
-                );
-                ui.selectable_value(
-                    &mut self.instrument,
-                    logic::Instrument::RotateAroundCustomLine,
-                    "Вращение линии",
-                );
-            });
-
-        // Перемещение
-        let mut new_pos = self.get_selected_model().unwrap().get_position();
-        ui.label("Перемещение:");
-        ui.horizontal(|ui| {
-            ui.add(egui::DragValue::new(&mut new_pos.x).speed(0.1).prefix("X"));
-            ui.add(egui::DragValue::new(&mut new_pos.y).speed(0.1).prefix("Y"));
-            ui.add(egui::DragValue::new(&mut new_pos.z).speed(0.1).prefix("Z"));
-        });
-        let delta_vec = new_pos - self.get_selected_model().unwrap().get_position();
-        self.translate_model(delta_vec);
-
-        ui.horizontal(|ui| {
-            if ui.button("Масштаб +").clicked() {
-                self.scale_model(1.2);
-            }
-            if ui.button("Масштаб -").clicked() {
-                self.scale_model(0.8);
-            }
-        });
-
-        // Отражения
-        ui.label("Отражения:");
-        ui.horizontal(|ui| {
-            if ui.button("XY").clicked() {
-                self.apply_reflection(logic::ReflectionPlane::XY);
-            }
-            if ui.button("XZ").clicked() {
-                self.apply_reflection(logic::ReflectionPlane::XZ);
-            }
-            if ui.button("YZ").clicked() {
-                self.apply_reflection(logic::ReflectionPlane::YZ);
-            }
-        });
-
-        // Произвольная ось вращения
-        if self.instrument == logic::Instrument::RotateAroundCustomLine {
-            ui.label("Произвольная ось:");
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label("Точка 1:");
-                    ui.horizontal(|ui| {
-                        ui.add(
-                            egui::DragValue::new(&mut self.axis_point1.x)
-                                .speed(0.1)
-                                .prefix("X:"),
-                        );
-                        ui.add(
-                            egui::DragValue::new(&mut self.axis_point1.y)
-                                .speed(0.1)
-                                .prefix("Y:"),
-                        );
-                        ui.add(
-                            egui::DragValue::new(&mut self.axis_point1.z)
-                                .speed(0.1)
-                                .prefix("Z:"),
-                        );
-                    });
-                });
-            });
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label("Точка 2:");
-                    ui.horizontal(|ui| {
-                        ui.add(
-                            egui::DragValue::new(&mut self.axis_point2.x)
-                                .speed(0.1)
-                                .prefix("X:"),
-                        );
-                        ui.add(
-                            egui::DragValue::new(&mut self.axis_point2.y)
-                                .speed(0.1)
-                                .prefix("Y:"),
-                        );
-                        ui.add(
-                            egui::DragValue::new(&mut self.axis_point2.z)
-                                .speed(0.1)
-                                .prefix("Z:"),
-                        );
-                    });
-                });
-            });
-            ui.add(
-                egui::DragValue::new(&mut self.angle_of_rotate)
-                    .range(0.0..=360.0)
-                    .suffix("°"),
-            );
-            if ui.button("Применить вращение").clicked() {
-                self.apply_custom_rotation();
-            }
         }
     }
 
@@ -523,107 +290,320 @@ impl AthenianApp {
         });
     }
 
+    fn show_function_model_controls(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("Функция:");
+            egui::ComboBox::from_id_salt("surface_function")
+                .selected_text(match self.selected_surface_function {
+                    g3d::SurfaceFunction::Paraboloid => "Параболоид",
+                    g3d::SurfaceFunction::Saddle => "Седло",
+                    g3d::SurfaceFunction::Wave => "Волна",
+                    g3d::SurfaceFunction::Ripple => "Пульсация",
+                    g3d::SurfaceFunction::Gaussian => "Гаусс",
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(
+                        &mut self.selected_surface_function,
+                        g3d::SurfaceFunction::Paraboloid,
+                        "Параболоид (z = x² + y²)",
+                    );
+                    ui.selectable_value(
+                        &mut self.selected_surface_function,
+                        g3d::SurfaceFunction::Saddle,
+                        "Седло (z = x² - y²)",
+                    );
+                    ui.selectable_value(
+                        &mut self.selected_surface_function,
+                        g3d::SurfaceFunction::Wave,
+                        "Волна (z = sin(x)·cos(y))",
+                    );
+                    ui.selectable_value(
+                        &mut self.selected_surface_function,
+                        g3d::SurfaceFunction::Ripple,
+                        "Пульсация (z = sin(r)/r)",
+                    );
+                    ui.selectable_value(
+                        &mut self.selected_surface_function,
+                        g3d::SurfaceFunction::Gaussian,
+                        "Гаусс (z = e^(-(x²+y²)))",
+                    );
+                });
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("X:");
+            ui.add(
+                egui::DragValue::new(&mut self.surface_x_min)
+                    .speed(0.1)
+                    .prefix("от "),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.surface_x_max)
+                    .speed(0.1)
+                    .prefix("до "),
+            );
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Y:");
+            ui.add(
+                egui::DragValue::new(&mut self.surface_y_min)
+                    .speed(0.1)
+                    .prefix("от "),
+            );
+            ui.add(
+                egui::DragValue::new(&mut self.surface_y_max)
+                    .speed(0.1)
+                    .prefix("до "),
+            );
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("Разбиений:");
+            ui.add(egui::Slider::new(&mut self.surface_divisions, 10..=200).step_by(5.0));
+        });
+
+        if ui.button("Построить график").clicked() {
+            self.create_function_model();
+        }
+    }
+
+    /// Показать управление выбранной моделью
+    fn show_current_model_controls(&mut self, ui: &mut egui::Ui) {
+        self.show_transform_controls(ui);
+        self.show_material_controls(ui);
+    }
+
+    /// Показать элементы управления преобразованиями.
+    fn show_transform_controls(&mut self, ui: &mut egui::Ui) {
+        ui.label("Преобразования:");
+
+        egui::ComboBox::from_label("Инструмент")
+            .selected_text(self.instrument.to_string())
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    &mut self.instrument,
+                    logic::Instrument::Move3D,
+                    "Перемещение",
+                );
+                ui.selectable_value(
+                    &mut self.instrument,
+                    logic::Instrument::Rotate3D,
+                    "Вращение",
+                );
+                ui.selectable_value(&mut self.instrument, logic::Instrument::Scale3D, "Масштаб");
+                ui.selectable_value(
+                    &mut self.instrument,
+                    logic::Instrument::RotateAroundX,
+                    "Вращение X",
+                );
+                ui.selectable_value(
+                    &mut self.instrument,
+                    logic::Instrument::RotateAroundY,
+                    "Вращение Y",
+                );
+                ui.selectable_value(
+                    &mut self.instrument,
+                    logic::Instrument::RotateAroundZ,
+                    "Вращение Z",
+                );
+                ui.selectable_value(
+                    &mut self.instrument,
+                    logic::Instrument::RotateAroundCustomLine,
+                    "Вращение линии",
+                );
+            });
+
+        // Перемещение
+        let mut new_pos = self.get_selected_model().unwrap().get_position();
+        ui.label("Перемещение:");
+        ui.horizontal(|ui| {
+            ui.add(egui::DragValue::new(&mut new_pos.x).speed(0.1).prefix("X"));
+            ui.add(egui::DragValue::new(&mut new_pos.y).speed(0.1).prefix("Y"));
+            ui.add(egui::DragValue::new(&mut new_pos.z).speed(0.1).prefix("Z"));
+        });
+        let delta_vec = new_pos - self.get_selected_model().unwrap().get_position();
+        self.translate_model(delta_vec);
+
+        ui.horizontal(|ui| {
+            if ui.button("Масштаб +").clicked() {
+                self.scale_model(1.2);
+            }
+            if ui.button("Масштаб -").clicked() {
+                self.scale_model(0.8);
+            }
+        });
+
+        // Отражения
+        ui.label("Отражения:");
+        ui.horizontal(|ui| {
+            if ui.button("XY").clicked() {
+                self.apply_reflection(logic::ReflectionPlane::XY);
+            }
+            if ui.button("XZ").clicked() {
+                self.apply_reflection(logic::ReflectionPlane::XZ);
+            }
+            if ui.button("YZ").clicked() {
+                self.apply_reflection(logic::ReflectionPlane::YZ);
+            }
+        });
+
+        // Произвольная ось вращения
+        if self.instrument == logic::Instrument::RotateAroundCustomLine {
+            ui.label("Произвольная ось:");
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label("Точка 1:");
+                    ui.horizontal(|ui| {
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point1.x)
+                                .speed(0.1)
+                                .prefix("X:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point1.y)
+                                .speed(0.1)
+                                .prefix("Y:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point1.z)
+                                .speed(0.1)
+                                .prefix("Z:"),
+                        );
+                    });
+                });
+            });
+            ui.horizontal(|ui| {
+                ui.vertical(|ui| {
+                    ui.label("Точка 2:");
+                    ui.horizontal(|ui| {
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point2.x)
+                                .speed(0.1)
+                                .prefix("X:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point2.y)
+                                .speed(0.1)
+                                .prefix("Y:"),
+                        );
+                        ui.add(
+                            egui::DragValue::new(&mut self.axis_point2.z)
+                                .speed(0.1)
+                                .prefix("Z:"),
+                        );
+                    });
+                });
+            });
+            ui.add(
+                egui::DragValue::new(&mut self.angle_of_rotate)
+                    .range(0.0..=360.0)
+                    .suffix("°"),
+            );
+            if ui.button("Применить вращение").clicked() {
+                self.apply_custom_rotation();
+            }
+        }
+    }
+
     /// Показать управление материалами и текстурами.
     fn show_material_controls(&mut self, ui: &mut egui::Ui) {
+        let material = &mut self.get_selected_model_mut().unwrap().material;
+
         ui.label("Материал:");
 
         ui.horizontal(|ui| {
-            ui.color_edit_button_srgba(&mut self.current_material.color);
+            ui.color_edit_button_srgba(&mut material.color);
             ui.label("Цвет");
         });
 
-        ui.add(
-            egui::Slider::new(&mut self.current_material.specular_strength, 0.0..=1.0)
-                .text("Блеск"),
-        );
-        ui.add(
-            egui::Slider::new(&mut self.current_material.shininess, 1.0..=128.0).text("Яркость"),
-        );
+        ui.separator();
 
-        if ui.button("Применить материал").clicked() {
-            self.apply_material_to_selected();
-        }
+        ui.label("Тип совмещения:");
+        egui::ComboBox::from_id_salt("blending")
+            .selected_text(material.blend_mode.to_string())
+            .show_ui(ui, |ui| {
+                ui.selectable_value(
+                    &mut material.blend_mode,
+                    g3d::classes3d::material::TextureBlendMode::Replace,
+                    g3d::classes3d::material::TextureBlendMode::Replace.to_string(),
+                );
+                ui.selectable_value(
+                    &mut material.blend_mode,
+                    g3d::classes3d::material::TextureBlendMode::Modulate,
+                    g3d::classes3d::material::TextureBlendMode::Modulate.to_string(),
+                );
+                ui.selectable_value(
+                    &mut material.blend_mode,
+                    g3d::classes3d::material::TextureBlendMode::Additive,
+                    g3d::classes3d::material::TextureBlendMode::Additive.to_string(),
+                );
+            });
 
         ui.separator();
+
         ui.label("Текстуры:");
         if ui.button("Загрузить текстуру...").clicked() {
-              self.load_texture();
+            self.load_texture();
         }
         if ui.button("Удалить текстуру").clicked() {
-             self.remove_texture();
+            self.remove_texture();
         }
     }
 
     /// Показать настройки рендеринга.
     fn show_rendering_controls(&mut self, ui: &mut egui::Ui) {
-        ui.label("Режим рендеринга:");
-        egui::ComboBox::from_label("Тип")
-            .selected_text(match self.render_options.render_type {
-                g3d::classes3d::scene::RenderType::WireFrame => "Каркас",
-                g3d::classes3d::scene::RenderType::Solid => "Полный",
-            })
+        ui.checkbox(&mut self.scene_renderer.render_wireframe, "Рендер каркаса");
+        ui.checkbox(&mut self.scene_renderer.render_solid, "Рендер полигонов");
+        ui.checkbox(
+            &mut self.scene_renderer.backface_culling,
+            "Отсечение задних граней",
+        );
+        ui.checkbox(&mut self.scene_renderer.z_buffer_enabled, "Z-буфер");
+
+        ui.label("Шейдинг:");
+        egui::ComboBox::from_label("Модель")
+            .selected_text(self.scene_renderer.shading_type.to_string())
             .show_ui(ui, |ui| {
                 ui.selectable_value(
-                    &mut self.render_options.render_type,
-                    g3d::classes3d::scene::RenderType::WireFrame,
-                    "Каркас",
+                    &mut self.scene_renderer.shading_type,
+                    g3d::classes3d::scene_renderer::ShadingType::None,
+                    g3d::classes3d::scene_renderer::ShadingType::None.to_string(),
                 );
                 ui.selectable_value(
-                    &mut self.render_options.render_type,
-                    g3d::classes3d::scene::RenderType::Solid,
-                    "Полный",
+                    &mut self.scene_renderer.shading_type,
+                    g3d::classes3d::scene_renderer::ShadingType::GouraudLambert,
+                    g3d::classes3d::scene_renderer::ShadingType::GouraudLambert.to_string(),
+                );
+                ui.selectable_value(
+                    &mut self.scene_renderer.shading_type,
+                    g3d::classes3d::scene_renderer::ShadingType::PhongToonShading(3),
+                    g3d::classes3d::scene_renderer::ShadingType::PhongToonShading(0).to_string(),
                 );
             });
 
-        ui.label("Затенение:");
-        egui::ComboBox::from_label("Модель")
-            .selected_text(match self.render_options.shading_type {
-                g3d::classes3d::scene::ShadingType::None => "Нет",
-                g3d::classes3d::scene::ShadingType::Gouraud => "Гуро-Ламберт",
-                g3d::classes3d::scene::ShadingType::Phong => "Фонг",
-            })
-            .show_ui(ui, |ui| {
-                ui.selectable_value(
-                    &mut self.render_options.shading_type,
-                    g3d::classes3d::scene::ShadingType::None,
-                    "Нет",
-                );
-                ui.selectable_value(
-                    &mut self.render_options.shading_type,
-                    g3d::classes3d::scene::ShadingType::Gouraud,
-                    "Гуро-Ламберт",
-                );
-                ui.selectable_value(
-                    &mut self.render_options.shading_type,
-                    g3d::classes3d::scene::ShadingType::Phong,
-                    "Фонг",
-                );
-            });
+        match self.scene_renderer.shading_type {
+            g3d::classes3d::scene_renderer::ShadingType::PhongToonShading(mut bands) => {
+                ui.add(egui::Slider::new(&mut bands, 1..=256).text("Групп:"));
+            }
+            _ => (),
+        }
 
         ui.label("Проекция:");
         egui::ComboBox::from_label("Тип проекции")
-            .selected_text(match self.render_options.projection_type {
-                g3d::classes3d::scene::ProjectionType::Perspective => "Перспективная",
-                g3d::classes3d::scene::ProjectionType::Parallel => "Параллельная",
-            })
+            .selected_text(self.scene_renderer.projection_type.to_string())
             .show_ui(ui, |ui| {
                 ui.selectable_value(
-                    &mut self.render_options.projection_type,
-                    g3d::classes3d::scene::ProjectionType::Perspective,
-                    "Перспективная",
+                    &mut self.scene_renderer.projection_type,
+                    g3d::classes3d::scene_renderer::ProjectionType::Perspective,
+                    g3d::classes3d::scene_renderer::ProjectionType::Perspective.to_string(),
                 );
                 ui.selectable_value(
-                    &mut self.render_options.projection_type,
-                    g3d::classes3d::scene::ProjectionType::Parallel,
-                    "Параллельная",
+                    &mut self.scene_renderer.projection_type,
+                    g3d::classes3d::scene_renderer::ProjectionType::Parallel,
+                    g3d::classes3d::scene_renderer::ProjectionType::Perspective.to_string(),
                 );
             });
-
-        ui.checkbox(
-            &mut self.render_options.backface_culling,
-            "Отсечение задних граней",
-        );
-        ui.checkbox(&mut self.render_options.z_buffer_enabled, "Z-буфер");
     }
 
     /// Показать управление освещением.
@@ -636,8 +616,13 @@ impl AthenianApp {
 
         if !self.scene.lights.is_empty() {
             egui::ComboBox::from_label("Выбранный свет")
-                .selected_text(format!("Свет {}", self.selected_light_index.unwrap_or(0)))
+                .selected_text(if let Some(light_index) = self.selected_light_index {
+                    format!("Свет {}", light_index)
+                } else {
+                    "Отсутствует".to_owned()
+                })
                 .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.selected_light_index, None, "None".to_owned());
                     for (i, _) in self.scene.lights.iter().enumerate() {
                         ui.selectable_value(
                             &mut self.selected_light_index,
@@ -681,55 +666,25 @@ impl AthenianApp {
                 }
             }
         }
-
-        ui.separator();
-        ui.label("Окружающий свет:");
-        let mut ambient = self.scene.ambient_light;
-        ui.color_edit_button_srgba(&mut ambient);
-        self.scene.set_ambient_light(ambient);
     }
 
     /// Показать управление камерой.
     fn show_camera_controls(&mut self, ui: &mut egui::Ui) {
+        let camera = &mut self.scene.camera;
+
         ui.label("Позиция камеры:");
         ui.horizontal(|ui| {
-            ui.add(
-                egui::DragValue::new(&mut self.camera_controls.position.x)
-                    .speed(0.1)
-                    .prefix("X:"),
-            );
-            ui.add(
-                egui::DragValue::new(&mut self.camera_controls.position.y)
-                    .speed(0.1)
-                    .prefix("Y:"),
-            );
-            ui.add(
-                egui::DragValue::new(&mut self.camera_controls.position.z)
-                    .speed(0.1)
-                    .prefix("Z:"),
-            );
+            let mut new_pos = camera.get_position();
+            ui.add(egui::DragValue::new(&mut new_pos.x).speed(0.5).prefix("X:"));
+            ui.add(egui::DragValue::new(&mut new_pos.y).speed(0.5).prefix("Y:"));
+            ui.add(egui::DragValue::new(&mut new_pos.z).speed(0.5).prefix("Z:"));
+            camera.set_position(new_pos);
         });
 
-        ui.label("Цель камеры:");
-        ui.horizontal(|ui| {
-            ui.add(
-                egui::DragValue::new(&mut self.camera_controls.target.x)
-                    .speed(0.1)
-                    .prefix("X:"),
-            );
-            ui.add(
-                egui::DragValue::new(&mut self.camera_controls.target.y)
-                    .speed(0.1)
-                    .prefix("Y:"),
-            );
-            ui.add(
-                egui::DragValue::new(&mut self.camera_controls.target.z)
-                    .speed(0.1)
-                    .prefix("Z:"),
-            );
-        });
+        let mut new_fov = camera.get_fov_degrees();
+        ui.add(egui::Slider::new(&mut new_fov, 30.0..=120.0).text("Поле зрения"));
+        camera.set_fov_degrees(new_fov);
 
-        ui.add(egui::Slider::new(&mut self.camera_controls.fov, 30.0..=120.0).text("Поле зрения"));
         ui.add(
             egui::Slider::new(&mut self.camera_controls.move_speed, 0.1..=2.0)
                 .text("Скорость движения"),
@@ -739,17 +694,9 @@ impl AthenianApp {
                 .text("Скорость вращения"),
         );
 
-        ui.horizontal(|ui| {
-            if ui.button("Сброс камеры").clicked() {
-                self.reset_camera();
-            }
-            if ui.button("Вид спереди").clicked() {
-                self.set_front_view();
-            }
-            if ui.button("Вид сверху").clicked() {
-                self.set_top_view();
-            }
-        });
+        if ui.button("Сброс камеры").clicked() {
+            self.reset_camera();
+        }
     }
 
     /// Показать нижнюю панель приложения.
@@ -770,9 +717,11 @@ impl AthenianApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             // Выделить область под холст
             let (canvas_response, painter) = self.allocate_canvas(ui);
+            self.display_canvas_width = canvas_response.rect.width();
+            self.display_canvas_height = canvas_response.rect.height();
 
             // Обработка ввода
-            self.handle_input(&canvas_response);
+            self.handle_input(&canvas_response, ctx);
 
             // Рендеринг сцены
             self.render_scene();
@@ -787,67 +736,6 @@ impl AthenianApp {
                     egui::Color32::WHITE,
                 );
             }
-
-            // Отображение информации о сцене
-            self.show_scene_info(ui, &canvas_response);
         });
-    }
-
-    fn show_scene_info(&self, ui: &mut egui::Ui, response: &egui::Response) {
-        if response.hovered() {
-            let info_text = format!(
-                "Модели: {} | Источники света: {} | Камера: ({:.1}, {:.1}, {:.1})",
-                self.scene.models.len(),
-                self.scene.lights.len(),
-                self.camera_controls.position.x,
-                self.camera_controls.position.y,
-                self.camera_controls.position.z
-            );
-
-            let painter = ui.painter();
-            let rect = response.rect;
-            let text_color = egui::Color32::WHITE;
-            let background = egui::Color32::from_black_alpha(180);
-
-            painter.rect_filled(
-                egui::Rect::from_min_size(
-                    rect.min + egui::Vec2::new(10.0, 10.0),
-                    egui::Vec2::new(info_text.len() as f32 * 6.0, 20.0),
-                ),
-                5.0,
-                background,
-            );
-
-            painter.text(
-                rect.min + egui::Vec2::new(15.0, 25.0),
-                egui::Align2::LEFT_TOP,
-                info_text,
-                egui::FontId::monospace(12.0),
-                text_color,
-            );
-        }
-    }
-
-    fn handle_camera_input(&mut self, ctx: &egui::Context) {
-        if ctx.input(|i| i.key_pressed(egui::Key::W)) {
-            self.camera_controls.position.z -= self.camera_controls.move_speed;
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::S)) {
-            self.camera_controls.position.z += self.camera_controls.move_speed;
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::A)) {
-            self.camera_controls.position.x -= self.camera_controls.move_speed;
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::D)) {
-            self.camera_controls.position.x += self.camera_controls.move_speed;
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::Q)) {
-            self.camera_controls.position.y -= self.camera_controls.move_speed;
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::E)) {
-            self.camera_controls.position.y += self.camera_controls.move_speed;
-        }
-
-        ctx.request_repaint();
     }
 }

@@ -131,8 +131,6 @@ pub struct Material {
     pub texture: Option<Texture>,
     /// Как совмещать текстуру с цветом материала
     pub blend_mode: classes3d::material::TextureBlendMode,
-    pub shininess: f32,
-    pub specular_strength: f32,
 }
 
 /// Модель (объект) в 3D пространстве.
@@ -216,8 +214,18 @@ pub struct Canvas {
     height: usize,
 }
 
-/// Структура для отрисовки сцены. Содержит в себе параметры рендера.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub enum SurfaceFunction {
+    #[default]
+    Paraboloid,
+    Saddle,
+    Wave,
+    Ripple,
+    Gaussian,
+}
+
+/// Структура для отрисовки сцены. Содержит в себе параметры рендера.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SceneRenderer {
     /// Отрисовывать ли каркас модели.
     pub render_wireframe: bool,

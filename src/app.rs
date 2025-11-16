@@ -1,6 +1,11 @@
 pub mod logic;
 pub mod ui;
-use g3d::classes3d::surface_generator::SurfaceFunction;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CameraControls {
+    pub move_speed: f32,
+    pub rotate_speed: f32,
+}
 
 /// Приложение-демонстрация 3D графики.
 pub struct AthenianApp {
@@ -32,31 +37,20 @@ pub struct AthenianApp {
     rotation_params: logic::RotationModelParams,
 
     // Настройки рендеринга
-    render_options: g3d::classes3d::scene::RenderOptions,
-
-    // Материалы и текстуры
-    current_material: g3d::Material,
+    scene_renderer: g3d::SceneRenderer,
 
     selected_light_index: Option<usize>,
 
     // Камера
     camera_controls: CameraControls,
 
-    selected_surface_function: SurfaceFunction,
+    // график функции
+    selected_surface_function: g3d::SurfaceFunction,
     surface_x_min: f64,
     surface_x_max: f64,
     surface_y_min: f64,
     surface_y_max: f64,
     surface_divisions: usize,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CameraControls {
-    pub position: g3d::Point3,
-    pub target: g3d::Point3,
-    pub fov: f32,
-    pub move_speed: f32,
-    pub rotate_speed: f32,
 }
 
 impl AthenianApp {
@@ -77,33 +71,49 @@ impl Default for AthenianApp {
             color: egui::Color32::WHITE,
             intensity: 1.0,
         };
-        scene.add_light(light);
+        scene.lights.push(light);
 
         Self {
             scene,
+
+            // Текущий инструмент
             instrument: Default::default(),
+
+            // Начальная позиция перетаскивания
             drag_prev_pos: Default::default(),
+
+            // Холст
             canvas: g3d::Canvas::new(800, 600),
             texture_handle: Default::default(),
-            display_canvas_width: 800.0,
-            display_canvas_height: 600.0,
+
+            // отображение холста
+            display_canvas_width: 0.0,
+            display_canvas_height: 0.0,
+
+            // 3D поля
             selected_3d_model_index: Default::default(),
             angle_of_rotate: 0.0,
+
+            // Поля для осей вращения
             axis_point1: g3d::Point3::new(0.0, 0.0, 0.0),
             axis_point2: g3d::Point3::new(1.0, 0.0, 0.0),
+
+            // Параметры для создания моделей вращения
             rotation_params: logic::RotationModelParams::default(),
-            render_options: Default::default(),
-            current_material: Default::default(),
+
+            // Настройки рендеринга
+            scene_renderer: Default::default(),
+
             selected_light_index: None,
+
+            // камера
             camera_controls: CameraControls {
-                position: g3d::Point3::new(10.0, 10.0, 10.0),
-                target: g3d::Point3::new(0.0, 0.0, 0.0),
-                fov: 60.0,
                 move_speed: 0.5,
                 rotate_speed: 0.01,
             },
 
-            selected_surface_function: SurfaceFunction::Paraboloid,
+            // график функции
+            selected_surface_function: Default::default(),
             surface_x_min: -2.0,
             surface_x_max: 2.0,
             surface_y_min: -2.0,

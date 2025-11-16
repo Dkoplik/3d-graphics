@@ -1,7 +1,7 @@
 use crate::app::AthenianApp;
 use egui::{Color32, Painter, Pos2, Response, Ui};
-use g3d::classes3d::surface_generator::{SurfaceFunction, generate_surface_mesh};
-
+use g3d::SurfaceFunction;
+use g3d::classes3d::surface_generator::generate_surface_mesh;
 use g3d::{
     Line3, Model3, Point3, Transform3D, Vec3, classes3d::model3::ObjLoadError,
     classes3d::model3::ObjSaveError,
@@ -51,9 +51,9 @@ impl AthenianApp {
         // Рендерим в зависимости от выбранного режима
         let show_custom_axis = self.instrument == Instrument::RotateAroundCustomLine;
 
-        self.scene.render(
+        self.scene_renderer.render(
+            &self.scene,
             &mut self.canvas,
-            self.render_options,
             show_custom_axis,
             self.axis_point1,
             self.axis_point2,
@@ -67,9 +67,10 @@ impl AthenianApp {
 
 impl AthenianApp {
     /// Обработать взаимодействие с холстом.
-    pub fn handle_input(&mut self, response: &Response) {
+    pub fn handle_input(&mut self, response: &Response, ctx: &egui::Context) {
         self.handle_click(response);
         self.handle_drag(response);
+        self.handle_camera_input(ctx)
     }
 
     /// Обработать клики по холсту.
@@ -128,7 +129,7 @@ impl AthenianApp {
                 }
                 Instrument::Scale3D => {
                     let scale_factor = 1.0 + (delta_x + delta_y) * 2.0;
-                    model.scale(scale_factor, scale_factor, scale_factor);
+                    model.uniform_scale(scale_factor);
                 }
                 Instrument::RotateAroundX => {
                     let rotation = g3d::Transform3D::rotation_x_rad(delta_x * 2.0);
@@ -147,6 +148,35 @@ impl AthenianApp {
                 }
             }
         }
+    }
+
+    fn handle_camera_input(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.key_pressed(egui::Key::W)) {
+            self.scene
+                .camera
+                .move_forward(self.camera_controls.move_speed);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::S)) {
+            self.scene
+                .camera
+                .move_backward(self.camera_controls.move_speed);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::A)) {
+            self.scene.camera.move_left(self.camera_controls.move_speed);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::D)) {
+            self.scene
+                .camera
+                .move_right(self.camera_controls.move_speed);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::Q)) {
+            self.scene.camera.move_up(self.camera_controls.move_speed);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::E)) {
+            self.scene.camera.move_down(self.camera_controls.move_speed);
+        }
+
+        ctx.request_repaint();
     }
 }
 
@@ -215,15 +245,15 @@ impl AthenianApp {
         }
     }
 
-    pub fn rotate_model(&mut self, axis: g3d::Vec3, angle_rad: f32) {
-        if let Some(model) = self.get_selected_model_mut() {
-            model.rotate_around_axis(axis, angle_rad);
-        }
-    }
+    // pub fn rotate_model(&mut self, axis: g3d::Vec3, angle_rad: f32) {
+    //     if let Some(model) = self.get_selected_model_mut() {
+    //         model.rotate_around_axis(axis, angle_rad);
+    //     }
+    // }
 
     pub fn scale_model(&mut self, factor: f32) {
         if let Some(model) = self.get_selected_model_mut() {
-            model.scale(factor, factor, factor);
+            model.uniform_scale(factor);
         }
     }
 
@@ -251,17 +281,6 @@ impl AthenianApp {
         }
     }
 
-    pub fn apply_material_to_selected(&mut self) {
-        let temp_material = self.current_material.clone();
-
-        if let Some(model) = self.get_selected_model_mut() {
-            model.material = temp_material;
-            println!("Материал применен к выбранной модели");
-        } else {
-            eprintln!("Нет выбранной модели для применения материала");
-        }
-    }
-
     // === ОПЕРАЦИИ С ОСВЕЩЕНИЕМ ===
 
     pub fn add_light_source(&mut self) {
@@ -270,46 +289,14 @@ impl AthenianApp {
             color: egui::Color32::WHITE,
             intensity: 1.0,
         };
-        self.scene.add_light(new_light);
+        self.scene.lights.push(new_light);
         self.selected_light_index = Some(self.scene.lights.len() - 1);
     }
 
     // === ОПЕРАЦИИ С КАМЕРОЙ ===
 
     pub fn reset_camera(&mut self) {
-        let camera = &mut self.scene.camera;
-
-        // Обновляем позицию и направление
-        camera.set_position(g3d::Point3::new(10.0, 10.0, 10.0));
-        camera.set_direction(
-            (g3d::Point3::new(0.0, 0.0, 0.0) - camera.get_position()).normalize(),
-            g3d::Vec3::up(),
-        );
-
-        // Обновляем поле зрения
-        camera.set_fov_degrees(60.0);
-    }
-
-    pub fn set_front_view(&mut self) {
-        let camera = &mut self.scene.camera;
-
-        // Обновляем позицию и направление
-        camera.set_position(g3d::Point3::new(0.0, 0.0, 10.0));
-        camera.set_direction(
-            (g3d::Point3::new(0.0, 0.0, 0.0) - camera.get_position()).normalize(),
-            g3d::Vec3::up(),
-        );
-    }
-
-    pub fn set_top_view(&mut self) {
-        let camera = &mut self.scene.camera;
-
-        // Обновляем позицию и направление
-        camera.set_position(g3d::Point3::new(0.0, 10.0, 0.0));
-        camera.set_direction(
-            (g3d::Point3::new(0.0, 0.0, 0.0) - camera.get_position()).normalize(),
-            g3d::Vec3::up(),
-        );
+        self.scene.camera = g3d::Camera3::default();
     }
 
     pub fn load_obj_file(&mut self) {
@@ -489,9 +476,7 @@ impl AthenianApp {
                         model.material.texture = Some(texture);
                         println!("Текстура успешно загружена и применена к модели");
                     } else {
-                        // Если нет выбранной модели, сохраняем текстуру в текущий материал
-                        self.current_material.texture = Some(texture);
-                        println!("Текстура загружена в текущий материал");
+                        panic!("Текстура загружена, но модель не выбрана");
                     }
                 }
                 Err(e) => {
@@ -513,19 +498,7 @@ impl AthenianApp {
         )
         .map_err(|e| format!("Ошибка загрузки изображения: {}", e))?;
 
-        let (width, height) = img.dimensions();
-        let rgba_img = img.to_rgba8();
-
-        // Конвертируем пиксели в Color32
-        let mut pixels = Vec::with_capacity((width * height) as usize);
-
-        for pixel in rgba_img.pixels() {
-            let color =
-                egui::Color32::from_rgba_premultiplied(pixel[0], pixel[1], pixel[2], pixel[3]);
-            pixels.push(color);
-        }
-
-        Ok(g3d::Texture::new(pixels, width as usize, height as usize))
+        Ok(g3d::Texture::new(img))
     }
 
     pub fn remove_texture(&mut self) {
@@ -533,8 +506,7 @@ impl AthenianApp {
             model.material.texture = None;
             println!("Текстура удалена у выбранной модели");
         } else {
-            self.current_material.texture = None;
-            println!("Текстура удалена из текущего материала");
+            panic!("Удаление текстуры, но модель не выбрана");
         }
     }
 }

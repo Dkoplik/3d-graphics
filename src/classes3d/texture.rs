@@ -2,8 +2,13 @@
 
 use crate::Texture;
 use egui::Color32;
+use image::DynamicImage;
 
 impl Texture {
+    pub fn new(image: DynamicImage) -> Self {
+        Self(image.to_rgb8())
+    }
+
     /// Получить цвет текстуры в пикселе по UV-координатам.
     pub fn get_pixel_color(&self, u: f32, v: f32) -> Color32 {
         let (x, y) = self.transform_uv(u, v);

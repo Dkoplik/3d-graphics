@@ -275,6 +275,16 @@ impl Camera3 {
         self.local_frame.origin = position;
     }
 
+    pub fn get_target(&self) -> Point3 {
+        self.get_position() + self.forward()
+    }
+
+    pub fn set_target(&mut self, target: Point3) {
+        let from = self.get_target() - self.get_position();
+        let to = target - self.get_position();
+        self.rotate(from, to);
+    }
+
     pub fn get_direction(&self) -> Vec3 {
         self.forward()
     }
@@ -313,6 +323,17 @@ impl Camera3 {
 
     pub fn move_down(&mut self, distance: f32) {
         self.local_frame.origin = self.local_frame.origin + self.down() * distance;
+    }
+
+    /// Повернуть камеру из направления `from` в направление `to` в **локальных** координатах.
+    ///
+    /// Сами `from` и `to` указываются в **глобальных** координатах.
+    pub fn rotate(&mut self, from: Vec3, to: Vec3) {
+        // привести к локальным координатам модели
+        let to_local = self.local_frame.global_to_local_matrix();
+        let from = Vec3::from(to_local.apply_to_hvec(from.into())).normalize();
+        let to = Vec3::from(to_local.apply_to_hvec(to.into())).normalize();
+        self.apply_transform(&Transform3D::rotation_aligning(from, to));
     }
 
     // --------------------------------------------------
