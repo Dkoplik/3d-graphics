@@ -55,9 +55,14 @@ impl Canvas {
         [self.width, self.height]
     }
 
-    /// Заполнить весь холст указанным цветом
+    /// Заполнить весь холст указанным цветом и очистить z-буфер.
     pub fn clear(&mut self, color: Color32) {
         self.pixels.fill(color);
+        self.clear_z_buffer();
+    }
+
+    /// Очистить z-буфер.
+    pub fn clear_z_buffer(&mut self) {
         self.buffer.fill(f32::MIN);
     }
 
@@ -406,7 +411,6 @@ impl Canvas {
         let mut error = dx + dy;
 
         loop {
-            // ✅ ДОБАВЬТЕ ЭТУ ПРОВЕРКУ:
             if (x0 as usize) < self.width && (y0 as usize) < self.height {
                 self[(x0 as usize, y0 as usize)] = color;
             }

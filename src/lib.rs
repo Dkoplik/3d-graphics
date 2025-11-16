@@ -229,6 +229,8 @@ pub enum SurfaceFunction {
 pub struct SceneRenderer {
     /// Отрисовывать ли каркас модели.
     pub render_wireframe: bool,
+    /// Отрисовывать ли нормали вершин.
+    pub render_normals: bool,
     /// Отрисовывать ли грани модели.
     pub render_solid: bool,
     /// Тип проекции на камеру.

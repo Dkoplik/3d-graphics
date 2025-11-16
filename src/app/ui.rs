@@ -554,6 +554,7 @@ impl AthenianApp {
     /// Показать настройки рендеринга.
     fn show_rendering_controls(&mut self, ui: &mut egui::Ui) {
         ui.checkbox(&mut self.scene_renderer.render_wireframe, "Рендер каркаса");
+        ui.checkbox(&mut self.scene_renderer.render_normals, "Рендер нормалей");
         ui.checkbox(&mut self.scene_renderer.render_solid, "Рендер полигонов");
         ui.checkbox(
             &mut self.scene_renderer.backface_culling,

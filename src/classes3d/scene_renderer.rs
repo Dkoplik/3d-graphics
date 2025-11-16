@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use crate::{
-    Camera3, Canvas, HVec3, LightSource, Material, Model3, Point3, Scene, SceneRenderer,
+    Camera3, Canvas, HVec3, LightSource, Line3, Material, Model3, Point3, Scene, SceneRenderer,
     Transform3D, Vec3, classes3d::mesh::Polygon3,
 };
-use egui::{Color32, Pos2};
+use egui::{Color32, Pos2, epaint::color};
 
 /// Тип проекции на камеру.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
@@ -55,6 +55,7 @@ impl Default for SceneRenderer {
     fn default() -> Self {
         Self {
             render_wireframe: true,
+            render_normals: false,
             render_solid: false,
             projection_type: Default::default(),
             shading_type: Default::default(),
@@ -84,7 +85,7 @@ impl SceneRenderer {
             self::get_global_to_screen_transform(self.projection_type, scene, &canvas);
 
         // Отрисовка глобальной координатной системы.
-        self::draw_coordinate_axes(canvas, global_to_screen_transform);
+        self.draw_coordinate_axes(canvas, global_to_screen_transform);
 
         // Отрисовка пользовательской оси вращения, если имеется
         if show_custom_axis {
@@ -161,6 +162,10 @@ impl SceneRenderer {
                     canvas,
                 );
             }
+
+            if self.render_normals {
+                self.render_model_normals(model, &polygons, global_to_screen_transform, canvas);
+            }
         }
         // рендер идёт верхом вниз
         canvas.invert_y();
@@ -173,8 +178,6 @@ impl SceneRenderer {
     // --------------------------------------------------
 
     /// Реднер каркаса модели.
-    ///
-    /// Возвращает количество нарисованных полигонов.
     fn render_model_wireframe(
         &self,
         projected_vertexes: &Vec<Vec3>,
@@ -207,6 +210,44 @@ impl SceneRenderer {
         for &vertex in projected_vertexes {
             let pos = Pos2::new(vertex.x, vertex.y);
             canvas.circle_filled(pos, 3.0, color);
+        }
+    }
+
+    /// Реднер нормалей модели
+    fn render_model_normals(
+        &self,
+        model: &Model3,
+        polygons: &Vec<Polygon3>,
+        global_to_screen_transform: Transform3D,
+        canvas: &mut Canvas,
+    ) {
+        let normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
+        let positions: Vec<Vec3> = model
+            .mesh
+            .get_global_vertexes()
+            .map(|v| Vec3::from(v))
+            .collect();
+        // индексы используемых нормалей
+        let mut indexes: Vec<usize> = polygons
+            .iter()
+            .flat_map(|polygon| polygon.get_vertexes().clone())
+            .collect();
+        indexes.sort();
+        indexes.dedup();
+
+        // рисуем нормали
+        for index in indexes {
+            let origin = positions[index];
+            let direction = normals[index];
+
+            let start = Point3::from(origin);
+            self.render_line(
+                global_to_screen_transform,
+                start,
+                start + direction * 1.0,
+                Color32::PURPLE,
+                canvas,
+            );
         }
     }
 
@@ -706,6 +747,60 @@ impl SceneRenderer {
             ((light_color.b() as f32 / step).floor() * step).min(step) as u8,
         ))
     }
+
+    fn render_line(
+        &self,
+        global_to_screen_transform: Transform3D,
+        start: Point3,
+        end: Point3,
+        color: Color32,
+        canvas: &mut Canvas,
+    ) {
+        let start = Point3::from(global_to_screen_transform.apply_to_hvec(start.into()));
+        let end = Point3::from(global_to_screen_transform.apply_to_hvec(end.into()));
+
+        let start_pos = Pos2::new(start.x, start.y);
+        let end_pos = Pos2::new(end.x, end.y);
+        canvas.draw_sharp_line(start_pos, end_pos, color);
+    }
+
+    /// Отрисовка глобальной координатной системы.
+    fn draw_coordinate_axes(&self, canvas: &mut Canvas, global_to_screen_transform: Transform3D) {
+        let axis_length = 5.0; // Длина осей
+        let origin = Point3::zero();
+
+        let x_axis_end = Point3::new(axis_length, 0.0, 0.0);
+        let y_axis_end = Point3::new(0.0, axis_length, 0.0);
+        let z_axis_end = Point3::new(0.0, 0.0, axis_length);
+
+        // Рисуем оси с разными цветами
+        // Ось X - красная
+        self.render_line(
+            global_to_screen_transform,
+            origin,
+            x_axis_end,
+            Color32::RED,
+            canvas,
+        );
+
+        // Ось Y - зелёная
+        self.render_line(
+            global_to_screen_transform,
+            origin,
+            y_axis_end,
+            Color32::GREEN,
+            canvas,
+        );
+
+        // Ось Z - синяя
+        self.render_line(
+            global_to_screen_transform,
+            origin,
+            z_axis_end,
+            Color32::BLUE,
+            canvas,
+        );
+    }
 }
 
 // --------------------------------------------------
@@ -771,32 +866,6 @@ fn transform_model(
 fn project_point(point: Point3, view_proj_matrix: Transform3D) -> Pos2 {
     let proj_point: Point3 = view_proj_matrix.apply_to_hvec(point.into()).into();
     Pos2::new(proj_point.x, proj_point.y)
-}
-
-/// Отрисовка глобальной координатной системы.
-fn draw_coordinate_axes(canvas: &mut Canvas, global_to_screen_transform: Transform3D) {
-    // TODO нелпохо бы сделать полноценную отрисовку координатной сетки.
-    let axis_length = 2.0; // Длина осей
-    let origin = Point3::new(0.0, 0.0, 0.0);
-
-    let x_axis_end = Point3::new(axis_length, 0.0, 0.0);
-    let y_axis_end = Point3::new(0.0, axis_length, 0.0);
-    let z_axis_end = Point3::new(0.0, 0.0, axis_length);
-
-    let origin_2d = project_point(origin, global_to_screen_transform);
-    let x_end_2d = project_point(x_axis_end, global_to_screen_transform);
-    let y_end_2d = project_point(y_axis_end, global_to_screen_transform);
-    let z_end_2d = project_point(z_axis_end, global_to_screen_transform);
-
-    // Рисуем оси с разными цветами
-    // Ось X - красная
-    canvas.draw_sharp_line(origin_2d, x_end_2d, Color32::RED);
-
-    // Ось Y - зелёная
-    canvas.draw_sharp_line(origin_2d, y_end_2d, Color32::GREEN);
-
-    // Ось Z - синяя
-    canvas.draw_sharp_line(origin_2d, z_end_2d, Color32::BLUE);
 }
 
 /// Отрисовка пользовательской оси для вращения
