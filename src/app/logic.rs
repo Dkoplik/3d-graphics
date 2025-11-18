@@ -1,12 +1,9 @@
 use crate::app::AthenianApp;
-use egui::{Color32, Painter, Pos2, Response, Ui};
+use egui::Response;
 use g3d::SurfaceFunction;
 use g3d::classes3d::surface_generator::generate_surface_mesh;
-use g3d::{
-    Line3, Model3, Point3, Transform3D, Vec3, classes3d::model3::ObjLoadError,
-    classes3d::model3::ObjSaveError,
-};
-use image::{GenericImageView, ImageFormat};
+use g3d::{Model3, Vec3, classes3d::model3::ObjLoadError, classes3d::model3::ObjSaveError};
+use image::ImageFormat;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -71,7 +68,8 @@ impl AthenianApp {
         self.handle_click(response);
         self.handle_drag(response);
         self.handle_right_drag(response);
-        self.handle_camera_input(ctx)
+        self.handle_camera_input(ctx);
+        ctx.request_repaint();
     }
 
     /// Обработать клики по холсту.
@@ -124,10 +122,14 @@ impl AthenianApp {
         if let Some(drag_start) = self.right_drag_prev_pos
             && let Some(drag_cur) = response.hover_pos()
         {
+            let transform = self
+                .scene_renderer
+                .screen_to_global_transform(&self.scene, &self.canvas);
             let camera = &mut self.scene.camera;
+
             let z = (camera.get_far_plane() + camera.get_near_plane()) / 2.0;
-            let from = Vec3::new(drag_start.x, drag_start.y, z);
-            let to = Vec3::new(drag_cur.x, drag_cur.y, z);
+            let from = Vec3::new(drag_start.x, drag_start.y, z) * transform;
+            let to = Vec3::new(drag_cur.x, drag_cur.y, z) * transform;
             camera.rotate(from, to);
         }
 
@@ -136,66 +138,44 @@ impl AthenianApp {
 
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
-        let delta_x = (end.x - start.x) / self.display_canvas_width;
-        let delta_y = (end.y - start.y) / self.display_canvas_height;
-        let height = self.display_canvas_height;
-        let canvas_size = self.canvas.size();
-        let camera = self.scene.camera;
-        let proj_type = self.scene_renderer.projection_type;
+        let transform = self
+            .scene_renderer
+            .screen_to_global_transform(&self.scene, &self.canvas);
+        let mut from = g3d::Vec3::new(start.x, start.y, 0.0);
+        let mut to = g3d::Vec3::new(end.x, end.y, 0.0);
         let cur_instrument = self.instrument;
         if let Some(model) = self.get_selected_model_mut() {
+            from.z = model.get_position().z;
+            from = from * transform;
+            to.z = model.get_position().z;
+            to = to * transform;
+
             match cur_instrument {
                 Instrument::Move3D => {
-                    let move_delta = g3d::Vec3::new(-delta_x * 5.0, -delta_y * 5.0, 0.0);
+                    let move_delta = to - from;
                     model.translate(move_delta);
                 }
                 Instrument::Rotate3D => {
-                    let z_model = model.get_position().z;
-                    let inv_projection = match proj_type {
-                        g3d::classes3d::scene_renderer::ProjectionType::Parallel => {
-                            g3d::Transform3D::parallel_symmetric(
-                                canvas_size[0] as f32,
-                                canvas_size[1] as f32,
-                                camera.get_near_plane(),
-                                camera.get_far_plane(),
-                            )
-                            .inverse()
-                            .unwrap()
-                        }
-                        g3d::classes3d::scene_renderer::ProjectionType::Perspective => {
-                            g3d::Transform3D::perspective(
-                                camera.get_fov(),
-                                camera.get_aspect_ratio(),
-                                camera.get_near_plane(),
-                                camera.get_far_plane(),
-                            )
-                            .inverse()
-                            .unwrap()
-                        }
-                    };
-                    let to_global =
-                        inv_projection * camera.get_local_frame().local_to_global_matrix();
-                    let from = g3d::HVec3::new(start.x, height - start.y, z_model)
-                        .apply_transform(&to_global);
-                    let to =
-                        g3d::HVec3::new(end.x, height - end.y, z_model).apply_transform(&to_global);
-                    model.rotate(from.into(), to.into());
+                    model.rotate(from, to);
                 }
                 Instrument::Scale3D => {
-                    let scale_factor = 1.0 + (delta_x + delta_y) * 2.0;
-                    model.uniform_scale(scale_factor);
+                    let scale_factor = to - from;
+                    model.scale_vec(scale_factor);
                 }
                 Instrument::RotateAroundX => {
-                    let rotation = g3d::Transform3D::rotation_x_rad(delta_x * 2.0);
-                    model.apply_transform(&rotation);
+                    from.x = 0.0;
+                    to.x = 0.0;
+                    model.rotate(from, to);
                 }
                 Instrument::RotateAroundY => {
-                    let rotation = g3d::Transform3D::rotation_y_rad(delta_x * 2.0);
-                    model.apply_transform(&rotation);
+                    from.y = 0.0;
+                    to.y = 0.0;
+                    model.rotate(from, to);
                 }
                 Instrument::RotateAroundZ => {
-                    let rotation = g3d::Transform3D::rotation_z_rad(delta_x * 2.0);
-                    model.apply_transform(&rotation);
+                    from.z = 0.0;
+                    to.z = 0.0;
+                    model.rotate(from, to);
                 }
                 Instrument::RotateAroundCustomLine => {
                     // Вращение вокруг произвольной оси обрабатывается отдельно
@@ -205,34 +185,26 @@ impl AthenianApp {
     }
 
     fn handle_camera_input(&mut self, ctx: &egui::Context) {
+        let distance = self.camera_controls.move_speed;
+
         if ctx.input(|i| i.key_pressed(egui::Key::W)) {
-            self.scene
-                .camera
-                .move_forward(self.camera_controls.move_speed);
+            self.scene.camera.move_forward(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::S)) {
-            self.scene
-                .camera
-                .move_backward(self.camera_controls.move_speed);
+            self.scene.camera.move_backward(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::A)) {
-            // камера инвертирована
-            self.scene
-                .camera
-                .move_right(self.camera_controls.move_speed);
+            self.scene.camera.move_right(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::D)) {
-            // камера инвертирована
-            self.scene.camera.move_left(self.camera_controls.move_speed);
+            self.scene.camera.move_left(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Q)) {
-            self.scene.camera.move_up(self.camera_controls.move_speed);
+            self.scene.camera.move_up(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::E)) {
-            self.scene.camera.move_down(self.camera_controls.move_speed);
+            self.scene.camera.move_down(distance);
         }
-
-        ctx.request_repaint();
     }
 }
 
@@ -313,17 +285,6 @@ impl AthenianApp {
         }
     }
 
-    pub fn apply_reflection(&mut self, plane_type: ReflectionPlane) {
-        if let Some(model) = self.get_selected_model_mut() {
-            let reflection = match plane_type {
-                ReflectionPlane::XY => g3d::Transform3D::reflection_xy(),
-                ReflectionPlane::XZ => g3d::Transform3D::reflection_xz(),
-                ReflectionPlane::YZ => g3d::Transform3D::reflection_yz(),
-            };
-            model.apply_transform(&reflection);
-        }
-    }
-
     pub fn apply_custom_rotation(&mut self) {
         if self.get_selected_model().is_some() {
             let axis_line = g3d::Line3::from_points(self.axis_point1, self.axis_point2);
@@ -332,7 +293,7 @@ impl AthenianApp {
                 self.angle_of_rotate.to_radians(),
             );
             if let Some(model) = self.get_selected_model_mut() {
-                model.apply_transform(&rotation);
+                model.mesh.get_local_frame_mut().rotate(rotation);
             }
         }
     }

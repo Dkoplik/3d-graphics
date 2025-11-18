@@ -438,13 +438,19 @@ impl AthenianApp {
         ui.label("Отражения:");
         ui.horizontal(|ui| {
             if ui.button("XY").clicked() {
-                self.apply_reflection(logic::ReflectionPlane::XY);
+                if let Some(model) = self.get_selected_model_mut() {
+                    model.reflect_local_xy();
+                }
             }
             if ui.button("XZ").clicked() {
-                self.apply_reflection(logic::ReflectionPlane::XZ);
+                if let Some(model) = self.get_selected_model_mut() {
+                    model.reflect_local_xz();
+                }
             }
             if ui.button("YZ").clicked() {
-                self.apply_reflection(logic::ReflectionPlane::YZ);
+                if let Some(model) = self.get_selected_model_mut() {
+                    model.reflect_local_yz();
+                }
             }
         });
 
@@ -553,6 +559,20 @@ impl AthenianApp {
 
     /// Показать настройки рендеринга.
     fn show_rendering_controls(&mut self, ui: &mut egui::Ui) {
+        // канвас (viewport)
+        let mut width = self.canvas.size()[0];
+        ui.add(egui::Slider::new(&mut width, 10..=2000).text("Ширина:"));
+
+        let mut height = self.canvas.size()[1];
+        ui.add(egui::Slider::new(&mut height, 10..=2000).text("Высота:"));
+
+        if [width, height] != self.canvas.size() {
+            self.canvas = g3d::Canvas::new(width, height);
+        }
+
+        ui.separator();
+
+        // сам рендер
         ui.checkbox(&mut self.scene_renderer.render_wireframe, "Рендер каркаса");
         ui.checkbox(&mut self.scene_renderer.render_normals, "Рендер нормалей");
         ui.checkbox(&mut self.scene_renderer.render_solid, "Рендер полигонов");
@@ -602,7 +622,7 @@ impl AthenianApp {
                 ui.selectable_value(
                     &mut self.scene_renderer.projection_type,
                     g3d::classes3d::scene_renderer::ProjectionType::Parallel,
-                    g3d::classes3d::scene_renderer::ProjectionType::Perspective.to_string(),
+                    g3d::classes3d::scene_renderer::ProjectionType::Parallel.to_string(),
                 );
             });
     }

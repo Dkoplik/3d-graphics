@@ -332,10 +332,16 @@ impl Camera3 {
     pub fn rotate(&mut self, from: Vec3, to: Vec3) {
         // привести к локальным координатам модели
         let to_local = self.local_frame.global_to_local_matrix();
-        let from = Vec3::from(to_local.apply_to_hvec(from.into())).normalize();
-        let to = Vec3::from(to_local.apply_to_hvec(to.into())).normalize();
-        self.local_frame
-            .rotate(Transform3D::rotation_aligning(from, to));
+        let from = (from * to_local).normalize();
+        let to = (to * to_local).normalize();
+
+        let transform = Transform3D::translation_vec(-Vec3::from(self.local_frame.origin))
+            .multiply(Transform3D::rotation_aligning(from, to))
+            .multiply(Transform3D::translation_vec(Vec3::from(
+                self.local_frame.origin,
+            )));
+
+        self.local_frame.rotate(transform);
     }
 
     // --------------------------------------------------

@@ -269,6 +269,10 @@ impl Model3 {
             .rotate(Transform3D::rotation_around_axis(forward, angle));
     }
 
+    pub fn scale_vec(&mut self, vec: Vec3) {
+        self.mesh.get_local_frame_mut().scale_vec(vec);
+    }
+
     pub fn uniform_scale(&mut self, scale: f32) {
         self.mesh
             .get_local_frame_mut()
