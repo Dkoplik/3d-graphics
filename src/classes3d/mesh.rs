@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Point3, Transform3D, Vec3};
+use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
 
 impl Mesh {
     // --------------------------------------------------
@@ -643,13 +643,6 @@ impl Mesh {
         &mut self.local_frame
     }
 
-    /// Применить преобразование над Mesh'ем.
-    ///
-    /// По сути, является тупо синтаксическим сахаром для `self.get_local_frame_mut().apply_transform(transform)`.
-    pub fn apply_transform(&mut self, transform: &Transform3D) {
-        self.get_local_frame_mut().apply_transform(transform)
-    }
-
     /// Возвращает итератор вершин Mesh'а в **локальных** координатах.
     pub fn get_local_vertexes(&self) -> impl Iterator<Item = HVec3> {
         self.vertexes.iter().copied()
@@ -660,7 +653,7 @@ impl Mesh {
         self.vertexes
             .iter()
             .copied()
-            .map(|v| v.apply_transform(&self.local_frame.local_to_global_matrix()))
+            .map(|v| v.apply_transform(self.local_frame.local_to_global_matrix()))
     }
 
     /// Возвращает итератор на полигоны.
@@ -695,7 +688,7 @@ impl Mesh {
             .iter()
             .copied()
             .map(|n| HVec3::from(n)) // HVec3 для трансормации векторов нормалей
-            .map(|hvec| hvec.apply_transform(&self.local_frame.local_to_global_matrix())) // в глобальные
+            .map(|hvec| hvec.apply_transform(self.local_frame.local_to_global_matrix())) // в глобальные
             .map(|hvec| Vec3::from(hvec)) // обратно в обычный вектор
     }
 

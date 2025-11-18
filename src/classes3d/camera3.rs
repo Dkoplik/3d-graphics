@@ -169,11 +169,6 @@ impl Camera3 {
         &mut self.local_frame
     }
 
-    /// Применить преобразование к камере.
-    pub fn apply_transform(&mut self, transform: &Transform3D) {
-        self.local_frame.apply_transform(transform);
-    }
-
     // --------------------------------------------------
     // Доступ и изменение параметров камеры
     // --------------------------------------------------
@@ -301,28 +296,34 @@ impl Camera3 {
 
     /// Двигает в направлении камеры.
     pub fn move_forward(&mut self, distance: f32) {
-        self.local_frame.origin = self.local_frame.origin + self.forward() * distance;
+        let vec = self.forward() * distance;
+        self.local_frame.translate_vec(vec);
     }
 
     /// Двигает против направления камеры.
     pub fn move_backward(&mut self, distance: f32) {
-        self.local_frame.origin = self.local_frame.origin + self.backward() * distance;
+        let vec = self.backward() * distance;
+        self.local_frame.translate_vec(vec);
     }
 
     pub fn move_right(&mut self, distance: f32) {
-        self.local_frame.origin = self.local_frame.origin + self.right() * distance;
+        let vec = self.right() * distance;
+        self.local_frame.translate_vec(vec);
     }
 
     pub fn move_left(&mut self, distance: f32) {
-        self.local_frame.origin = self.local_frame.origin + self.left() * distance;
+        let vec = self.left() * distance;
+        self.local_frame.translate_vec(vec);
     }
 
     pub fn move_up(&mut self, distance: f32) {
-        self.local_frame.origin = self.local_frame.origin + self.up() * distance;
+        let vec = self.up() * distance;
+        self.local_frame.translate_vec(vec);
     }
 
     pub fn move_down(&mut self, distance: f32) {
-        self.local_frame.origin = self.local_frame.origin + self.down() * distance;
+        let vec = self.down() * distance;
+        self.local_frame.translate_vec(vec);
     }
 
     /// Повернуть камеру из направления `from` в направление `to` в **локальных** координатах.
@@ -333,7 +334,8 @@ impl Camera3 {
         let to_local = self.local_frame.global_to_local_matrix();
         let from = Vec3::from(to_local.apply_to_hvec(from.into())).normalize();
         let to = Vec3::from(to_local.apply_to_hvec(to.into())).normalize();
-        self.apply_transform(&Transform3D::rotation_aligning(from, to));
+        self.local_frame
+            .rotate(Transform3D::rotation_aligning(from, to));
     }
 
     // --------------------------------------------------

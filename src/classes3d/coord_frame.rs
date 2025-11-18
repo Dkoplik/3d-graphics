@@ -3,7 +3,7 @@ use crate::{CoordFrame, Point3, Transform3D, Vec3};
 impl CoordFrame {
     /// Создать новую координатную систему по 3-м базисам и точке, из которой эти базисы выходят.
     /// Базисы должны быть **ортонормированными**.
-    pub fn new(mut forward: Vec3, mut right: Vec3, up: Vec3, origin: Point3) -> Self {
+    pub fn new(forward: Vec3, right: Vec3, up: Vec3, origin: Point3) -> Self {
         debug_assert!(
             !forward.approx_equal(Vec3::zero(), 1e-7),
             "вектор forward не может быть нулевым"
@@ -17,8 +17,8 @@ impl CoordFrame {
             "вектор up не может быть нулевым"
         );
 
-        forward = forward.normalize();
-        right = right.normalize();
+        let forward = forward.normalize();
+        let right = right.normalize();
 
         // убедиться в ортогональности базисов (возможно накопление ошибок)
         let up = right.cross_left(forward).normalize();
@@ -29,6 +29,7 @@ impl CoordFrame {
             right,
             up,
             origin,
+            scale: Vec3::new(1.0, 1.0, 1.0),
         }
     }
 
@@ -96,7 +97,7 @@ impl CoordFrame {
     ///
     /// Эта матрица преобразует вектор из локальной системы координат в глобальную.
     pub fn local_to_global_matrix(&self) -> Transform3D {
-        Transform3D {
+        let rotation = Transform3D {
             m: [
                 self.right().x,
                 self.right().y,
@@ -110,19 +111,23 @@ impl CoordFrame {
                 self.forward().y,
                 self.forward().z,
                 0.0,
-                self.position().x,
-                self.position().y,
-                self.position().z,
+                0.0,
+                0.0,
+                0.0,
                 1.0,
             ],
-        }
+        };
+        let scale = Transform3D::scale(self.scale.x, self.scale.y, self.scale.z);
+        let translate = Transform3D::translation_vec(self.origin.into());
+        // масштабирование -> поворот -> перемещение
+        scale.multiply(rotation).multiply(translate)
     }
 
     /// Получить матрицу преобразования из глобальных координат в текущие локальные.
     ///
     /// Эта матрица преобразует вектор из глобальной системы координат в локальную.
     pub fn global_to_local_matrix(&self) -> Transform3D {
-        Transform3D {
+        let inv_rotation = Transform3D {
             m: [
                 self.right().x,
                 self.up().x,
@@ -136,12 +141,17 @@ impl CoordFrame {
                 self.up().z,
                 self.forward().z,
                 0.0,
-                -self.right().dot(self.position().into()),
-                -self.up().dot(self.position().into()),
-                -self.forward().dot(self.position().into()),
+                0.0,
+                0.0,
+                0.0,
                 1.0,
             ],
-        }
+        };
+        let inv_scale =
+            Transform3D::scale(1.0 / self.scale.x, 1.0 / self.scale.y, 1.0 / self.scale.z);
+        let inv_translate = Transform3D::translation_vec(-Vec3::from(self.origin));
+        // переместить в точку отчёта -> повернуть к локальной -> масштабировать к локальной
+        inv_translate.multiply(inv_rotation).multiply(inv_scale)
     }
 
     /// Получить матрицу преобразования из текущих локальных координат в другие локальные координаты.
@@ -157,24 +167,41 @@ impl CoordFrame {
             .multiply(self.global_to_local_matrix())
     }
 
-    /// Преобразовать локальную систему координат.
-    pub fn apply_transform(&mut self, transform: &Transform3D) {
-        let new_origin = Point3::from(Vec3::from(
-            transform.apply_to_hvec(Vec3::from(self.origin).into()),
-        ));
-        let translation = new_origin - self.origin;
-        self.origin = new_origin;
+    /// Сместить координатную систему на `vec`.
+    pub fn translate_vec(&mut self, vec: Vec3) {
+        self.origin = self.origin + vec;
+    }
 
-        let vec_transform = Transform3D::translation_vec(-translation).multiply(*transform);
-        self.forward = Vec3::from(vec_transform.apply_to_hvec(self.forward.into()));
-        self.up = Vec3::from(vec_transform.apply_to_hvec(self.up.into()));
-        self.right = Vec3::from(vec_transform.apply_to_hvec(self.right.into()));
+    /// Масштабирует координатную систему в соответсвии с `vec`.
+    ///
+    /// Каждая координата `vec` является коэфициентом масштабирования каждой из осей.
+    pub fn scale_vec(&mut self, vec: Vec3) {
+        self.scale = Vec3::new(
+            self.scale.x * vec.x,
+            self.scale.y * vec.y,
+            self.scale.z * vec.z,
+        );
+    }
+
+    /// Повернуть локальную систему координат через `transform`.
+    ///
+    /// `transform` должен содержать только вращение.
+    pub fn rotate(&mut self, transform: Transform3D) {
+        self.forward = self.forward * transform;
+        self.up = self.up * transform;
+        self.right = self.right * transform;
 
         // избавляемся от ошибок для сохранения ортонормированности базиса
         self.up = self.right.cross_left(self.forward).normalize();
         self.right = self.forward.cross_left(self.up).normalize();
         self.forward = self.forward.normalize();
 
+        #[cfg(debug_assertions)]
+        self.assert_orthonormal();
+    }
+
+    /// Вспомогательный метод для проверки ортонормированности координатной системы.
+    fn assert_orthonormal(&self) {
         debug_assert!(
             (self.forward.length() - 1.0).abs() < 2.0 * f32::EPSILON,
             "Базис self.forward длиной {} должен быть нормирован",

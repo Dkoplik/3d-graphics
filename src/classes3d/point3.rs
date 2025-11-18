@@ -1,8 +1,8 @@
 //! Реализация структуры `Point3`.
 
-use std::ops::{Add, Sub};
+use std::ops::{Add, Mul, MulAssign, Sub};
 
-use crate::{HVec3, Point3, Vec3};
+use crate::{HVec3, Point3, Transform3D, Vec3};
 
 impl Point3 {
     /// Создать новую точку по 3-м координатам.
@@ -24,6 +24,27 @@ impl Point3 {
         (self.x - other.x).abs() < tolerance
             && (self.y - other.y).abs() < tolerance
             && (self.z - other.z).abs() < tolerance
+    }
+
+    /// Применить преобразование к точке `Point3`. Эта операция **создаёт новую** точку.
+    pub fn apply_transform(self, transform: Transform3D) -> Self {
+        transform.apply_to_hvec(self.into()).into()
+    }
+}
+
+impl Mul<Transform3D> for Point3 {
+    type Output = Point3;
+
+    /// Применить преобразование `Transform3D` к точке `Point3`.
+    fn mul(self, rhs: Transform3D) -> Self::Output {
+        self.apply_transform(rhs)
+    }
+}
+
+impl MulAssign<Transform3D> for Point3 {
+    /// Применить преобразование `Transform3D` к точке `Point3`.
+    fn mul_assign(&mut self, rhs: Transform3D) {
+        *self = *self * rhs;
     }
 }
 

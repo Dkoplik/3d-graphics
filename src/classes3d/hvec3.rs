@@ -133,7 +133,7 @@ impl HVec3 {
     /// `HVec3` не содержит в себе готовых методов по типу поворота по той причине, что одна и та же операция
     /// преобразования может быть применена сразу к большому количеству векторов, поэтому лучше переиспользовать
     /// одну и ту же матрицу.
-    pub fn apply_transform(self, transform: &Transform3D) -> Self {
+    pub fn apply_transform(self, transform: Transform3D) -> Self {
         transform.apply_to_hvec(self)
     }
 }
@@ -206,7 +206,7 @@ mod tests {
         let vec = HVec3::new(1.0, 2.0, 3.0);
 
         let transform = Transform3D::identity();
-        let vec_transformed = vec.apply_transform(&transform);
+        let vec_transformed = vec.apply_transform(transform);
 
         assert_hvecs(vec_transformed, vec, TOLERANCE);
     }
@@ -216,7 +216,7 @@ mod tests {
         let mut vec = HVec3::new(1.0, 2.0, 3.0);
 
         let transform = Transform3D::translation_uniform(1.0);
-        let mut vec_transformed = vec.apply_transform(&transform);
+        let mut vec_transformed = vec.apply_transform(transform);
 
         let expected = HVec3::new(2.0, 3.0, 4.0);
         assert_hvecs(vec_transformed, expected, TOLERANCE);

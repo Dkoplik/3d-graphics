@@ -206,32 +206,30 @@ impl Model3 {
     // Синтаксический сахар для преобразований
     // --------------------------------------------------
 
-    /// Применить трансформацию к объекту.
-    ///
-    /// Так как за положение в пространстве отвечает Mesh, по факту, этот метод просто
-    /// передаёт трансформацию в Mesh.
-    pub fn apply_transform(&mut self, transform: &Transform3D) {
-        self.mesh.get_local_frame_mut().apply_transform(transform);
-    }
-
     /// Сдвинуть Mesh на вектор `delta`.
     pub fn translate(&mut self, delta: Vec3) {
-        self.apply_transform(&Transform3D::translation_vec(delta));
+        self.mesh.get_local_frame_mut().translate_vec(delta);
     }
 
     /// Сдвинуть Mesh по оси X.
     pub fn move_x(&mut self, dx: f32) {
-        self.apply_transform(&Transform3D::translation(dx, 0.0, 0.0));
+        self.mesh
+            .get_local_frame_mut()
+            .translate_vec(Vec3::new(dx, 0.0, 0.0));
     }
 
     /// Сдвинуть Mesh по оси Y.
     pub fn move_y(&mut self, dy: f32) {
-        self.apply_transform(&Transform3D::translation(0.0, dy, 0.0));
+        self.mesh
+            .get_local_frame_mut()
+            .translate_vec(Vec3::new(0.0, dy, 0.0));
     }
 
     /// Сдвинуть Mesh по оси Z.
     pub fn move_z(&mut self, dz: f32) {
-        self.apply_transform(&Transform3D::translation(0.0, 0.0, dz));
+        self.mesh
+            .get_local_frame_mut()
+            .translate_vec(Vec3::new(0.0, 0.0, dz));
     }
 
     /// Повернуть модель из направления `from` в направление `to` в **локальных** координатах.
@@ -242,62 +240,93 @@ impl Model3 {
         let to_local = self.mesh.get_local_frame().global_to_local_matrix();
         let from = Vec3::from(to_local.apply_to_hvec(from.into())).normalize();
         let to = Vec3::from(to_local.apply_to_hvec(to.into())).normalize();
-        self.apply_transform(&Transform3D::rotation_aligning(from, to));
+        self.mesh
+            .get_local_frame_mut()
+            .rotate(Transform3D::rotation_aligning(from, to));
     }
 
     /// Повернуть модель вокруг **локальной** оси X.
     pub fn rotate_local_x(&mut self, angle: f32) {
-        self.apply_transform(&Transform3D::rotation_around_axis(
-            self.mesh.local_frame.right(),
-            angle,
-        ));
+        let right = self.mesh.local_frame.right();
+        self.mesh
+            .get_local_frame_mut()
+            .rotate(Transform3D::rotation_around_axis(right, angle));
     }
 
     /// Повернуть модель вокруг **локальной** оси Y.
     pub fn rotate_local_y(&mut self, angle: f32) {
-        self.apply_transform(&Transform3D::rotation_around_axis(
-            self.mesh.local_frame.up(),
-            angle,
-        ));
+        let up = self.mesh.local_frame.up();
+        self.mesh
+            .get_local_frame_mut()
+            .rotate(Transform3D::rotation_around_axis(up, angle));
     }
 
     /// Повернуть модель вокруг **локальной** оси Z.
     pub fn rotate_local_z(&mut self, angle: f32) {
-        self.apply_transform(&Transform3D::rotation_around_axis(
-            self.mesh.local_frame.forward(),
-            angle,
-        ));
+        let forward = self.mesh.local_frame.forward();
+        self.mesh
+            .get_local_frame_mut()
+            .rotate(Transform3D::rotation_around_axis(forward, angle));
     }
 
     pub fn uniform_scale(&mut self, scale: f32) {
-        self.apply_transform(&Transform3D::scale_uniform(scale));
+        self.mesh
+            .get_local_frame_mut()
+            .scale_vec(Vec3::new(scale, scale, scale));
     }
 
     /// Отразить модель в плоскости XY относительно **локальных координат**.
     pub fn reflect_local_xy(&mut self) {
-        let to_zero = Transform3D::translation_vec(-Vec3::from(self.mesh.local_frame.position()));
-        let reflect = Transform3D::reflection_xy();
-        let to_origin = Transform3D::translation_vec(Vec3::from(self.mesh.local_frame.position()));
-        let transform = to_zero * reflect * to_origin;
-        self.apply_transform(&transform);
+        let frame = self.mesh.get_local_frame_mut();
+        // отразить по xy это то же, что и поменять направление z
+        let forward = frame.backward();
+        let up = frame.up();
+        let right = frame.right();
+        let origin = frame.position();
+        let scale = frame.scale;
+        *frame = CoordFrame {
+            forward,
+            up,
+            right,
+            origin,
+            scale,
+        }
     }
 
     /// Отразить модель в плоскости XZ относительно **локальных координат**.
     pub fn reflect_local_xz(&mut self) {
-        let to_zero = Transform3D::translation_vec(-Vec3::from(self.mesh.local_frame.position()));
-        let reflect = Transform3D::reflection_xz();
-        let to_origin = Transform3D::translation_vec(Vec3::from(self.mesh.local_frame.position()));
-        let transform = to_zero * reflect * to_origin;
-        self.apply_transform(&transform);
+        let frame = self.mesh.get_local_frame_mut();
+        let forward = frame.forward();
+        // отразить по xz это то же, что и поменять направление y
+        let up = frame.down();
+        let right = frame.right();
+        let origin = frame.position();
+        let scale = frame.scale;
+        *frame = CoordFrame {
+            forward,
+            up,
+            right,
+            origin,
+            scale,
+        }
     }
 
     /// Отразить модель в плоскости YZ относительно **локальных координат**.
     pub fn reflect_local_yz(&mut self) {
-        let to_zero = Transform3D::translation_vec(-Vec3::from(self.mesh.local_frame.position()));
-        let reflect = Transform3D::reflection_yz();
-        let to_origin = Transform3D::translation_vec(Vec3::from(self.mesh.local_frame.position()));
-        let transform = to_zero * reflect * to_origin;
-        self.apply_transform(&transform);
+        let frame = self.mesh.get_local_frame_mut();
+        let forward = frame.forward();
+        let up = frame.up();
+        // отразить по yz это то же, что и поменять направление x
+        let right = frame.left();
+        let origin = frame.position();
+        let scale = frame.scale;
+        *frame = CoordFrame {
+            forward,
+            up,
+            right,
+            origin,
+            scale,
+        }
     }
 
     /// Текущая позиция модели

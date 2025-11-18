@@ -2,7 +2,7 @@
 
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
-use crate::{HVec3, Point3, Vec3};
+use crate::{HVec3, Point3, Transform3D, Vec3};
 
 impl Vec3 {
     // ========================================
@@ -175,6 +175,27 @@ impl Vec3 {
             && (self.y - other.y).abs() < tolerance
             && (self.z - other.z).abs() < tolerance
     }
+
+    /// Применить преобразование к текущемы однородному `Vec3`. Эта операция **создаёт новый** вектор.
+    pub fn apply_transform(self, transform: Transform3D) -> Self {
+        transform.apply_to_hvec(self.into()).into()
+    }
+}
+
+impl Mul<Transform3D> for Vec3 {
+    type Output = Vec3;
+
+    /// Применить преобразование `Transform3D` к однородному `Vec3`.
+    fn mul(self, rhs: Transform3D) -> Self::Output {
+        self.apply_transform(rhs)
+    }
+}
+
+impl MulAssign<Transform3D> for Vec3 {
+    /// Применить преобразование `Transform3D` к вектору `Vec3`.
+    fn mul_assign(&mut self, rhs: Transform3D) {
+        *self = *self * rhs;
+    }
 }
 
 impl Neg for Vec3 {
@@ -278,10 +299,11 @@ impl From<HVec3> for Vec3 {
     /// 4D вектор `(x, y, z, w)` становится 3D вектором `(x/w, y/w, z/w)`.
     fn from(value: HVec3) -> Self {
         if value.w == 0.0 {
+            // если w = 0, то оставляет вектор как есть
             Self {
-                x: f32::INFINITY,
-                y: f32::INFINITY,
-                z: f32::INFINITY,
+                x: value.x,
+                y: value.y,
+                z: value.z,
             }
         } else {
             Self {
