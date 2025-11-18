@@ -1,4 +1,4 @@
-use crate::app::{AthenianApp, logic, ui};
+use crate::app::{AthenianApp, logic};
 
 // --------------------------------------------------
 // Построение UI приложения

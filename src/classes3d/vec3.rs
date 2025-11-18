@@ -277,15 +277,18 @@ impl From<HVec3> for Vec3 {
     ///
     /// 4D вектор `(x, y, z, w)` становится 3D вектором `(x/w, y/w, z/w)`.
     fn from(value: HVec3) -> Self {
-        debug_assert_ne!(
-            value.w, 0.0,
-            "компонента однородности равна 0, Vec3 будет состоять из NaN"
-        );
-
-        Self {
-            x: value.x / value.w,
-            y: value.y / value.w,
-            z: value.z / value.w,
+        if value.w == 0.0 {
+            Self {
+                x: f32::INFINITY,
+                y: f32::INFINITY,
+                z: f32::INFINITY,
+            }
+        } else {
+            Self {
+                x: value.x / value.w,
+                y: value.y / value.w,
+                z: value.z / value.w,
+            }
         }
     }
 }

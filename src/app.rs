@@ -16,6 +16,7 @@ pub struct AthenianApp {
 
     /// Начальная позиция перетаскивания
     drag_prev_pos: Option<egui::Pos2>,
+    right_drag_prev_pos: Option<egui::Pos2>,
 
     /// Холст
     canvas: g3d::Canvas,
@@ -81,6 +82,7 @@ impl Default for AthenianApp {
 
             // Начальная позиция перетаскивания
             drag_prev_pos: Default::default(),
+            right_drag_prev_pos: Default::default(),
 
             // Холст
             canvas: g3d::Canvas::new(800, 600),

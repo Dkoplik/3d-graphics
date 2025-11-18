@@ -1,10 +1,10 @@
 use std::fmt::Display;
 
 use crate::{
-    Camera3, Canvas, HVec3, LightSource, Line3, Material, Model3, Point3, Scene, SceneRenderer,
+    Camera3, Canvas, HVec3, LightSource, Material, Model3, Point3, Scene, SceneRenderer,
     Transform3D, Vec3, classes3d::mesh::Polygon3,
 };
-use egui::{Color32, Pos2, epaint::color};
+use egui::{Color32, Pos2};
 
 /// Тип проекции на камеру.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
@@ -108,7 +108,7 @@ impl SceneRenderer {
 
             // Полигоны к отрисовке
             let polygons = if self.backface_culling {
-                self::model_backface_culling(scene.camera, model)
+                self.model_backface_culling(scene.camera, model, global_to_screen_transform, canvas)
             } else {
                 model.mesh.get_polygons().cloned().collect()
             };
@@ -801,6 +801,64 @@ impl SceneRenderer {
             canvas,
         );
     }
+
+    /// Отсечение нелицевых граней модели
+    /// `model` - сама модель.
+    ///
+    /// Возвращает вектор полигонов только с лицевыми гранями.
+    fn model_backface_culling(
+        &self,
+        camera: Camera3,
+        model: &Model3,
+        global_to_screen_transform: Transform3D,
+        canvas: &mut Canvas,
+    ) -> Vec<Polygon3> {
+        let camera_direction = camera.get_direction();
+        let global_normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
+        let normals_positions: Vec<HVec3> = model.mesh.get_global_vertexes().collect();
+        let mut visible_polygons = Vec::new();
+        for polygon in model.mesh.get_polygons() {
+            if !polygon.is_valid() {
+                continue;
+            }
+
+            let mut polygon_normal = Vec3::zero();
+
+            for &vertex_index in polygon.get_vertexes() {
+                polygon_normal += global_normals[vertex_index];
+            }
+
+            // Если нормаль есть, производим отсечение
+            if polygon_normal.length() > 0.0 {
+                polygon_normal /= polygon.get_vertexes().len() as f32;
+                polygon_normal = polygon_normal.normalize();
+
+                // Если нормаль направлена в сторону камеры, то оставляем полигон
+                let dot_product = polygon_normal.dot(camera_direction);
+                if dot_product < 0.0 {
+                    visible_polygons.push(polygon.clone());
+
+                    // показываем нормаль, если надо
+                    if self.render_normals {
+                        let mut normal_pos = Vec3::zero();
+                        for &vertex_index in polygon.get_vertexes() {
+                            normal_pos += Vec3::from(normals_positions[vertex_index]);
+                        }
+                        normal_pos /= polygon.get_vertexes().len() as f32;
+                        self.render_line(
+                            global_to_screen_transform,
+                            normal_pos.into(),
+                            (normal_pos + polygon_normal).into(),
+                            Color32::ORANGE,
+                            canvas,
+                        );
+                    }
+                }
+            }
+        }
+
+        visible_polygons
+    }
 }
 
 // --------------------------------------------------
@@ -892,42 +950,6 @@ fn draw_custom_axis_line(
 
     canvas.circle_filled(screen_point1, 4.0, Color32::GREEN);
     canvas.circle_filled(screen_point2, 4.0, Color32::BLUE);
-}
-
-/// Отсечение нелицевых граней модели
-/// `model` - сама модель.
-///
-/// Возвращает вектор полигонов только с лицевыми гранями.
-fn model_backface_culling(camera: Camera3, model: &Model3) -> Vec<Polygon3> {
-    let camera_direction = camera.get_direction();
-    let global_normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
-    let mut visible_polygons = Vec::new();
-    for polygon in model.mesh.get_polygons() {
-        if !polygon.is_valid() {
-            continue;
-        }
-
-        let mut polygon_normal = Vec3::zero();
-        let mut normals_count = 0;
-
-        for &vertex_index in polygon.get_vertexes() {
-            polygon_normal += global_normals[vertex_index];
-            normals_count += 1;
-        }
-
-        // Если нормаль есть, производим отсечение
-        if normals_count > 0 && polygon_normal.length_squared() > f32::EPSILON {
-            polygon_normal = polygon_normal.normalize();
-
-            // Если нормаль направлена в сторону камеры, то оставляем полигон
-            let dot_product = polygon_normal.dot(camera_direction);
-            if dot_product < 0.0 {
-                visible_polygons.push(polygon.clone());
-            }
-        }
-    }
-
-    visible_polygons
 }
 
 /// Находит барицентрические координаты по 3-м точкам.

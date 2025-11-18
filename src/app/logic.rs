@@ -70,13 +70,14 @@ impl AthenianApp {
     pub fn handle_input(&mut self, response: &Response, ctx: &egui::Context) {
         self.handle_click(response);
         self.handle_drag(response);
+        self.handle_right_drag(response);
         self.handle_camera_input(ctx)
     }
 
     /// Обработать клики по холсту.
     fn handle_click(&mut self, response: &Response) {
         if response.clicked_by(egui::PointerButton::Primary) {
-            if let Some(pos) = response.hover_pos() {
+            if let Some(_pos) = response.hover_pos() {
                 match &self.instrument {
                     _ => {
                         // Если есть фигура на сцене, автоматически выбираем её
@@ -109,23 +110,76 @@ impl AthenianApp {
         self.drag_prev_pos = response.hover_pos();
     }
 
+    /// Обработать перетаскивание по холсту.
+    fn handle_right_drag(&mut self, response: &Response) {
+        if response.drag_stopped_by(egui::PointerButton::Secondary) {
+            self.right_drag_prev_pos = None;
+            return;
+        }
+
+        if !response.dragged_by(egui::PointerButton::Secondary) {
+            return;
+        }
+
+        if let Some(drag_start) = self.right_drag_prev_pos
+            && let Some(drag_cur) = response.hover_pos()
+        {
+            let camera = &mut self.scene.camera;
+            let z = (camera.get_far_plane() + camera.get_near_plane()) / 2.0;
+            let from = Vec3::new(drag_start.x, drag_start.y, z);
+            let to = Vec3::new(drag_cur.x, drag_cur.y, z);
+            camera.rotate(from, to);
+        }
+
+        self.right_drag_prev_pos = response.hover_pos();
+    }
+
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
         let delta_x = (end.x - start.x) / self.display_canvas_width;
         let delta_y = (end.y - start.y) / self.display_canvas_height;
-
+        let height = self.display_canvas_height;
+        let canvas_size = self.canvas.size();
+        let camera = self.scene.camera;
+        let proj_type = self.scene_renderer.projection_type;
         let cur_instrument = self.instrument;
         if let Some(model) = self.get_selected_model_mut() {
             match cur_instrument {
                 Instrument::Move3D => {
-                    let move_delta = g3d::Vec3::new(delta_x * 5.0, -delta_y * 5.0, 0.0);
+                    let move_delta = g3d::Vec3::new(-delta_x * 5.0, -delta_y * 5.0, 0.0);
                     model.translate(move_delta);
                 }
                 Instrument::Rotate3D => {
-                    let rotation_x = g3d::Transform3D::rotation_y_rad(delta_x * 2.0);
-                    let rotation_y = g3d::Transform3D::rotation_x_rad(delta_y * 2.0);
-                    model.apply_transform(&rotation_x);
-                    model.apply_transform(&rotation_y);
+                    let z_model = model.get_position().z;
+                    let inv_projection = match proj_type {
+                        g3d::classes3d::scene_renderer::ProjectionType::Parallel => {
+                            g3d::Transform3D::parallel_symmetric(
+                                canvas_size[0] as f32,
+                                canvas_size[1] as f32,
+                                camera.get_near_plane(),
+                                camera.get_far_plane(),
+                            )
+                            .inverse()
+                            .unwrap()
+                        }
+                        g3d::classes3d::scene_renderer::ProjectionType::Perspective => {
+                            g3d::Transform3D::perspective(
+                                camera.get_fov(),
+                                camera.get_aspect_ratio(),
+                                camera.get_near_plane(),
+                                camera.get_far_plane(),
+                            )
+                            .inverse()
+                            .unwrap()
+                        }
+                    };
+                    let to_global =
+                        inv_projection * camera.get_local_frame().local_to_global_matrix();
+                    let from = g3d::HVec3::new(start.x, height - start.y, z_model)
+                        .apply_transform(&to_global);
+                    let to =
+                        g3d::HVec3::new(end.x, height - end.y, z_model).apply_transform(&to_global);
+                    model.rotate(from.into(), to.into());
                 }
                 Instrument::Scale3D => {
                     let scale_factor = 1.0 + (delta_x + delta_y) * 2.0;
@@ -162,12 +216,14 @@ impl AthenianApp {
                 .move_backward(self.camera_controls.move_speed);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::A)) {
-            self.scene.camera.move_left(self.camera_controls.move_speed);
-        }
-        if ctx.input(|i| i.key_pressed(egui::Key::D)) {
+            // камера инвертирована
             self.scene
                 .camera
                 .move_right(self.camera_controls.move_speed);
+        }
+        if ctx.input(|i| i.key_pressed(egui::Key::D)) {
+            // камера инвертирована
+            self.scene.camera.move_left(self.camera_controls.move_speed);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Q)) {
             self.scene.camera.move_up(self.camera_controls.move_speed);
