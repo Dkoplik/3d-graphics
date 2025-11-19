@@ -335,6 +335,22 @@ mod tests {
     }
 
     #[test]
+    fn test_local_is_translated_3() {
+        // Локальная система смещена относительно глоабальной
+        let frame = CoordFrame::from_2(Vec3::forward(), Vec3::up(), Point3::new(5.0, 0.0, 0.0));
+        let local_vec = HVec3::new(2.0, 0.0, 0.0);
+
+        // Глобальный вектор в локальный
+        let global_vec = frame.local_to_global_matrix().apply_to_hvec(local_vec);
+        let expected = HVec3::new(7.0, 0.0, 0.0);
+        assert_hvecs(global_vec, expected, TOLERANCE);
+
+        // Обратно в глобальный
+        let back_to_local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
+        assert_hvecs(back_to_local_vec, local_vec, TOLERANCE);
+    }
+
+    #[test]
     fn test_local_is_rotated_90_1() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::up(), Vec3::backward(), Point3::zero());

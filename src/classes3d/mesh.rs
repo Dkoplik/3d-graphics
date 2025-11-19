@@ -653,7 +653,7 @@ impl Mesh {
         self.vertexes
             .iter()
             .copied()
-            .map(|v| v.apply_transform(self.local_frame.local_to_global_matrix()))
+            .map(|v| v * self.local_frame.local_to_global_matrix())
     }
 
     /// Возвращает итератор на полигоны.
@@ -687,9 +687,7 @@ impl Mesh {
         self.normals
             .iter()
             .copied()
-            .map(|n| HVec3::from(n)) // HVec3 для трансормации векторов нормалей
-            .map(|hvec| hvec.apply_transform(self.local_frame.local_to_global_matrix())) // в глобальные
-            .map(|hvec| Vec3::from(hvec)) // обратно в обычный вектор
+            .map(|n| n * self.local_frame.local_to_global_matrix())
     }
 
     /// Получить текстурные координаты модели.
@@ -998,6 +996,67 @@ mod mesh_tests {
 
         for i in 0..global_vertexes.len() {
             assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_translated_normals_1() {
+        let mut cube = generate_cube();
+        // сдвиг по y
+        cube.get_local_frame_mut().origin.y += 5.0;
+
+        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
+        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
+        for i in 0..global_normals.len() {
+            let expected_global_normal = local_normals[i] + Vec3::new(0.0, 5.0, 0.0);
+            assert_vecs(global_normals[i], expected_global_normal, TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_translated_normals_2() {
+        let mut cube = generate_cube();
+        // сдвиг по y
+        cube.get_local_frame_mut().origin.x += 5.0;
+
+        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
+        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
+        for i in 0..global_normals.len() {
+            let expected_global_normal = local_normals[i] + Vec3::new(5.0, 0.0, 0.0);
+            assert_vecs(global_normals[i], expected_global_normal, TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_translated_normals_3() {
+        let mut cube = Mesh::hexahedron();
+        // сдвиг по y
+        cube.get_local_frame_mut().origin.x += 5.0;
+
+        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
+        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
+        for i in 0..global_normals.len() {
+            let expected_global_normal = local_normals[i] + Vec3::new(5.0, 0.0, 0.0);
+            assert_vecs(global_normals[i], expected_global_normal, TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_translated() {
+        let mut cube = Mesh::hexahedron();
+        // сдвиг по y
+        cube.get_local_frame_mut()
+            .translate_vec(Vec3::new(2.0, 4.0, 6.0));
+
+        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
+        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
+        let global_vertexes: Vec<Vec3> =
+            cube.get_global_vertexes().map(|v| Vec3::from(v)).collect();
+        let local_vertexes: Vec<Vec3> = cube.get_local_vertexes().map(|v| Vec3::from(v)).collect();
+        for i in 0..global_normals.len() {
+            let delta_normal = global_normals[i] - local_normals[i];
+            let delta_vertex = global_vertexes[i] - local_vertexes[i];
+            assert_vecs(delta_normal, delta_vertex, TOLERANCE);
         }
     }
 }

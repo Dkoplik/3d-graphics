@@ -60,7 +60,7 @@ impl Shader for NormalsShader {
         }
 
         // рисуем нормали полигонов
-        for polygon in model.mesh.get_polygons() {
+        for polygon in polygons {
             let mut polygon_normal = Vec3::zero();
             let mut polygon_pos = Vec3::zero();
             for &index in polygon.get_vertexes() {
