@@ -367,3 +367,114 @@ pub enum ObjSaveError {
     WriteError,
     InvalidData,
 }
+
+#[cfg(test)]
+mod model_tests {
+    use crate::HVec3;
+
+    use super::*;
+
+    const TOLERANCE: f32 = 1e-6;
+
+    fn assert_vecs(got: Vec3, expected: Vec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_points(got: Point3, expected: Point3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидалась точка {:?}, но получена {:?}, одна из координат которой отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_hvecs(got: HVec3, expected: HVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    #[test]
+    fn test_move_x() {
+        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut expected_pos = model.get_position();
+
+        model.move_x(5.0);
+        expected_pos.x += 5.0;
+        assert_points(model.get_position(), expected_pos, TOLERANCE);
+    }
+
+    #[test]
+    fn test_move_y() {
+        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut expected_pos = model.get_position();
+
+        model.move_y(5.0);
+        expected_pos.y += 5.0;
+        assert_points(model.get_position(), expected_pos, TOLERANCE);
+    }
+
+    #[test]
+    fn test_move_z() {
+        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut expected_pos = model.get_position();
+
+        model.move_z(5.0);
+        expected_pos.z += 5.0;
+        assert_points(model.get_position(), expected_pos, TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotate_1() {
+        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+
+        model.translate(Vec3::new(2.0, 2.0, 3.0));
+        model.rotate(Vec3::forward(), Vec3::up());
+
+        assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
+
+        assert_vecs(model.mesh.local_frame.forward(), Vec3::up(), TOLERANCE);
+        assert_vecs(model.mesh.local_frame.right(), Vec3::right(), TOLERANCE);
+        assert_vecs(model.mesh.local_frame.up(), Vec3::backward(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotate_2() {
+        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+
+        model.translate(Vec3::new(2.0, 2.0, 3.0));
+        model.rotate(Vec3::forward(), Vec3::right());
+
+        assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
+
+        assert_vecs(model.mesh.local_frame.forward(), Vec3::right(), TOLERANCE);
+        assert_vecs(model.mesh.local_frame.right(), Vec3::backward(), TOLERANCE);
+        assert_vecs(model.mesh.local_frame.up(), Vec3::up(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_rotate_x() {
+        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+
+        model.translate(Vec3::new(2.0, 2.0, 3.0));
+        model.rotate_local_x((90.0 as f32).to_radians());
+
+        assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
+
+        assert_vecs(model.mesh.local_frame.forward(), Vec3::up(), TOLERANCE);
+        assert_vecs(model.mesh.local_frame.right(), Vec3::right(), TOLERANCE);
+        assert_vecs(model.mesh.local_frame.up(), Vec3::backward(), TOLERANCE);
+    }
+}

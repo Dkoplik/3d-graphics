@@ -115,7 +115,7 @@ impl SceneRenderer {
 
         // Матрица преобразования из глобальных координат в экранные
         let global_to_screen_transform =
-            self::get_global_to_screen_transform(self.projection_type, scene, &canvas);
+            self::get_global_to_screen_transform(self.projection_type, &scene.camera, &canvas);
 
         // Отрисовка глобальной координатной системы.
         self.draw_coordinate_axes(canvas, global_to_screen_transform);
@@ -279,10 +279,9 @@ impl SceneRenderer {
 /// глобальные координаты -> координаты камеры (view tranform) -> проекция на камеру в NDC -> растяжение NDC на размер canvas.
 fn get_global_to_screen_transform(
     projection_type: ProjectionType,
-    scene: &Scene,
+    camera: &Camera3,
     canvas: &Canvas,
 ) -> Transform3D {
-    let camera = scene.camera;
     // Матрица проекции координат камеры в NDC
     let proj_matrix = match projection_type {
         ProjectionType::Parallel => {
@@ -344,4 +343,61 @@ fn draw_custom_axis_line(
 
     canvas.circle_filled(screen_point1, 4.0, Color32::GREEN);
     canvas.circle_filled(screen_point2, 4.0, Color32::BLUE);
+}
+
+#[cfg(test)]
+mod render_tests {
+    use crate::HVec3;
+
+    use super::*;
+
+    const TOLERANCE: f32 = 1e-6;
+
+    fn assert_vecs(got: Vec3, expected: Vec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_points(got: Point3, expected: Point3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидалась точка {:?}, но получена {:?}, одна из координат которой отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_hvecs(got: HVec3, expected: HVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    #[test]
+    fn test_global_to_screen_transform_1() {
+        let camera = Camera3::default();
+        let canvas = Canvas::new(900, 600);
+        let transform =
+            get_global_to_screen_transform(ProjectionType::Perspective, &camera, &canvas);
+
+        // точка по центру камеры
+        let camera_pos = camera.get_position();
+        let z_depth = (camera.get_near_plane() + camera.get_far_plane()) / 2.0;
+        let point = Point3::new(camera_pos.x, camera_pos.y, camera_pos.z + z_depth);
+
+        // точка должна быть где-то по центру экрана
+        let proj_point = point * transform;
+        assert!((proj_point.x - canvas.width as f32 / 2.0).abs() < TOLERANCE);
+        assert!((proj_point.y - canvas.height as f32 / 2.0).abs() < TOLERANCE);
+    }
 }

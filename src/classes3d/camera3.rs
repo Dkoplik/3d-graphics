@@ -344,10 +344,6 @@ impl Camera3 {
         self.local_frame.rotate(transform);
     }
 
-    // --------------------------------------------------
-    // Вспомогательные методы
-    // --------------------------------------------------
-
     /// Возвращает луч из камеры через точку на экране (в нормализованных координатах [-1, 1]).
     pub fn screen_point_to_ray(&self, screen_x: f32, screen_y: f32) -> Line3 {
         // Преобразуем нормализованные координаты экрана в направление луча
@@ -798,5 +794,77 @@ mod camera_tests {
     fn test_camera_invalid_near_plane() {
         let mut camera = Camera3::default();
         camera.set_near_plane(-1.0); // Should panic for negative near plane
+    }
+
+    // ========================================
+    // Движение камеры
+    // ========================================
+    #[test]
+    fn test_camera_movement() {
+        let mut camera = Camera3::default();
+        let original_pos = camera.get_position();
+        let mut expected_pos = original_pos;
+
+        // up
+        camera.move_up(2.0);
+        expected_pos.y += 2.0;
+        assert_points(camera.get_position(), expected_pos, TOLERANCE);
+
+        // down
+        camera.move_down(2.0);
+        expected_pos.y -= 2.0;
+        assert_points(camera.get_position(), expected_pos, TOLERANCE);
+
+        // right
+        camera.move_right(2.0);
+        expected_pos.x += 2.0;
+        assert_points(camera.get_position(), expected_pos, TOLERANCE);
+
+        // left
+        camera.move_left(2.0);
+        expected_pos.x -= 2.0;
+        assert_points(camera.get_position(), expected_pos, TOLERANCE);
+
+        // forward
+        camera.move_forward(2.0);
+        expected_pos.z += 2.0;
+        assert_points(camera.get_position(), expected_pos, TOLERANCE);
+
+        // backward
+        camera.move_backward(2.0);
+        expected_pos.z -= 2.0;
+        assert_points(camera.get_position(), expected_pos, TOLERANCE);
+    }
+
+    #[test]
+    fn test_camera_rotation_1() {
+        let mut camera = Camera3::default();
+        let original_pos = camera.get_position();
+
+        camera.rotate(Vec3::forward(), Vec3::right());
+
+        // позиция не должна была поменяться
+        assert_points(camera.get_position(), original_pos, TOLERANCE);
+
+        // поворот правильный?
+        assert_vecs(camera.forward(), Vec3::right(), TOLERANCE);
+        assert_vecs(camera.right(), Vec3::backward(), TOLERANCE);
+        assert_vecs(camera.up(), Vec3::up(), TOLERANCE);
+    }
+
+    #[test]
+    fn test_camera_rotation_2() {
+        let mut camera = Camera3::default();
+        let original_pos = camera.get_position();
+
+        camera.rotate(Vec3::forward(), Vec3::up());
+
+        // позиция не должна была поменяться
+        assert_points(camera.get_position(), original_pos, TOLERANCE);
+
+        // поворот правильный?
+        assert_vecs(camera.forward(), Vec3::up(), TOLERANCE);
+        assert_vecs(camera.right(), Vec3::right(), TOLERANCE);
+        assert_vecs(camera.up(), Vec3::backward(), TOLERANCE);
     }
 }

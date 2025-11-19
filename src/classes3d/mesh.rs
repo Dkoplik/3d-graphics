@@ -884,3 +884,123 @@ impl Polygon3 {
         }
     }
 }
+
+#[cfg(test)]
+mod mesh_tests {
+    use crate::HVec3;
+
+    use super::*;
+
+    const TOLERANCE: f32 = 1e-6;
+
+    fn assert_vecs(got: Vec3, expected: Vec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_hvecs(got: HVec3, expected: HVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn generate_cube() -> Mesh {
+        let vertexes = vec![
+            HVec3::new(0.0, 0.0, 0.0),
+            HVec3::new(1.0, 0.0, 0.0),
+            HVec3::new(0.0, 1.0, 0.0),
+            HVec3::new(1.0, 1.0, 0.0),
+            HVec3::new(0.0, 0.0, 1.0),
+            HVec3::new(1.0, 0.0, 1.0),
+            HVec3::new(0.0, 1.0, 1.0),
+            HVec3::new(1.0, 1.0, 1.0),
+        ];
+        let polygons = vec![
+            Polygon3::from_list(&vec![0, 1, 2, 3]),
+            Polygon3::from_list(&vec![0, 1, 4, 5]),
+            Polygon3::from_list(&vec![4, 5, 6, 7]),
+            Polygon3::from_list(&vec![6, 7, 2, 3]),
+            Polygon3::from_list(&vec![1, 3, 5, 7]),
+            Polygon3::from_list(&vec![0, 2, 4, 6]),
+        ];
+        Mesh::from_polygons(vertexes, polygons)
+    }
+
+    #[test]
+    fn test_global_to_global() {
+        let cube = generate_cube();
+
+        let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
+        let expected_vertexes = vec![
+            HVec3::new(0.0, 0.0, 0.0),
+            HVec3::new(1.0, 0.0, 0.0),
+            HVec3::new(0.0, 1.0, 0.0),
+            HVec3::new(1.0, 1.0, 0.0),
+            HVec3::new(0.0, 0.0, 1.0),
+            HVec3::new(1.0, 0.0, 1.0),
+            HVec3::new(0.0, 1.0, 1.0),
+            HVec3::new(1.0, 1.0, 1.0),
+        ];
+
+        for i in 0..global_vertexes.len() {
+            assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_local_translated_to_global() {
+        let mut cube = generate_cube();
+        cube.get_local_frame_mut().origin.y += 5.0;
+
+        let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
+        let expected_vertexes = vec![
+            HVec3::new(0.0, 5.0, 0.0),
+            HVec3::new(1.0, 5.0, 0.0),
+            HVec3::new(0.0, 6.0, 0.0),
+            HVec3::new(1.0, 6.0, 0.0),
+            HVec3::new(0.0, 5.0, 1.0),
+            HVec3::new(1.0, 5.0, 1.0),
+            HVec3::new(0.0, 6.0, 1.0),
+            HVec3::new(1.0, 6.0, 1.0),
+        ];
+
+        for i in 0..global_vertexes.len() {
+            assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn test_local_rotated_to_global() {
+        let mut cube = generate_cube();
+        cube.get_local_frame_mut()
+            .rotate(Transform3D::rotation_aligning(
+                Vec3::plus_z(),
+                Vec3::plus_y(),
+            ));
+
+        let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
+        let expected_vertexes = vec![
+            HVec3::new(0.0, 0.0, 0.0),
+            HVec3::new(1.0, 0.0, 0.0),
+            HVec3::new(0.0, 0.0, 1.0),
+            HVec3::new(1.0, 0.0, 1.0),
+            HVec3::new(0.0, -1.0, 0.0),
+            HVec3::new(1.0, -1.0, 0.0),
+            HVec3::new(0.0, -1.0, 1.0),
+            HVec3::new(1.0, -1.0, 1.0),
+        ];
+
+        for i in 0..global_vertexes.len() {
+            assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+        }
+    }
+}
