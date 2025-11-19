@@ -474,4 +474,29 @@ mod model_tests {
         assert_vecs(model.mesh.local_frame.right(), Vec3::right(), TOLERANCE);
         assert_vecs(model.mesh.local_frame.up(), Vec3::backward(), TOLERANCE);
     }
+
+    #[test]
+    fn test_translated() {
+        let mut cube = Model3::from_mesh(Mesh::hexahedron());
+        // сдвиг по y
+        cube.move_x(10.0);
+
+        let global_normals: Vec<Vec3> = cube.mesh.get_global_normals().collect();
+        let local_normals: Vec<Vec3> = cube.mesh.get_local_normals().collect();
+        let global_vertexes: Vec<Vec3> = cube
+            .mesh
+            .get_global_vertexes()
+            .map(|v| Vec3::from(v))
+            .collect();
+        let local_vertexes: Vec<Vec3> = cube
+            .mesh
+            .get_local_vertexes()
+            .map(|v| Vec3::from(v))
+            .collect();
+        for i in 0..global_normals.len() {
+            let delta_normal = global_normals[i] - local_normals[i];
+            let delta_vertex = global_vertexes[i] - local_vertexes[i];
+            assert_vecs(delta_normal, delta_vertex, TOLERANCE);
+        }
+    }
 }
