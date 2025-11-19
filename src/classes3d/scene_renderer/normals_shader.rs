@@ -1,6 +1,9 @@
 use crate::{
     Point3, Vec3,
-    classes3d::scene_renderer::{Shader, shader_utils},
+    classes3d::{
+        mesh::Polygon3,
+        scene_renderer::{Shader, shader_utils},
+    },
 };
 
 pub struct NormalsShader {
@@ -21,6 +24,7 @@ impl Shader for NormalsShader {
     fn shade_model(
         &self,
         model: &crate::Model3,
+        polygons: &Vec<Polygon3>,
         global_to_screen_transform: crate::Transform3D,
         _lights: &Vec<crate::LightSource>,
         canvas: &mut crate::Canvas,
@@ -33,9 +37,7 @@ impl Shader for NormalsShader {
             .collect();
 
         // индексы используемых нормалей
-        let mut indexes: Vec<usize> = model
-            .mesh
-            .polygons
+        let mut indexes: Vec<usize> = polygons
             .iter()
             .flat_map(|polygon| polygon.get_vertexes().clone())
             .collect();

@@ -1,4 +1,5 @@
 use crate::Model3;
+use crate::classes3d::mesh::Polygon3;
 use crate::classes3d::scene_renderer::shader_utils;
 use crate::{Canvas, LightSource, Transform3D, Vec3, classes3d::scene_renderer::Shader};
 
@@ -14,6 +15,7 @@ impl Shader for WireframeShader {
     fn shade_model(
         &self,
         model: &Model3,
+        polygons: &Vec<Polygon3>,
         global_to_screen_transform: Transform3D,
         _lights: &Vec<LightSource>,
         canvas: &mut Canvas,
@@ -30,7 +32,7 @@ impl Shader for WireframeShader {
             .collect();
 
         // Рисуем рёбра
-        for polygon in model.mesh.get_polygons() {
+        for polygon in polygons {
             // Вершины полигона
             let points: Vec<Vec3> = polygon
                 .get_vertexes()

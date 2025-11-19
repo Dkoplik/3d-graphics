@@ -17,6 +17,7 @@ pub trait Shader {
     fn shade_model(
         &self,
         model: &Model3,
+        polygons: &Vec<Polygon3>,
         global_to_screen_transform: Transform3D,
         lights: &Vec<LightSource>,
         canvas: &mut Canvas,
@@ -130,6 +131,8 @@ impl SceneRenderer {
             );
         }
 
+        draw_lights(&scene.lights, global_to_screen_transform, canvas);
+
         // количество отрисованных полигонов.
         let mut polygon_count: usize = 0;
 
@@ -151,6 +154,7 @@ impl SceneRenderer {
                         let shader = solid_shader::SolidShader::new(self.z_buffer_enabled);
                         shader.shade_model(
                             model,
+                            &polygons,
                             global_to_screen_transform,
                             &scene.lights,
                             canvas,
@@ -162,6 +166,7 @@ impl SceneRenderer {
                         );
                         shader.shade_model(
                             model,
+                            &polygons,
                             global_to_screen_transform,
                             &scene.lights,
                             canvas,
@@ -172,6 +177,7 @@ impl SceneRenderer {
                             phong_toon_shader::PhongToonShading::new(self.z_buffer_enabled, bands);
                         shader.shade_model(
                             model,
+                            &polygons,
                             global_to_screen_transform,
                             &scene.lights,
                             canvas,
@@ -183,15 +189,28 @@ impl SceneRenderer {
             // каркас модели
             if self.render_wireframe {
                 let shader = wireframe_shader::WireframeShader::new();
-                shader.shade_model(model, global_to_screen_transform, &scene.lights, canvas);
+                shader.shade_model(
+                    model,
+                    &polygons,
+                    global_to_screen_transform,
+                    &scene.lights,
+                    canvas,
+                );
             }
 
             // нормали модели
             if self.render_normals {
                 let shader = normals_shader::NormalsShader::new();
-                shader.shade_model(model, global_to_screen_transform, &scene.lights, canvas);
+                shader.shade_model(
+                    model,
+                    &polygons,
+                    global_to_screen_transform,
+                    &scene.lights,
+                    canvas,
+                );
             }
         }
+        canvas.invert_y();
         polygon_count
     }
 
@@ -238,8 +257,12 @@ impl SceneRenderer {
     ///
     /// Возвращает вектор полигонов только с лицевыми гранями.
     fn model_backface_culling(&self, camera: Camera3, model: &Model3) -> Vec<Polygon3> {
-        let camera_direction = camera.get_direction();
         let global_normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
+        let global_vertexes: Vec<Vec3> = model
+            .mesh
+            .get_global_vertexes()
+            .map(|v| Vec3::from(v))
+            .collect();
         let mut visible_polygons = Vec::new();
         for polygon in model.mesh.get_polygons() {
             if !polygon.is_valid() {
@@ -247,15 +270,25 @@ impl SceneRenderer {
             }
 
             let mut polygon_normal = Vec3::zero();
-
             for &vertex_index in polygon.get_vertexes() {
                 polygon_normal += global_normals[vertex_index];
             }
 
             // Если нормаль есть, производим отсечение
-            if polygon_normal.length() > 0.0 {
+            if polygon_normal.length_squared() > 0.0 {
                 polygon_normal /= polygon.get_vertexes().len() as f32;
-                polygon_normal = polygon_normal.normalize();
+
+                let camera_direction = match self.projection_type {
+                    ProjectionType::Parallel => camera.get_direction(),
+                    ProjectionType::Perspective => {
+                        let mut polygon_pos = Vec3::zero();
+                        for &vertex_index in polygon.get_vertexes() {
+                            polygon_pos += global_vertexes[vertex_index];
+                        }
+                        polygon_pos /= polygon.get_vertexes().len() as f32;
+                        Point3::from(polygon_pos) - camera.get_position()
+                    }
+                };
 
                 // Если нормаль направлена в сторону камеры, то оставляем полигон
                 let dot_product = polygon_normal.dot(camera_direction);
@@ -309,8 +342,8 @@ fn get_global_to_screen_transform(
         .get_local_frame()
         .global_to_local_matrix() // view transformation (локальные координаты камеры)
         .multiply(proj_matrix) // вот тут получается NDC с координатами [-1, +1]
-        .multiply(Transform3D::translation_uniform(1.0)) // теперь координаты [0, +2]
-        .multiply(Transform3D::scale(scale_x, -scale_y, 1.0)) // теперь экранные, причём y надо инвертировать, так как на экране она вниз
+        .multiply(Transform3D::translation(-1.0, 1.0, 0.0))
+        .multiply(Transform3D::scale(-scale_x, scale_y, 1.0)) // теперь экранные
 }
 
 /// Преобразует глобальные координаты точки в координаты экрана.
@@ -343,6 +376,20 @@ fn draw_custom_axis_line(
 
     canvas.circle_filled(screen_point1, 4.0, Color32::GREEN);
     canvas.circle_filled(screen_point2, 4.0, Color32::BLUE);
+}
+
+fn draw_lights(
+    lights: &Vec<LightSource>,
+    global_to_screen_transform: Transform3D,
+    canvas: &mut Canvas,
+) {
+    for light in lights {
+        let light_pos = light.position * global_to_screen_transform;
+        let pos = Pos2::new(light_pos.x, light_pos.y);
+        if pos.x < canvas.width as f32 && pos.y < canvas.height as f32 {
+            canvas.circle_filled(pos, 3.0, light.color);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -399,5 +446,49 @@ mod render_tests {
         let proj_point = point * transform;
         assert!((proj_point.x - canvas.width as f32 / 2.0).abs() < TOLERANCE);
         assert!((proj_point.y - canvas.height as f32 / 2.0).abs() < TOLERANCE);
+    }
+
+    #[test]
+    fn test_global_to_screen_transform_2() {
+        let camera = Camera3::default();
+        let canvas = Canvas::new(900, 600);
+        let transform =
+            get_global_to_screen_transform(ProjectionType::Perspective, &camera, &canvas);
+
+        // точка слева снизу от центра камеры
+        let camera_pos = camera.get_position();
+        let z_depth = (camera.get_near_plane() + camera.get_far_plane()) / 2.0;
+        let point = Point3::new(
+            camera_pos.x - 15.0,
+            camera_pos.y - 15.0,
+            camera_pos.z + z_depth,
+        );
+
+        // точка должна быть где-то слева снизу от центра экрана
+        let proj_point = point * transform;
+        assert!(proj_point.x < canvas.width as f32 / 2.0 - TOLERANCE);
+        assert!(proj_point.y < canvas.height as f32 / 2.0 - TOLERANCE);
+    }
+
+    #[test]
+    fn test_global_to_screen_transform_3() {
+        let camera = Camera3::default();
+        let canvas = Canvas::new(900, 600);
+        let transform =
+            get_global_to_screen_transform(ProjectionType::Perspective, &camera, &canvas);
+
+        // точка справа сверху от центра камеры
+        let camera_pos = camera.get_position();
+        let z_depth = (camera.get_near_plane() + camera.get_far_plane()) / 2.0;
+        let point = Point3::new(
+            camera_pos.x + 15.0,
+            camera_pos.y + 15.0,
+            camera_pos.z + z_depth,
+        );
+
+        // точка должна быть где-то справа сверху от центра экрана
+        let proj_point = point * transform;
+        assert!(proj_point.x > canvas.width as f32 / 2.0 + TOLERANCE);
+        assert!(proj_point.y > canvas.height as f32 / 2.0 + TOLERANCE);
     }
 }

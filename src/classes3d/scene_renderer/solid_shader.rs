@@ -1,6 +1,9 @@
 use crate::{
     Point3, Vec3,
-    classes3d::scene_renderer::{Shader, shader_utils},
+    classes3d::{
+        mesh::Polygon3,
+        scene_renderer::{Shader, shader_utils},
+    },
 };
 
 pub struct SolidShader {
@@ -17,6 +20,7 @@ impl Shader for SolidShader {
     fn shade_model(
         &self,
         model: &crate::Model3,
+        polygons: &Vec<Polygon3>,
         global_to_screen_transform: crate::Transform3D,
         _lights: &Vec<crate::LightSource>,
         canvas: &mut crate::Canvas,
@@ -31,7 +35,7 @@ impl Shader for SolidShader {
         let texture_coords = model.mesh.get_texture_coords();
 
         // отрисовка каждого полигона
-        for polygon in model.mesh.get_polygons() {
+        for polygon in polygons {
             // если четырёхугольник - билинейная интерполяция
             if polygon.is_rectangle() {
                 let rectangle = polygon.get_vertexes();
@@ -81,7 +85,7 @@ impl Shader for SolidShader {
                             cur_point,
                         ) {
                             // точка за границами полигона
-                            if alpha < 0.0 || beta < 0.0 {
+                            if alpha < 0.0 || 1.0 < alpha || beta < 0.0 || 1.0 < beta {
                                 continue;
                             }
 

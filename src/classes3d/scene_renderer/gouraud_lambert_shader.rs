@@ -1,6 +1,9 @@
 use crate::{
     LightSource, Point3, Vec3,
-    classes3d::scene_renderer::{Shader, shader_utils},
+    classes3d::{
+        mesh::Polygon3,
+        scene_renderer::{Shader, shader_utils},
+    },
 };
 
 pub struct GouraudLambertShader {
@@ -38,6 +41,7 @@ impl Shader for GouraudLambertShader {
     fn shade_model(
         &self,
         model: &crate::Model3,
+        polygons: &Vec<Polygon3>,
         global_to_screen_transform: crate::Transform3D,
         lights: &Vec<crate::LightSource>,
         canvas: &mut crate::Canvas,
@@ -59,7 +63,7 @@ impl Shader for GouraudLambertShader {
         // глобальные нормали
         let global_normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
 
-        for polygon in model.mesh.get_polygons() {
+        for polygon in polygons {
             // если четырёхугольник - билинейная интерполяция
             if polygon.is_rectangle() {
                 let rectangle = polygon.get_vertexes();
@@ -129,7 +133,8 @@ impl Shader for GouraudLambertShader {
                             v3.into(),
                             cur_point,
                         ) {
-                            if alpha < 0.0 || beta < 0.0 {
+                            // точка за границами полигона
+                            if alpha < 0.0 || 1.0 < alpha || beta < 0.0 || 1.0 < beta {
                                 continue;
                             }
 

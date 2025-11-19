@@ -152,11 +152,15 @@ impl AthenianApp {
 
             match cur_instrument {
                 Instrument::Move3D => {
-                    let move_delta = to - from;
+                    let mut move_delta = to - from;
+                    move_delta.x *= -1.0;
                     model.translate(move_delta);
                 }
                 Instrument::Rotate3D => {
-                    model.rotate(from, to);
+                    let tmp = from.x;
+                    from.x = to.x;
+                    to.x = tmp;
+                    model.rotate(from.normalize(), to.normalize());
                 }
                 Instrument::Scale3D => {
                     let scale_factor = to - from;
@@ -165,17 +169,23 @@ impl AthenianApp {
                 Instrument::RotateAroundX => {
                     from.x = 0.0;
                     to.x = 0.0;
-                    model.rotate(from, to);
+                    model.rotate(from.normalize(), to.normalize());
                 }
                 Instrument::RotateAroundY => {
                     from.y = 0.0;
                     to.y = 0.0;
-                    model.rotate(from, to);
+                    let tmp = from.x;
+                    from.x = to.x;
+                    to.x = tmp;
+                    model.rotate(from.normalize(), to.normalize());
                 }
                 Instrument::RotateAroundZ => {
                     from.z = 0.0;
                     to.z = 0.0;
-                    model.rotate(from, to);
+                    let tmp = from.x;
+                    from.x = to.x;
+                    to.x = tmp;
+                    model.rotate(from.normalize(), to.normalize());
                 }
                 Instrument::RotateAroundCustomLine => {
                     // Вращение вокруг произвольной оси обрабатывается отдельно
@@ -194,10 +204,10 @@ impl AthenianApp {
             self.scene.camera.move_backward(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::A)) {
-            self.scene.camera.move_right(distance);
+            self.scene.camera.move_left(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::D)) {
-            self.scene.camera.move_left(distance);
+            self.scene.camera.move_right(distance);
         }
         if ctx.input(|i| i.key_pressed(egui::Key::Q)) {
             self.scene.camera.move_up(distance);

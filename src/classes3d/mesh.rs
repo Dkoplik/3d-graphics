@@ -810,7 +810,7 @@ impl Polygon3 {
     }
 
     pub fn is_rectangle(&self) -> bool {
-        self.vertexes.len() == 4
+        self.vertexes.len() == 0
     }
 
     /// Полигон является хотя бы треугольником.
@@ -982,21 +982,18 @@ mod mesh_tests {
     fn test_local_rotated_to_global() {
         let mut cube = generate_cube();
         cube.get_local_frame_mut()
-            .rotate(Transform3D::rotation_aligning(
-                Vec3::plus_z(),
-                Vec3::plus_y(),
-            ));
+            .rotate(Transform3D::rotation_aligning(Vec3::forward(), Vec3::up()));
 
         let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
         let expected_vertexes = vec![
             HVec3::new(0.0, 0.0, 0.0),
             HVec3::new(1.0, 0.0, 0.0),
-            HVec3::new(0.0, 0.0, 1.0),
-            HVec3::new(1.0, 0.0, 1.0),
-            HVec3::new(0.0, -1.0, 0.0),
-            HVec3::new(1.0, -1.0, 0.0),
-            HVec3::new(0.0, -1.0, 1.0),
-            HVec3::new(1.0, -1.0, 1.0),
+            HVec3::new(0.0, 0.0, -1.0),
+            HVec3::new(1.0, 0.0, -1.0),
+            HVec3::new(0.0, 1.0, 0.0),
+            HVec3::new(1.0, 1.0, 0.0),
+            HVec3::new(0.0, 1.0, -1.0),
+            HVec3::new(1.0, 1.0, -1.0),
         ];
 
         for i in 0..global_vertexes.len() {

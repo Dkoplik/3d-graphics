@@ -237,9 +237,6 @@ impl Model3 {
     /// Сами `from` и `to` указываются в **глобальных** координатах.
     pub fn rotate(&mut self, from: Vec3, to: Vec3) {
         // привести к локальным координатам модели
-        let to_local = self.mesh.get_local_frame().global_to_local_matrix();
-        let from = Vec3::from(to_local.apply_to_hvec(from.into())).normalize();
-        let to = Vec3::from(to_local.apply_to_hvec(to.into())).normalize();
         self.mesh
             .get_local_frame_mut()
             .rotate(Transform3D::rotation_aligning(from, to));
@@ -469,7 +466,7 @@ mod model_tests {
         let mut model = Model3::from_mesh(Mesh::dodecahedron());
 
         model.translate(Vec3::new(2.0, 2.0, 3.0));
-        model.rotate_local_x((90.0 as f32).to_radians());
+        model.rotate_local_x((-90.0 as f32).to_radians());
 
         assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
 

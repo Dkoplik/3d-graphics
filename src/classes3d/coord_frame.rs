@@ -371,6 +371,10 @@ mod tests {
         // Локальная система повёрнута относительно глоабальной
         let mut frame = CoordFrame::global();
         frame.rotate(Transform3D::rotation_aligning(Vec3::forward(), Vec3::up()));
+        assert_vecs(frame.forward(), Vec3::up(), TOLERANCE);
+        assert_vecs(frame.right(), Vec3::right(), TOLERANCE);
+        assert_vecs(frame.up(), Vec3::backward(), TOLERANCE);
+
         let global_vec = HVec3::new(1.0, 2.0, 3.0);
 
         // Глобальный вектор в локальный
@@ -391,6 +395,10 @@ mod tests {
             Vec3::forward(),
             Vec3::right(),
         ));
+        assert_vecs(frame.forward(), Vec3::right(), TOLERANCE);
+        assert_vecs(frame.right(), Vec3::backward(), TOLERANCE);
+        assert_vecs(frame.up(), Vec3::up(), TOLERANCE);
+
         let global_vec = HVec3::new(0.0, 0.0, 10.0);
 
         // Глобальный вектор в локальный
