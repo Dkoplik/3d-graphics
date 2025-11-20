@@ -1,6 +1,18 @@
 use std::ops::{Mul, MulAssign};
 
-use crate::{Line3, Point3, Transform3D, Vec3};
+// используем все примитивы
+use crate::library::primitives::*;
+
+/// Линия в 3D пространстве.
+///
+/// Линия задаётся точкой, через которую проходит, и направлением.
+#[derive(Debug, Clone, Copy)]
+pub struct Line3 {
+    /// Точка, через которую проходит прямая.
+    pub origin: Point3,
+    /// Направление прямой в виде единичного вектора.
+    pub direction: Vec3,
+}
 
 impl Line3 {
     pub fn new(origin: Point3, mut direction: Vec3) -> Self {

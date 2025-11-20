@@ -1,6 +1,18 @@
 use std::ops::{Mul, MulAssign};
 
-use crate::{Plane, Point3, Transform3D, Vec3};
+// используем все примитивы
+use crate::library::primitives::*;
+
+/// Плоскость в 3D пространстве.
+///
+/// Плоскость задаётся точкой, через которую проходит, и нормалью к этой точке.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Plane {
+    /// Точка, через которую проходит плоскость.
+    pub origin: Point3,
+    /// Нормаль плоскости в виде единичного вектора.
+    pub normal: Vec3,
+}
 
 impl Plane {
     pub fn new(origin: Point3, normal: Vec3) -> Self {

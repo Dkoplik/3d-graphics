@@ -1,94 +1,53 @@
-//! Реализация структуры `Vec3`.
+//! Объявление и реализация структуры `Vec3`.
 
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+// используем все примитивы
+use crate::library::primitives::*;
+use std::{
+    fmt::Display,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
+};
 
-use crate::{HVec3, Point3, Transform3D, Vec3};
+/// Направление в 3D пространстве с координатами `x`, `y`, `z`.
+///
+/// Эту структуру надо использовать, если необходимо обозначить какое-то **направление** в
+/// 3D пространстве. Для положения надо использовать `Point3`. О координатной системе
+/// подробнее можно узнать в `CoordFrame`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Vec3 {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+// ========================================
+// Различные конструкторы вектора
+// ========================================
 
 impl Vec3 {
-    // ========================================
-    // Различные конструкторы вектора
-    // ========================================
-
     /// Создать вектор по 3-м координатам.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// assert_eq!(vec.x, 1.0);
+    /// assert_eq!(vec.y, 2.0);
+    /// assert_eq!(vec.z, 3.0);
+    /// ```
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
     }
 
     /// Получить нулевой вектор (0.0, 0.0, 0.0).
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::zero();
+    /// assert_eq!(vec.x, 0.0);
+    /// assert_eq!(vec.y, 0.0);
+    /// assert_eq!(vec.z, 0.0);
+    /// ```
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
-    }
-
-    /// Получить единичный вектор (1.0, 0.0, 0.0) в глобальных координатах.
-    pub fn plus_x() -> Self {
-        Self::new(1.0, 0.0, 0.0)
-    }
-
-    /// Получить единичный вектор (-1.0, 0.0, 0.0) в глобальных координатах.
-    pub fn minus_x() -> Self {
-        Self::new(-1.0, 0.0, 0.0)
-    }
-
-    /// Получить единичный вектор (0.0, 1.0, 0.0) в глобальных координатах.
-    pub fn plus_y() -> Self {
-        Self::new(0.0, 1.0, 0.0)
-    }
-
-    /// Получить единичный вектор (0.0, -1.0, 0.0) в глобальных координатах.
-    pub fn minus_y() -> Self {
-        Self::new(0.0, -1.0, 0.0)
-    }
-
-    /// Получить единичный вектор (0.0, 0.0, 1.0) в глобальных координатах.
-    pub fn plus_z() -> Self {
-        Self::new(0.0, 0.0, 1.0)
-    }
-
-    /// Получить единичный вектор (0.0, 0.0, -1.0) в глобальных координатах.
-    pub fn minus_z() -> Self {
-        Self::new(0.0, 0.0, -1.0)
-    }
-
-    /// Получить единичный вектор с направлением "вверх".
-    ///
-    /// Направлением вверх считается `+y`, поэтому вектор имеет вид `(0.0, 1.0, 0.0)`.
-    pub fn up() -> Self {
-        Self::plus_y()
-    }
-
-    /// Получить единичный вектор с направлением "вниз".
-    ///
-    /// Направлением вниз считается `-y`, поэтому вектор имеет вид `(0.0, -1.0, 0.0)`.
-    pub fn down() -> Self {
-        Self::minus_y()
-    }
-
-    /// Получить единичный вектор с направлением "влево".
-    ///
-    /// Направлением влево считается `-x`, поэтому вектор имеет вид `(-1.0, 0.0, 0.0)`.
-    pub fn left() -> Self {
-        Self::minus_x()
-    }
-
-    /// Получить единичный вектор с направлением "вправо".
-    ///
-    /// Направлением вправо считается `+x`, поэтому вектор имеет вид `(1.0, 0.0, 0.0)`.
-    pub fn right() -> Self {
-        Self::plus_x()
-    }
-
-    /// Получить единичный вектор с направлением "прямо".
-    ///
-    /// Направлением прямо считается `+z`, поэтому вектор имеет вид `(0.0, 0.0, 1.0)`.
-    pub fn forward() -> Self {
-        Self::plus_z()
-    }
-
-    /// Получить единичный вектор с направлением "назад".
-    ///
-    /// Направлением назад считается `-z`, поэтому вектор имеет вид `(0.0, 0.0, -1.0)`.
-    pub fn backward() -> Self {
-        Self::minus_z()
     }
 
     /// Получить проекцию вектора `from` на плоскость XY в **глобальных** координатах.
@@ -105,33 +64,82 @@ impl Vec3 {
     pub fn projection_yz(from: Self) -> Self {
         Self::new(0.0, from.y, from.z)
     }
+}
 
-    // ========================================
-    // Операции над 3D вектором
-    // ========================================
+// ========================================
+// Операции над 3D вектором
+// ========================================
 
+impl Vec3 {
     /// Скалярное произведение векторов.
+    ///
+    /// # Examples
+    /// ```rust
+    /// // (1*4) + (2*5) + (3*6) = 4 + 10 + 18 = 32
+    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
+    /// let v2 = Vec3::new(4.0, 5.0, 6.0);
+    /// assert_eq!(v1.dot(v2), 32.0);
+    ///
+    /// // Перпендикулярные вектора
+    /// let v3 = Vec3::new(1.0, 0.0, 0.0);
+    /// let v4 = Vec3::new(0.0, 1.0, 0.0);
+    /// assert_eq!(v3.dot(v4), 0.0);
+    /// ```
+    #[inline]
     pub fn dot(self, other: Self) -> f32 {
         self.x * other.x + self.y * other.y + self.z * other.z
     }
 
     /// Возвращает косинус угла между 2-мя векторами.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let v1 = Vec3::new(1.0, 0.0, 0.0);
+    /// let v2 = Vec3::new(0.2, 0.8, 0.0);
+    /// let dot = v1.dot(v2);
+    /// assert!(0.0 < dot);
+    /// assert!(dot < 1.0);
+    ///
+    /// // Перпендикулярные вектора
+    /// let v3 = Vec3::new(1.0, 0.0, 0.0);
+    /// let v4 = Vec3::new(0.0, 1.0, 0.0);
+    /// assert_eq!(v3.cos(v4), 0.0);
+    /// ```
+    #[inline]
     pub fn cos(self, other: Self) -> f32 {
         self.dot(other) / (self.length() * other.length())
     }
 
     /// Возвращает угл в радианах между 2-мя векторами.
+    #[inline]
     pub fn angle_rad(self, other: Self) -> f32 {
         self.cos(other).acos()
     }
 
     /// Возвращает угл в градусах между 2-мя векторами.
+    #[inline]
     pub fn angle_deg(self, other: Self) -> f32 {
         self.cos(other).acos().to_degrees()
     }
 
-    /// Векторное произведение векторов для **правой** координатной системы.
-    pub fn cross_right(self, other: Self) -> Self {
+    /// Векторное произведение векторов.
+    ///
+    /// Поскольку все координатные системы являются **левыми**, то и векторное произведение левое.
+    /// Иными словами, при умножении `self` на `other` направление результирующего вектора будет таковым,
+    /// что если 4-мя пальцами левой руки прокрутить от `self` к `other` по наименьшему углу, то большой палец
+    /// будет указывать на направление результирующего вектора.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec_x = Vec3::plus_x();
+    /// let vec_y = Vec3::plus_y();
+    /// let vec_z = vec_x.cross(vec_y);
+    /// assert_eq!(vec_z.x, 0.0);
+    /// assert_eq!(vec_z.y, 0.0);
+    /// assert_eq!(vec_z.z, 1.0);
+    /// ```
+    #[inline]
+    pub fn cross(self, other: Self) -> Self {
         Self {
             x: self.y * other.z - self.z * other.y,
             y: self.z * other.x - self.x * other.z,
@@ -139,28 +147,58 @@ impl Vec3 {
         }
     }
 
-    pub fn cross_left(self, other: Self) -> Self {
-        -self.cross_right(other)
-    }
-
     /// Получить квадрат длины вектора.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(0.0, 4.0, 0.0);
+    /// let sq_len = vec.length_squared();
+    /// assert_eq!(sq_len, 16.0);
+    /// ```
+    #[inline]
     pub fn length_squared(self) -> f32 {
         self.x * self.x + self.y * self.y + self.z * self.z
     }
 
     /// Получить длину вектора.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(0.0, 4.0, 0.0);
+    /// let len = vec.length();
+    /// assert_eq!(sq_len, 4.0);
+    /// ```
+    #[inline]
     pub fn length(&self) -> f32 {
         self.length_squared().sqrt()
     }
 
     /// Привести вектор к единичной длине.
-    pub fn normalize(self) -> Self {
-        let len = self.length();
-        debug_assert_ne!(len, 0.0, "попытка нормализовать нулевой вектор");
-        self / len
+    ///
+    /// Поскольку новый вектор будет единичной длины, он будет иметь тип `UVec3`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(0.0, 2.0, 3.0) // длина = 4;
+    /// let uvec: UVec3 = vec.normalize();
+    /// assert_eq!(uvec.x, 0.0);
+    /// assert_eq!(uvec.y, 2.0 / 4.0);
+    /// assert_eq!(uvec.z, 3.0 / 4.0);
+    /// ```
+    #[inline]
+    pub fn normalize(self) -> UVec3 {
+        debug_assert_ne!(
+            self.length_squared(),
+            0.0,
+            "Попытка нормализовать вектор с нулевой длиной"
+        );
+        UVec3::from(self)
     }
 
     /// Является ли вектор нормализованным.
+    ///
+    /// Вектор `Vec3` может иметь единичную длину, но если это условие обязательно к выполнению, то,
+    /// скорее всего, лучше использовать `UVec3`.
     pub fn is_normalized(&self) -> bool {
         self.length_squared() - 1.0 <= 2.0 * f32::EPSILON
     }
@@ -224,6 +262,23 @@ impl AddAssign for Vec3 {
     }
 }
 
+impl Add<UVec3> for Vec3 {
+    type Output = Self;
+
+    /// Находит сумму между двумя векторами по правилу параллелограмма.
+    fn add(self, rhs: UVec3) -> Self::Output {
+        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl AddAssign<UVec3> for Vec3 {
+    fn add_assign(&mut self, rhs: UVec3) {
+        self.x += rhs.x;
+        self.y += rhs.y;
+        self.z += rhs.z;
+    }
+}
+
 impl Sub for Vec3 {
     type Output = Self;
 
@@ -235,6 +290,23 @@ impl Sub for Vec3 {
 
 impl SubAssign for Vec3 {
     fn sub_assign(&mut self, rhs: Self) {
+        self.x -= rhs.x;
+        self.y -= rhs.y;
+        self.z -= rhs.z;
+    }
+}
+
+impl Sub<UVec3> for Vec3 {
+    type Output = Self;
+
+    /// Находит разность между векторами по правилу параллелограмма.
+    fn sub(self, rhs: UVec3) -> Self::Output {
+        self + (-rhs)
+    }
+}
+
+impl SubAssign<UVec3> for Vec3 {
+    fn sub_assign(&mut self, rhs: UVec3) {
         self.x -= rhs.x;
         self.y -= rhs.y;
         self.z -= rhs.z;
@@ -293,25 +365,32 @@ impl From<Point3> for Vec3 {
     }
 }
 
-impl From<HVec3> for Vec3 {
-    /// Получить вектор из `HVec3`.
+impl TryFrom<HVec3> for Vec3 {
+    type Error = VecError;
+
+    /// Получить направление из `HVec3`.
     ///
-    /// 4D вектор `(x, y, z, w)` становится 3D вектором `(x/w, y/w, z/w)`.
-    fn from(value: HVec3) -> Self {
-        if value.w == 0.0 {
-            // если w = 0, то оставляет вектор как есть
-            Self {
-                x: value.x,
-                y: value.y,
-                z: value.z,
-            }
+    /// `HVec3` описывает какое-то направление 3D пространства только если `w = 0`, в противном случае
+    /// `HVec3` представляет собой точку, но не направление пространства.
+    fn try_from(value: HVec3) -> Result<Self, Self::Error> {
+        if value.w != 0.0 {
+            Err(Self::Error)
         } else {
-            Self {
-                x: value.x / value.w,
-                y: value.y / value.w,
-                z: value.z / value.w,
-            }
+            Ok(Self::new(value.x, value.y, value.z))
         }
+    }
+}
+
+/// Ошибка при преобразовании `HVec3` в `Vec3`.
+///
+/// Возникает когда компонента `w != 0`, то есть `HVec3` обозначает позицию,
+/// поэтому не может быть направлением.
+#[derive(Debug, Clone, Copy)]
+struct VecError(HVec3);
+
+impl Display for VecError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} не может быть преобразован в Vec3 из-за w!=0", self.0)
     }
 }
 
@@ -343,17 +422,6 @@ mod tests {
 
     #[test]
     fn test_dot_product() {
-        let v1 = Vec3::new(1.0, 2.0, 3.0);
-        let v2 = Vec3::new(4.0, 5.0, 6.0);
-
-        // (1*4) + (2*5) + (3*6) = 4 + 10 + 18 = 32
-        assert_floats(v1.dot(v2), 32.0, TOLERANCE);
-
-        // Тест с перпендикулярными векторами (должен быть 0)
-        let v3 = Vec3::new(1.0, 0.0, 0.0);
-        let v4 = Vec3::new(0.0, 1.0, 0.0);
-        assert_floats(v3.dot(v4), 0.0, TOLERANCE);
-
         // Тест с отрицательными координатами
         let v5 = Vec3::new(-1.0, 2.0, -3.0);
         let v6 = Vec3::new(2.0, -1.0, 1.0);
