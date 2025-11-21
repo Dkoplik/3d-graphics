@@ -1,12 +1,21 @@
 //! Реализация холста для 2D рисования.
 
+use egui::{Color32, ColorImage, Pos2, Vec2};
+use std::collections::VecDeque;
 use std::ops::{Index, IndexMut};
 
-use egui::{Color32, ColorImage, Pos2, Vec2};
-
-use std::collections::VecDeque;
-
-use crate::Canvas;
+/// Холст для рисования 2D объектов.
+///
+/// Весь рендер (проекция) рисуется на этот холст, после чего этот холст отображается.
+/// Также этот холст содержит в себе z-buffer.
+pub struct Canvas {
+    /// Описание пикселей холста (viewport'а).
+    pixels: Vec<egui::Color32>,
+    /// z-buffer для помощи в отрисовке.
+    buffer: Vec<f32>,
+    width: usize,
+    height: usize,
+}
 
 impl Default for Canvas {
     fn default() -> Self {

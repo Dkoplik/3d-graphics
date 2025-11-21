@@ -35,6 +35,19 @@ impl Display for TextureBlendMode {
     }
 }
 
+/// Материал модели.
+///
+/// Материал задаёт сплошной цвет модели и его поведение при освещении.
+#[derive(Debug, Clone)]
+pub struct Material {
+    /// Цвет всего объекта
+    pub color: egui::Color32,
+    /// Текстура объекта, если имеется
+    pub texture: Option<Texture>,
+    /// Как совмещать текстуру с цветом материала
+    pub blend_mode: classes3d::material::TextureBlendMode,
+}
+
 impl Default for Material {
     fn default() -> Self {
         Self {

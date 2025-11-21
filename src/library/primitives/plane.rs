@@ -1,7 +1,7 @@
-use std::ops::{Mul, MulAssign};
+//! Объявление и реализация структуры `Plane`.
 
-// используем все примитивы
-use crate::library::primitives::*;
+use super::{Point3, Transform3D, UVec3};
+use std::ops::{Mul, MulAssign};
 
 /// Плоскость в 3D пространстве.
 ///
@@ -11,17 +11,19 @@ pub struct Plane {
     /// Точка, через которую проходит плоскость.
     pub origin: Point3,
     /// Нормаль плоскости в виде единичного вектора.
-    pub normal: Vec3,
+    pub normal: UVec3,
 }
 
 impl Plane {
-    pub fn new(origin: Point3, normal: Vec3) -> Self {
-        debug_assert!(
-            normal.is_normalized(),
-            "нормаль должа иметь длину 1.0, но она длины {}",
-            normal.length()
-        );
-
+    /// Создать плоскость из начальной точки и нормали к плоскости.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let plane = Plane::new(Point3::new(1.0, 2.0, 3.0), UVec3::new(1.0, 0.0, 0.0));
+    /// assert!(plane.origin.approx_equal(Point3::new(1.0, 2.0, 3.0)));
+    /// assert!(plane.normal.approx_equal(UVec3::new(1.0, 0.0, 0.0)));
+    /// ```
+    pub fn new(origin: Point3, normal: UVec3) -> Self {
         Self { origin, normal }
     }
 
@@ -29,7 +31,7 @@ impl Plane {
     pub fn apply_transform(self, transform: Transform3D) -> Self {
         Self::new(
             transform.apply_to_hvec(self.origin.into()).into(),
-            transform.apply_to_hvec(self.normal.into()).into(),
+            transform.inverse().apply_to_hvec(self.normal.into()).into(),
         )
     }
 }

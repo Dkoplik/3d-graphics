@@ -4,6 +4,12 @@ use crate::Texture;
 use egui::Color32;
 use image::DynamicImage;
 
+/// Текстура модели.
+///
+/// Благодаря текстуре модель может быть обёрнута в какую-то картинку вместо сплошного цвета.
+#[derive(Debug, Clone)]
+pub struct Texture(image::RgbImage);
+
 impl Texture {
     pub fn new(image: DynamicImage) -> Self {
         Self(image.to_rgb8())

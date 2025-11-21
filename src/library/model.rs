@@ -1,8 +1,19 @@
-use crate::{CoordFrame, HVec3, Material, Mesh, Model3, Point3, Transform3D, Vec3};
+use super::primitives::{HVec3, Point3, Transform3D, Vec3};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
+
+/// Модель (объект) в 3D пространстве.
+///
+/// По сути просто контейнер для Mesh'а и его материала, где Mesh задаёт форму модели, а материал отображение (цвет).
+#[derive(Debug, Clone)]
+pub struct Model3 {
+    /// Mesh модели.
+    pub mesh: Mesh,
+    /// Материал модели.
+    pub material: Material,
+}
 
 impl Model3 {
     // --------------------------------------------------

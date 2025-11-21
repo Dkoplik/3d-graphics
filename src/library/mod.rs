@@ -2,16 +2,16 @@
 //!
 //! В какой-то степени это костыль, но теперь вся логика библиотеки находится в `./library`
 
-mod primitives;
+// примитивы графики
+pub mod primitives;
 
+// модель
+pub mod model;
+
+// прочие структуры
 pub mod camera3;
 pub mod canvas;
 pub mod coord_frame;
-pub mod material;
-pub mod mesh;
-pub mod model3;
 pub mod scene;
 pub mod scene_renderer;
 pub mod surface_generator;
-pub mod texture;
-pub mod transform3;

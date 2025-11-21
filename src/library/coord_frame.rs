@@ -1,25 +1,31 @@
-use crate::{CoordFrame, Point3, Transform3D, Vec3};
+//! Объявление и реализация структуры `CoordFrame`.
+
+use super::primitives::{Point3, Transform3D, UVec3, Vec3};
+
+/// Локальная **левая** координатная система с ортонормированным базисом в 3D пространтсве.
+///
+/// Поддерживаются только ортонормированный базис (векторы базиса перпендикулярны друг другу и нормализованны).
+/// Эта структура представляет собой локальную коодринатную систему какого-либо объекта, в пределах которой объект записан.
+/// Через указанный базис системы можно получить части объекта в глобальных координатах.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct CoordFrame {
+    /// Направление вперёд локальной системы координат. Сам базис указывается в **глобальных** координатах.
+    forward: UVec3,
+    /// Направление вправо локальной системы координат. Сам базис указывается в **глобальных** координатах.
+    right: UVec3,
+    /// Направление вверх локальной системы координат. Сам базис указывается в **глобальных** координатах.
+    up: UVec3,
+    /// Точка (0.0, 0.0, 0.0) локальной координатной системы. Сама точка `origin` указывается в
+    /// **глобальных** координатах,задаёт нулевую точку локальных координат.
+    origin: Point3,
+    /// Вектор масштабирования каждой координатной оси локальной системы.
+    scale: Vec3,
+}
 
 impl CoordFrame {
     /// Создать новую координатную систему по 3-м базисам и точке, из которой эти базисы выходят.
     /// Базисы должны быть **ортонормированными**.
-    pub fn new(forward: Vec3, right: Vec3, up: Vec3, origin: Point3) -> Self {
-        debug_assert!(
-            !forward.approx_equal(Vec3::zero(), 1e-7),
-            "вектор forward не может быть нулевым"
-        );
-        debug_assert!(
-            !right.approx_equal(Vec3::zero(), 1e-7),
-            "вектор right не может быть нулевым"
-        );
-        debug_assert!(
-            !up.approx_equal(Vec3::zero(), 1e-7),
-            "вектор up не может быть нулевым"
-        );
-
-        let forward = forward.normalize();
-        let right = right.normalize();
-
+    pub fn new(forward: UVec3, right: UVec3, up: UVec3, origin: Point3) -> Self {
         // убедиться в ортогональности базисов (возможно накопление ошибок)
         let up = right.cross_left(forward).normalize();
         let right = forward.cross_left(up).normalize();
@@ -37,59 +43,72 @@ impl CoordFrame {
     ///
     /// 3-ий вектор строится автоматически перпендикулярно 2-м указанным. 2 заданных вектора
     /// должны быть **ортогональными**.
-    pub fn from_2(forward: Vec3, up: Vec3, origin: Point3) -> Self {
-        let right = forward.cross_left(up);
-        Self::new(forward, right, up, origin)
+    pub fn from_2(forward: UVec3, up: UVec3, origin: Point3) -> Self {
+        let right = forward.cross(up).normalize();
+        Self {
+            forward,
+            right,
+            up,
+            origin,
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        }
     }
 
     /// Создать координатную систему, идентичную глобальной.
     pub fn global() -> Self {
-        Self::new(Vec3::forward(), Vec3::right(), Vec3::up(), Point3::zero())
+        Self {
+            forward: UVec3::forward(),
+            right: UVec3::right(),
+            up: UVec3::up(),
+            origin: Point3::zero(),
+            scale: Vec3::new(1.0, 1.0, 1.0),
+        }
     }
 
     /// Вернуть направление вверх локальной координатной системы.
     ///
     /// Возвращаемый вектор будет в **глобальных** координатах.
-    pub fn up(&self) -> Vec3 {
+    pub fn up(&self) -> UVec3 {
         self.up
     }
 
     /// Вернуть направление вниз локальной координатной системы.
     ///
     /// Возвращаемый вектор будет в **глобальных** координатах.
-    pub fn down(&self) -> Vec3 {
+    pub fn down(&self) -> UVec3 {
         -self.up
     }
 
     /// Вернуть направление вперёд локальной координатной системы.
     ///
     /// Возвращаемый вектор будет в **глобальных** координатах.
-    pub fn forward(&self) -> Vec3 {
+    pub fn forward(&self) -> UVec3 {
         self.forward
     }
 
     /// Вернуть направление назад локальной координатной системы.
     ///
     /// Возвращаемый вектор будет в **глобальных** координатах.
-    pub fn backward(&self) -> Vec3 {
+    pub fn backward(&self) -> UVec3 {
         -self.forward
     }
 
     /// Вернуть направление влево локальной координатной системы.
     ///
     /// Возвращаемый вектор будет в **глобальных** координатах.
-    pub fn left(&self) -> Vec3 {
+    pub fn left(&self) -> UVec3 {
         -self.right
     }
 
     /// Вернуть направление вправо локальной координатной системы.
     ///
     /// Возвращаемый вектор будет в **глобальных** координатах.
-    pub fn right(&self) -> Vec3 {
+    pub fn right(&self) -> UVec3 {
         self.right
     }
 
-    pub fn position(&self) -> Point3 {
+    /// Положение (точка отчёта) локальной координатной системы.
+    pub fn get_origin(&self) -> Point3 {
         self.origin
     }
 
@@ -97,28 +116,10 @@ impl CoordFrame {
     ///
     /// Эта матрица преобразует вектор из локальной системы координат в глобальную.
     pub fn local_to_global_matrix(&self) -> Transform3D {
-        let rotation = Transform3D {
-            m: [
-                self.right().x,
-                self.right().y,
-                self.right().z,
-                0.0,
-                self.up().x,
-                self.up().y,
-                self.up().z,
-                0.0,
-                self.forward().x,
-                self.forward().y,
-                self.forward().z,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-            ],
-        };
+        let rotation = Transform3D::rotation_from_basis(self.forward(), self.right(), self.up());
         let scale = Transform3D::scale(self.scale.x, self.scale.y, self.scale.z);
         let translate = Transform3D::translation_vec(self.position().into());
+
         // масштабирование -> поворот -> перемещение
         scale.multiply(rotation).multiply(translate)
     }
@@ -127,29 +128,11 @@ impl CoordFrame {
     ///
     /// Эта матрица преобразует вектор из глобальной системы координат в локальную.
     pub fn global_to_local_matrix(&self) -> Transform3D {
-        let inv_rotation = Transform3D {
-            m: [
-                self.right().x,
-                self.up().x,
-                self.forward().x,
-                0.0,
-                self.right().y,
-                self.up().y,
-                self.forward().y,
-                0.0,
-                self.right().z,
-                self.up().z,
-                self.forward().z,
-                0.0,
-                0.0,
-                0.0,
-                0.0,
-                1.0,
-            ],
-        };
+        let inv_rotation = Transform3D::rotation_to_basis(self.forward(), self.right(), self.up());
         let inv_scale =
             Transform3D::scale(1.0 / self.scale.x, 1.0 / self.scale.y, 1.0 / self.scale.z);
         let inv_translate = Transform3D::translation_vec(-Vec3::from(self.position()));
+
         // переместить в точку отчёта -> повернуть к локальной -> масштабировать к локальной
         inv_translate.multiply(inv_rotation).multiply(inv_scale)
     }
@@ -172,6 +155,11 @@ impl CoordFrame {
         self.origin = self.origin + vec;
     }
 
+    /// Установить новую точку отчёта локальной системы координат.
+    pub fn set_origin(&mut self, new_pos: Point3) {
+        self.origin = new_pos;
+    }
+
     /// Масштабирует координатную систему в соответсвии с `vec`.
     ///
     /// Каждая координата `vec` является коэфициентом масштабирования каждой из осей.
@@ -181,6 +169,11 @@ impl CoordFrame {
             self.scale.y * vec.y,
             self.scale.z * vec.z,
         );
+    }
+
+    /// Выставить масштабирование локальной системы в значение `scale`.
+    pub fn set_scale(&mut self, scale: Vec3) {
+        self.scale = scale;
     }
 
     /// Повернуть локальную систему координат через `transform`.
@@ -202,22 +195,6 @@ impl CoordFrame {
 
     /// Вспомогательный метод для проверки ортонормированности координатной системы.
     fn assert_orthonormal(&self) {
-        debug_assert!(
-            (self.forward.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис self.forward длиной {} должен быть нормирован",
-            self.forward.length()
-        );
-        debug_assert!(
-            (self.right.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис self.right длиной {} должен быть нормирован",
-            self.right.length()
-        );
-        debug_assert!(
-            (self.up.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "Базис self.up длиной {} должен быть нормирован",
-            self.up.length()
-        );
-
         debug_assert!(
             self.forward.dot(self.right).abs() < 2.0 * f32::EPSILON,
             "Базисы self.forward {:?} и self.right{:?} должны быть ортогональными, но их произведение равно {}",
@@ -282,7 +259,7 @@ mod tests {
     fn test_global_to_global() {
         // Локальные координаты идентичны глобальным
         let frame = CoordFrame::global();
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
         assert_hvecs(local_vec, global_vec, TOLERANCE);
@@ -310,7 +287,7 @@ mod tests {
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(-1.0, -1.0, -1.0);
+        let expected = HVec3::new(-1.0, -1.0, -1.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -322,11 +299,11 @@ mod tests {
     fn test_local_is_translated_2() {
         // Локальная система смещена относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::forward(), Vec3::up(), Point3::new(1.0, 1.0, 1.0));
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(0.0, 1.0, 2.0); // (1.0 - 1.0, 2.0 - 1.0, 3.0 - 1.0)
+        let expected = HVec3::new(0.0, 1.0, 2.0, 1.0); // (1.0 - 1.0, 2.0 - 1.0, 3.0 - 1.0)
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -338,11 +315,11 @@ mod tests {
     fn test_local_is_translated_3() {
         // Локальная система смещена относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::forward(), Vec3::up(), Point3::new(5.0, 0.0, 0.0));
-        let local_vec = HVec3::new(2.0, 0.0, 0.0);
+        let local_vec = HVec3::new(2.0, 0.0, 0.0, 1.0);
 
         // Глобальный вектор в локальный
         let global_vec = frame.local_to_global_matrix().apply_to_hvec(local_vec);
-        let expected = HVec3::new(7.0, 0.0, 0.0);
+        let expected = HVec3::new(7.0, 0.0, 0.0, 1.0);
         assert_hvecs(global_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -354,11 +331,11 @@ mod tests {
     fn test_local_is_rotated_90_1() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::up(), Vec3::backward(), Point3::zero());
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(1.0, -3.0, 2.0); // x тот же, +z теперь +y, +y теперь -z
+        let expected = HVec3::new(1.0, -3.0, 2.0, 1.0); // x тот же, +z теперь +y, +y теперь -z
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -370,11 +347,11 @@ mod tests {
     fn test_local_is_rotated_90_2() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::right(), Vec3::up(), Point3::zero());
-        let global_vec = HVec3::new(0.0, 0.0, 10.0);
+        let global_vec = HVec3::new(0.0, 0.0, 10.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(-10.0, 0.0, 0.0);
+        let expected = HVec3::new(-10.0, 0.0, 0.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -391,11 +368,11 @@ mod tests {
         assert_vecs(frame.right(), Vec3::right(), TOLERANCE);
         assert_vecs(frame.up(), Vec3::backward(), TOLERANCE);
 
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(1.0, -3.0, 2.0); // x тот же, +z теперь +y, +y теперь -z
+        let expected = HVec3::new(1.0, -3.0, 2.0, 1.0); // x тот же, +z теперь +y, +y теперь -z
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -415,11 +392,11 @@ mod tests {
         assert_vecs(frame.right(), Vec3::backward(), TOLERANCE);
         assert_vecs(frame.up(), Vec3::up(), TOLERANCE);
 
-        let global_vec = HVec3::new(0.0, 0.0, 10.0);
+        let global_vec = HVec3::new(0.0, 0.0, 10.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(-10.0, 0.0, 0.0);
+        let expected = HVec3::new(-10.0, 0.0, 0.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -431,11 +408,11 @@ mod tests {
     fn test_local_is_rotated_180() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::backward(), Vec3::up(), Point3::zero());
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(-1.0, 2.0, -3.0); // y тот же, z теперь -z, а x теперь -x
+        let expected = HVec3::new(-1.0, 2.0, -3.0, 1.0); // y тот же, z теперь -z, а x теперь -x
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -447,11 +424,11 @@ mod tests {
     fn test_local_is_rotated_and_translated_1() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::up(), Vec3::backward(), Point3::new(1.0, 1.0, 1.0));
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(1.0 - 1.0, -3.0 + 1.0, 2.0 - 1.0); // x тот же, +z теперь +y, +y теперь -z + возврат на (1.0, 1.0, 1.0)
+        let expected = HVec3::new(1.0 - 1.0, -3.0 + 1.0, 2.0 - 1.0, 1.0); // x тот же, +z теперь +y, +y теперь -z + возврат на (1.0, 1.0, 1.0)
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -463,11 +440,11 @@ mod tests {
     fn test_local_is_rotated_and_translated_2() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::backward(), Vec3::up(), Point3::new(0.0, 0.0, 0.0));
-        let global_vec = HVec3::new(0.0, 0.0, 10.0);
+        let global_vec = HVec3::new(0.0, 0.0, 10.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(0.0, 0.0, -10.0);
+        let expected = HVec3::new(0.0, 0.0, -10.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -479,11 +456,11 @@ mod tests {
     fn test_local_is_rotated_and_translated_3() {
         // Локальная система повёрнута относительно глоабальной
         let frame = CoordFrame::from_2(Vec3::backward(), Vec3::up(), Point3::new(0.0, 0.0, -10.0));
-        let global_vec = HVec3::new(0.0, 0.0, 0.0);
+        let global_vec = HVec3::new(0.0, 0.0, 0.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(0.0, 0.0, -10.0);
+        let expected = HVec3::new(0.0, 0.0, -10.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -497,11 +474,11 @@ mod tests {
         let mut frame = CoordFrame::global();
         frame.rotate(Transform3D::rotation_aligning(Vec3::forward(), Vec3::up()));
         frame.translate_vec(Vec3::new(1.0, 1.0, 1.0));
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(1.0 - 1.0, -3.0 + 1.0, 2.0 - 1.0); // x тот же, +z теперь +y, +y теперь -z + возврат на (1.0, 1.0, 1.0)
+        let expected = HVec3::new(1.0 - 1.0, -3.0 + 1.0, 2.0 - 1.0, 1.0); // x тот же, +z теперь +y, +y теперь -z + возврат на (1.0, 1.0, 1.0)
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -518,11 +495,11 @@ mod tests {
             Vec3::backward(),
         ));
         frame.translate_vec(Vec3::new(0.0, 0.0, -10.0));
-        let global_vec = HVec3::new(0.0, 0.0, 0.0);
+        let global_vec = HVec3::new(0.0, 0.0, 0.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(0.0, 0.0, -10.0);
+        let expected = HVec3::new(0.0, 0.0, -10.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -535,11 +512,11 @@ mod tests {
         // Локальная система масштабируется в 2 раза по оси Y
         let mut frame = CoordFrame::from_2(Vec3::forward(), Vec3::up(), Point3::new(0.0, 0.0, 0.0));
         frame.scale_vec(Vec3::new(1.0, 2.0, 1.0));
-        let global_vec = HVec3::new(1.0, 3.0, 0.0);
+        let global_vec = HVec3::new(1.0, 3.0, 0.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(1.0, 1.5, 0.0);
+        let expected = HVec3::new(1.0, 1.5, 0.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -552,11 +529,11 @@ mod tests {
         // Локальная система масштабируется в 2 раза по всем осям
         let mut frame = CoordFrame::from_2(Vec3::forward(), Vec3::up(), Point3::zero());
         frame.scale_vec(Vec3::new(2.0, 2.0, 2.0));
-        let global_vec = HVec3::new(1.0, 3.0, 4.0);
+        let global_vec = HVec3::new(1.0, 3.0, 4.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(0.5, 1.5, 2.0);
+        let expected = HVec3::new(0.5, 1.5, 2.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -569,11 +546,11 @@ mod tests {
         // Локальная система масштабируется в 2 раза по всем осям
         let mut frame = CoordFrame::from_2(Vec3::forward(), Vec3::up(), Point3::new(1.0, 2.0, 3.0));
         frame.scale_vec(Vec3::new(2.0, 2.0, 2.0));
-        let global_vec = HVec3::new(1.0, 3.0, 4.0);
+        let global_vec = HVec3::new(1.0, 3.0, 4.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new((1.0 - 1.0) / 2.0, (3.0 - 2.0) / 2.0, (4.0 - 3.0) / 2.0);
+        let expected = HVec3::new((1.0 - 1.0) / 2.0, (3.0 - 2.0) / 2.0, (4.0 - 3.0) / 2.0, 1.0);
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -586,11 +563,11 @@ mod tests {
         // Локальная система повёрнута относительно глоабальной
         let mut frame = CoordFrame::from_2(Vec3::up(), Vec3::backward(), Point3::zero());
         frame.scale_vec(Vec3::new(2.0, 2.0, 2.0));
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(1.0 / 2.0, -3.0 / 2.0, 2.0 / 2.0); // x тот же, +z теперь +y, +y теперь -z
+        let expected = HVec3::new(1.0 / 2.0, -3.0 / 2.0, 2.0 / 2.0, 1.0); // x тот же, +z теперь +y, +y теперь -z
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный
@@ -604,11 +581,11 @@ mod tests {
         let mut frame =
             CoordFrame::from_2(Vec3::up(), Vec3::backward(), Point3::new(1.0, 1.0, 1.0));
         frame.scale_vec(Vec3::new(2.0, 2.0, 2.0));
-        let global_vec = HVec3::new(1.0, 2.0, 3.0);
+        let global_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
 
         // Глобальный вектор в локальный
         let local_vec = frame.global_to_local_matrix().apply_to_hvec(global_vec);
-        let expected = HVec3::new(0.0, -1.0, 0.5); // x тот же, +z теперь +y, +y теперь -z
+        let expected = HVec3::new(0.0, -1.0, 0.5, 1.0); // x тот же, +z теперь +y, +y теперь -z
         assert_hvecs(local_vec, expected, TOLERANCE);
 
         // Обратно в глобальный

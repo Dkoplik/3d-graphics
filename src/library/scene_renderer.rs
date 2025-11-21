@@ -69,6 +69,25 @@ impl Display for ShadingType {
     }
 }
 
+/// Структура для отрисовки сцены. Содержит в себе параметры рендера.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SceneRenderer {
+    /// Отрисовывать ли каркас модели.
+    pub render_wireframe: bool,
+    /// Отрисовывать ли нормали вершин.
+    pub render_normals: bool,
+    /// Отрисовывать ли грани модели.
+    pub render_solid: bool,
+    /// Тип проекции на камеру.
+    pub projection_type: classes3d::scene_renderer::ProjectionType,
+    /// Тип шейдинга. Ни на что не влияет, если `render_solid = false`.
+    pub shading_type: classes3d::scene_renderer::ShadingType,
+    /// Производить ли отсечение нелицевых граней.
+    pub backface_culling: bool,
+    /// Использовать ли z-buffer для упорядочивания граней.
+    pub z_buffer_enabled: bool,
+}
+
 impl Default for SceneRenderer {
     fn default() -> Self {
         Self {

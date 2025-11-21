@@ -1,7 +1,7 @@
-use std::ops::{Mul, MulAssign};
+//! Объявление и реализация структуры `Line3`.
 
-// используем все примитивы
-use crate::library::primitives::*;
+use super::{Point3, Transform3D, UVec3};
+use std::ops::{Mul, MulAssign};
 
 /// Линия в 3D пространстве.
 ///
@@ -11,23 +11,32 @@ pub struct Line3 {
     /// Точка, через которую проходит прямая.
     pub origin: Point3,
     /// Направление прямой в виде единичного вектора.
-    pub direction: Vec3,
+    pub direction: UVec3,
 }
 
 impl Line3 {
-    pub fn new(origin: Point3, mut direction: Vec3) -> Self {
-        debug_assert_ne!(
-            direction,
-            Vec3::zero(),
-            "Попытка создать линию из нулевого вектора {:?}",
-            direction
-        );
-
-        direction = direction.normalize();
+    /// Создать прямую из начальной точки и направления прямой.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let line = Line3::new(Point3::new(1.0, 2.0, 3.0), UVec3::new(1.0, 0.0, 0.0));
+    /// assert!(line.origin.approx_equal(Point3::new(1.0, 2.0, 3.0)));
+    /// assert!(line.direction.approx_equal(UVec3::new(1.0, 0.0, 0.0)));
+    /// ```
+    pub fn new(origin: Point3, direction: UVec3) -> Self {
         Self { origin, direction }
     }
 
     /// Получить прямую из 2-х точек.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let p1 = Point3::new(1.0, 2.0, 3.0);
+    /// let p2 = Point3::new(2.0, 2.0, 3.0);
+    /// let line = Line3::from_points(p1, p2);
+    /// assert!(line.origin.approx_equal(Point3::new(1.0, 2.0, 3.0)));
+    /// assert!(line.direction.approx_equal(UVec3::new(1.0, 0.0, 0.0)));
+    /// ```
     pub fn from_points(p1: Point3, p2: Point3) -> Self {
         debug_assert_ne!(
             p1, p2,
@@ -35,7 +44,7 @@ impl Line3 {
             p1, p2
         );
 
-        let direction = p2 - p1;
+        let direction = (p2 - p1).normalize();
         Self::new(p1, direction)
     }
 

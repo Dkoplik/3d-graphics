@@ -1,7 +1,6 @@
 //! Объявление и реализация структуры `Point3`.
 
-// используем все примитивы
-use crate::library::primitives::*;
+use super::{HVec3, Transform3D, UVec3, Vec3};
 use std::{
     fmt::Display,
     ops::{Add, Mul, MulAssign, Sub},
@@ -176,6 +175,15 @@ impl From<Vec3> for Point3 {
 
 impl From<UVec3> for Point3 {
     /// Получить точку из `UVec3`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let uvec = UVec3::new(0.0, 1.0, 0.0);
+    /// let point: Point3 = Point3::from(uvec);
+    /// assert_eq!(point.x, 0.0);
+    /// assert_eq!(point.y, 1.0);
+    /// assert_eq!(point.z, 0.0);
+    /// ```
     fn from(value: UVec3) -> Self {
         Self::new(value.x, value.y, value.z)
     }
@@ -188,6 +196,21 @@ impl TryFrom<HVec3> for Point3 {
     ///
     /// `HVec3` описывает какую-то точку 3D пространства только если `w != 0`, в противном случае
     /// `HVec3` представляет собой направление, но не точку пространства.
+    ///
+    /// # Examples
+    /// ```rust
+    /// // если hvec - точка
+    /// let hvec_position = HVec3::new(1.0, 2.0, 3.0, 1.0);
+    /// let point = Point3::try_from(hvec_position).unwrap();
+    /// assert_eq!(point.x, 1.0);
+    /// assert_eq!(point.y, 2.0);
+    /// assert_eq!(point.z, 3.0);
+    ///
+    /// // если hvec - направление
+    /// let hvec_direction = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let err = Point3::try_from(hvec_direction).unwrap_err();
+    /// assert_eq!(err, PointError(hvec_direction));
+    /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
         if value.w == 0.0 {
             Err(Self::Error)

@@ -1,7 +1,6 @@
 //! Объявление и реализация структуры `UVec3`.
 
-// используем все примитивы
-use crate::library::primitives::*;
+use super::{HVec3, Point3, Transform3D, Vec3};
 use std::{
     fmt::Display,
     ops::{Add, Div, Mul, MulAssign, Neg, Sub},
@@ -156,8 +155,8 @@ impl UVec3 {
     /// # Examples
     /// ```rust
     /// // Перпендикулярные вектора
-    /// let v3 = Vec3::new(1.0, 0.0, 0.0);
-    /// let v4 = Vec3::new(0.0, 1.0, 0.0);
+    /// let v3 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v4 = UVec3::new(0.0, 1.0, 0.0);
     /// assert_eq!(v3.dot(v4), 0.0);
     /// ```
     #[inline]
@@ -169,15 +168,15 @@ impl UVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 0.0, 0.0);
-    /// let v2 = Vec3::new(0.2, 0.8, 0.0);
+    /// let v1 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v2 = UVec3::new(0.2, 0.8, 0.0);
     /// let dot = v1.dot(v2);
     /// assert!(0.0 < dot);
     /// assert!(dot < 1.0);
     ///
     /// // Перпендикулярные вектора
-    /// let v3 = Vec3::new(1.0, 0.0, 0.0);
-    /// let v4 = Vec3::new(0.0, 1.0, 0.0);
+    /// let v3 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v4 = UVec3::new(0.0, 1.0, 0.0);
     /// assert_eq!(v3.cos(v4), 0.0);
     /// ```
     #[inline]
@@ -195,6 +194,38 @@ impl UVec3 {
     #[inline]
     pub fn angle_deg(self, other: Self) -> f32 {
         self.cos(other).acos().to_degrees()
+    }
+
+    /// Спроецировать текущий вектор на вектор `onto`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = UVec3::new(0.6, 0.8, 0.0);
+    /// let onto = UVec3::new(0.0, 1.0, 0.0);
+    /// let projection = vec.projection(onto);
+    /// assert_eq!(projection.x, 0.0);
+    /// assert_eq!(projection.y, 0.8);
+    /// assert_eq!(projection.z, 0.0);
+    /// ```
+    #[inline]
+    pub fn projection(self, onto: Self) -> Vec3 {
+        self.dot(onto.into()) * onto
+    }
+
+    /// Найти перпендикулярную составляющую текущего вектора к вектору `onto`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = UVec3::new(0.6, 0.8, 0.0);
+    /// let onto = UVec3::new(0.0, 1.0, 0.0);
+    /// let rejection = vec.rejection(onto);
+    /// assert_eq!(rejection.x, 0.6);
+    /// assert_eq!(rejection.y, 0.0);
+    /// assert_eq!(rejection.z, 0.0);
+    /// ```
+    #[inline]
+    pub fn rejection(self, onto: Self) -> Vec3 {
+        self - self.projection(onto)
     }
 
     /// Векторное произведение векторов.
@@ -283,6 +314,16 @@ impl Add for UVec3 {
     type Output = Vec3;
 
     /// Находит сумму между двумя векторами по правилу параллелограмма.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let v1 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v2 = UVec3::new(0.0, 1.0, 0.0);
+    /// let res: Vec3 = v1 + v2;
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, 1.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```
     fn add(self, rhs: Self) -> Self::Output {
         Vec3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
     }
@@ -292,6 +333,16 @@ impl Add<Vec3> for UVec3 {
     type Output = Vec3;
 
     /// Находит сумму между двумя векторами по правилу параллелограмма.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let v1 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v2 = Vec3::new(0.0, 2.0, 0.0);
+    /// let res: Vec3 = v1 + v2;
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, 2.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```
     fn add(self, rhs: Vec3) -> Self::Output {
         Vec3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
     }
@@ -301,6 +352,16 @@ impl Sub for UVec3 {
     type Output = Vec3;
 
     /// Находит разность между векторами по правилу параллелограмма.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let v1 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v2 = UVec3::new(0.0, 1.0, 0.0);
+    /// let res: Vec3 = v1 - v2;
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, -1.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```
     fn sub(self, rhs: Self) -> Self::Output {
         self + (-rhs)
     }
@@ -310,6 +371,16 @@ impl Sub<Vec3> for UVec3 {
     type Output = Vec3;
 
     /// Находит разность между векторами по правилу параллелограмма.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let v1 = UVec3::new(1.0, 0.0, 0.0);
+    /// let v2 = UVec3::new(0.0, 2.0, 0.0);
+    /// let res: Vec3 = v1 - v2;
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, -2.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```
     fn sub(self, rhs: Vec3) -> Self::Output {
         self + (-rhs)
     }
@@ -319,14 +390,51 @@ impl Mul<f32> for UVec3 {
     type Output = Vec3;
 
     /// Умножение вектора на скаляр.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let uvec = UVec3::new(1.0, 0.0, 0.0);
+    /// let res: Vec3 = v1 * 2.0;
+    /// assert_eq!(res.x, 2.0);
+    /// assert_eq!(res.y, 0.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```
     fn mul(self, rhs: f32) -> Self::Output {
         Vec3::new(self.x * rhs, self.y * rhs, self.z * rhs)
+    }
+}
+
+impl Mul<UVec3> for f32 {
+    type Output = Vec3;
+
+    /// Умножение скаляра на вектор.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let uvec = UVec3::new(1.0, 0.0, 0.0);
+    /// let res: Vec3 = 2.0 * v1;
+    /// assert_eq!(res.x, 2.0);
+    /// assert_eq!(res.y, 0.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```
+    fn mul(self, rhs: UVec3) -> Self::Output {
+        rhs * self
     }
 }
 
 impl Div<f32> for UVec3 {
     type Output = Vec3;
 
+    /// Поделить вектор на скаляр.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let uvec = UVec3::new(1.0, 0.0, 0.0);
+    /// let res: Vec3 = v1 / 2.0;
+    /// assert_eq!(res.x, 0.5);
+    /// assert_eq!(res.y, 0.0);
+    /// assert_eq!(res.z, 0.0);
+    /// ```    
     fn div(self, rhs: f32) -> Self::Output {
         Vec3::new(self.x / rhs, self.y / rhs, self.z / rhs)
     }
@@ -335,7 +443,22 @@ impl Div<f32> for UVec3 {
 impl TryFrom<Vec3> for UVec3 {
     type Error = UVecError;
 
-    /// Получить вектор из `Vec3`.
+    /// Получить вектор из `Vec3`, если он не нулевой.
+    ///
+    /// # Examples
+    /// ```rust
+    /// // если vec не нулевой
+    /// let vec = Vec3::new(5.0, 0.0, 0.0);
+    /// let uvec = UVec3::try_from(vec).unwrap();
+    /// assert_eq!(point.x, 1.0);
+    /// assert_eq!(point.y, 0.0);
+    /// assert_eq!(point.z, 0.0);
+    ///
+    /// // если vec - нулевой
+    /// vec = Vec3::zero();
+    /// let err = Point3::try_from(vec).unwrap_err();
+    /// assert_eq!(err, UVecError::ZeroVec);
+    /// ```
     fn try_from(value: Vec3) -> Result<Self, Self::Error> {
         if value.x == 0.0 && value.y == 0.0 && value.z == 0.0 {
             Err(UVecError::ZeroVec)
@@ -348,7 +471,22 @@ impl TryFrom<Vec3> for UVec3 {
 impl TryFrom<Point3> for UVec3 {
     type Error = UVecError;
 
-    /// Получить вектор из `Point3`.
+    /// Получить вектор из `Point3`, если точка не нулевая.
+    ///
+    /// # Examples
+    /// ```rust
+    /// // если point не нулевой
+    /// let point = Point3::new(5.0, 0.0, 0.0);
+    /// let uvec = UVec3::try_from(point).unwrap();
+    /// assert_eq!(point.x, 1.0);
+    /// assert_eq!(point.y, 0.0);
+    /// assert_eq!(point.z, 0.0);
+    ///
+    /// // если point - нулевой
+    /// point = Point3::zero();
+    /// let err = Point3::try_from(point).unwrap_err();
+    /// assert_eq!(err, UVecError::ZeroPoint);
+    /// ```
     fn try_from(value: Point3) -> Result<Self, Self::Error> {
         if value.x == 0.0 && value.y == 0.0 && value.z == 0.0 {
             Err(UVecError::ZeroPoint)
@@ -365,6 +503,21 @@ impl TryFrom<HVec3> for UVec3 {
     ///
     /// HVec3 должно быть направлением, то есть w = 0, в противном случае это позиция,
     /// которую сначала надо перевести в Point3, а потом только в Vec3.
+    ///
+    /// # Examples
+    /// ```rust
+    /// // если hvec - направление
+    /// let hvec_direction = HVec3::new(0.0, 0.0, 3.0, 0.0);
+    /// let uvec = UVec3::try_from(hvec_direction).unwrap();
+    /// assert_eq!(uvec.x, 0.0);
+    /// assert_eq!(uvec.y, 0.0);
+    /// assert_eq!(uvec.z, 1.0);
+    ///
+    /// // если hvec - точка
+    /// let hvec_position = HVec3::new(1.0, 2.0, 3.0, 1.0);
+    /// let err = Point3::try_from(hvec_position).unwrap_err();
+    /// assert_eq!(err, UVecError::PositionHVec(hvec_position));
+    /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
         if value.x == 0.0 && value.y == 0.0 && value.z == 0.0 {
             Err(UVecError::ZeroVec)

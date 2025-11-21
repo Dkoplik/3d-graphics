@@ -1,4 +1,23 @@
-use crate::{Camera3, CoordFrame, Line3, Point3, Transform3D, Vec3};
+use super::primitives::{Line3, Point3, Transform3D, UVec3, Vec3};
+use crate::CoordFrame;
+
+/// Камера в 3-х мерном пространстве.
+#[derive(Debug, Clone, Copy)]
+pub struct Camera3 {
+    /// Координатная система камеры.
+    ///
+    /// Направление -z считается направлением обзора камеры, направление +y считается направлением вверх,
+    /// а направление -x - право для камеры.
+    local_frame: CoordFrame,
+    /// Вертикальный угол обзора (в радианах).
+    fov: f32,
+    /// Соотношение сторон (ширина / высота).
+    aspect_ratio: f32,
+    /// С какого расстояния от точки камеры отображать объекты.
+    near_plane: f32,
+    /// До какого расстояния отображать объекты.
+    far_plane: f32,
+}
 
 impl Default for Camera3 {
     fn default() -> Self {
@@ -20,29 +39,26 @@ impl Camera3 {
     /// `position` - позиция камеры в **глобальных** координатах.
     /// `look_direction` - направление обзора камеры (вперёд) в **глобальных** координатах.
     /// `up` - направление камеры вверх в **глобальных** координатах.
-    /// `fov_rad` - угол обзора в радианах
+    /// `fov_rad` - вертикальный угол обзора в радианах
     /// `aspect_ratio` - соотношение сторон (ширина к высоте)
     /// `near_plane` - расстояние до ближней границы отсечения
     /// `far_plane` - расстояние для дальней границы отсечения
     pub fn new(
         position: Point3,
-        look_direction: Vec3,
-        up: Vec3,
+        look_direction: UVec3,
+        up: UVec3,
         fov_rad: f32,
         aspect_ratio: f32,
         near_plane: f32,
         far_plane: f32,
     ) -> Self {
         debug_assert!(
-            (look_direction.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "look_direction должен быть нормализован, но его длина равна {}",
-            look_direction.length()
+            near_plane < far_plane,
+            "near_plane {} должен быть ближе к камере, чем far_plane {}",
+            near_plane,
+            far_plane
         );
-        debug_assert!(
-            (up.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-            "up должен быть нормализован, но его длина равна {}",
-            up.length()
-        );
+        debug_assert!(fov_rad > 0.0, "fov {} должен быть больше 0", fov_rad);
 
         // в координатах камеры +z должно быть направлено в саму камеру, поэтому вектор направления ОТ камеры будет -z.
         let forward = -look_direction;
@@ -53,7 +69,11 @@ impl Camera3 {
 
     /// Создаёт камеру с использованием координатной системы.
     ///
-    /// Камера смотрит в направлении backward для локальной системы.
+    /// `local_frame` - координатная система камеры, forward (+z) направлен в саму камеру.
+    /// `fov_rad` - вертикальный угол обзора в радианах
+    /// `aspect_ratio` - соотношение сторон (ширина к высоте)
+    /// `near_plane` - расстояние до ближней границы отсечения
+    /// `far_plane` - расстояние для дальней границы отсечения
     pub fn from_frame(
         local_frame: CoordFrame,
         fov_rad: f32,
@@ -78,46 +98,6 @@ impl Camera3 {
         }
     }
 
-    /// Создаёт камеру из позиции и целевой точки. Направление вверх такое же, как и в глобальной системе.
-    // pub fn from(position: Point3, target: Point3) -> Self {
-    //     debug_assert!(
-    //         !position.approx_equal(target, 1e-8),
-    //         "камера в позиции {:?} не может смотреть в ту же точку {:?}",
-    //         position,
-    //         target
-    //     );
-    //     Self::look_at(position, target, Vec3::up())
-    // }
-
-    /// Создает камеру смотрящую в указанную точку.
-    pub fn look_at(position: Point3, target: Point3, up: Vec3) -> Self {
-        debug_assert!(
-            !position.approx_equal(target, 1e-8),
-            "камера в позиции {:?} не может смотреть в ту же точку {:?}",
-            position,
-            target
-        );
-
-        let direction = (target - position).normalize();
-
-        debug_assert!(
-            direction.dot(up).abs() < 1e-8,
-            "направление камеры {:?} должно быть перпендикулярно направлению вверх {:?}",
-            direction,
-            up
-        );
-
-        Self::new(
-            position,
-            direction,
-            up.normalize(),
-            (60.0 as f32).to_radians(),
-            16.0 / 9.0,
-            0.1,
-            100.0,
-        )
-    }
-
     /// Возвращает направление вверх в **глобальных** координатах.
     pub fn up(&self) -> Vec3 {
         self.local_frame.up()
@@ -129,24 +109,33 @@ impl Camera3 {
     }
 
     /// Возвращает направление направлениев вперёд в **глобальных** координатах.
+    ///
+    /// Так как +z должно быть направлено в саму камеру, то `forward` камеры совпадает
+    /// с `backward` локальной системы.
     pub fn forward(&self) -> Vec3 {
-        // поскольку координатная система смотрит в обратную сторону
         self.local_frame.backward()
     }
 
     /// Возвращает направление назад в **глобальных** координатах.
+    ///
+    /// Так как +z должно быть направлено в саму камеру, то `backward` камеры совпадает
+    /// с `forward` локальной системы.
     pub fn backward(&self) -> Vec3 {
-        // поскольку координатная система смотрит в обратную сторону
         self.local_frame.forward()
     }
 
     /// Возвращает направление налево в **глобальных** координатах.
+    ///
+    /// Так как +z должно быть направлено в саму камеру, то `left` камеры совпадает
+    /// с `right` локальной системы.
     pub fn left(&self) -> Vec3 {
-        // поскольку координатная система смотрит в обратную сторону
         self.local_frame.right()
     }
 
     /// Возвращает направление направо в **глобальных** координатах.
+    ///
+    /// Так как +z должно быть направлено в саму камеру, то `right` камеры совпадает
+    /// с `left` локальной системы.
     pub fn right(&self) -> Vec3 {
         // поскольку координатная система смотрит в обратную сторону
         self.local_frame.left()
@@ -154,7 +143,7 @@ impl Camera3 {
 
     /// Возвращает точку, в которую смотрит камера.
     pub fn target(&self) -> Point3 {
-        self.local_frame.origin + self.get_direction()
+        self.local_frame.position() + self.get_direction()
     }
 
     /// Возвращает локальные координаты камеры.
@@ -263,20 +252,20 @@ impl Camera3 {
     }
 
     pub fn get_position(&self) -> Point3 {
-        self.local_frame.position()
+        self.local_frame.get_origin()
     }
 
     pub fn set_position(&mut self, position: Point3) {
-        self.local_frame.origin = position;
+        self.local_frame.set_origin(position);
     }
 
     pub fn get_target(&self) -> Point3 {
-        self.get_position() + self.forward()
+        self.get_origin() + self.forward()
     }
 
     pub fn set_target(&mut self, target: Point3) {
-        let from = self.get_target() - self.get_position();
-        let to = target - self.get_position();
+        let from = self.get_target() - self.get_origin();
+        let to = target - self.get_origin();
         self.rotate(from, to);
     }
 
@@ -289,7 +278,7 @@ impl Camera3 {
         let new_frame = CoordFrame::from_2(
             forward.normalize(),
             up.cross_left(forward).normalize(),
-            self.local_frame.origin,
+            self.local_frame.get_origin(),
         );
         self.local_frame = new_frame;
     }
@@ -524,7 +513,7 @@ mod camera_tests {
         let proj_matrix = Transform3D::perspective(fov, aspect, near, far);
 
         // A point on the near plane should project to Z = 1 in NDC
-        let point_on_near_plane = HVec3::new(0.0, 0.0, -near);
+        let point_on_near_plane = HVec3::new(0.0, 0.0, -near, 1.0);
         let projected_point = proj_matrix.apply_to_hvec(point_on_near_plane);
 
         // After perspective divide, Z should be 1
@@ -542,7 +531,7 @@ mod camera_tests {
         let proj_matrix = Transform3D::perspective(fov, aspect, near, far);
 
         // A point on the far plane should project to Z = -1 in NDC
-        let point_on_far_plane = HVec3::new(0.0, 0.0, -far);
+        let point_on_far_plane = HVec3::new(0.0, 0.0, -far, 1.0);
         let projected_point = proj_matrix.apply_to_hvec(point_on_far_plane);
 
         let ndc_point: Point3 = projected_point.into();
@@ -559,7 +548,7 @@ mod camera_tests {
         let proj_matrix = Transform3D::perspective(fov, aspect, near, far);
 
         // For 90 degree FOV and near=1, points at near plane corners should be at ±1 in X and Y
-        let top_right_near = HVec3::new(1.0, 1.0, -1.0); // At near plane, tan(45)=1
+        let top_right_near = HVec3::new(1.0, 1.0, -1.0, 1.0); // At near plane, tan(45)=1
         let projected = proj_matrix.apply_to_hvec(top_right_near);
         let ndc: Point3 = projected.into();
 
@@ -581,7 +570,7 @@ mod camera_tests {
         let proj_matrix = Transform3D::parallel(left, right, bottom, top, near, far);
 
         // Test left-bottom-near corner
-        let lbn = HVec3::new(left, bottom, -near);
+        let lbn = HVec3::new(left, bottom, -near, 1.0);
         let projected = proj_matrix.apply_to_hvec(lbn);
         let ndc: Point3 = projected.into();
 
@@ -590,7 +579,7 @@ mod camera_tests {
         assert!((ndc.z - 1.0).abs() < TOLERANCE);
 
         // Test right-top-far corner
-        let rtf = HVec3::new(right, top, -far);
+        let rtf = HVec3::new(right, top, -far, 1.0);
         let projected = proj_matrix.apply_to_hvec(rtf);
         let ndc: Point3 = projected.into();
 
