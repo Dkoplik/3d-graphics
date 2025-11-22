@@ -1,21 +1,32 @@
-use super::primitives::{HVec3, Point3, Transform3D, Vec3};
+use super::primitives::{Point3, Transform3D, Vec3};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
+// составные части модели
+mod material;
+mod mesh;
+mod surface_generator;
+mod texture;
+
+// re-export в модуль `model`
+pub use material::*;
+pub use mesh::*;
+pub use texture::*;
+
 /// Модель (объект) в 3D пространстве.
 ///
 /// По сути просто контейнер для Mesh'а и его материала, где Mesh задаёт форму модели, а материал отображение (цвет).
 #[derive(Debug, Clone)]
-pub struct Model3 {
+pub struct Model3<'p> {
     /// Mesh модели.
-    pub mesh: Mesh,
+    pub mesh: Mesh<'p>,
     /// Материал модели.
     pub material: Material,
 }
 
-impl Model3 {
+impl<'p> Model3<'p> {
     // --------------------------------------------------
     // Конструкторы
     // --------------------------------------------------
@@ -74,7 +85,7 @@ impl Model3 {
                             .parse::<f32>()
                             .map_err(|_| ObjLoadError::InvalidFormat)?;
 
-                        vertexes.push(HVec3::new(x, y, z));
+                        vertexes.push(Point3::new(x, y, z));
                     }
                 }
                 "f" => {

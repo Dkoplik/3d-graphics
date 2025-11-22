@@ -17,9 +17,9 @@ pub use library::model::*;
 pub use library::camera3::*;
 pub use library::canvas::*;
 pub use library::coord_frame::*;
-pub use library::scene::*;
-pub use library::scene_renderer::*;
-pub use library::surface_generator::*;
+// pub use library::scene::*;
+// pub use library::scene_renderer::*;
+// pub use library::surface_generator::*;
 
 /// Точечный источник света.
 ///
@@ -29,14 +29,4 @@ pub struct LightSource {
     pub position: Point3,
     pub color: egui::Color32,
     pub intensity: f32,
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub enum SurfaceFunction {
-    #[default]
-    Paraboloid,
-    Saddle,
-    Wave,
-    Ripple,
-    Gaussian,
 }

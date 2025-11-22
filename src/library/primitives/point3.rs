@@ -3,7 +3,7 @@
 use super::{HVec3, Transform3D, UVec3, Vec3};
 use std::{
     fmt::Display,
-    ops::{Add, Mul, MulAssign, Sub},
+    ops::{Add, Sub},
 };
 
 /// Точка в 3D пространстве с координатами `x`, `y`, `z`.
@@ -67,50 +67,14 @@ impl Point3 {
     /// assert_eq!(translated_point.y, 2.0);
     /// assert_eq!(translated_point.z, 3.0);
     /// ```
-    pub fn apply_transform(self, transform: Transform3D) -> Self {
-        Point3::from(HVec3::from(self) * transform)
+    pub fn apply_transform(self, transform: Transform3D) -> Result<Self, PointError> {
+        Point3::try_from(HVec3::from(self) * transform)
     }
 }
 
 impl Display for Point3 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Point3(x: {}, y: {}, z: {})", self.x, self.y, self.z)
-    }
-}
-
-impl Mul<Transform3D> for Point3 {
-    type Output = Point3;
-
-    /// Применить преобразование `Transform3D` к точке `Point3`.
-    ///
-    /// # Examples
-    /// ```rust
-    /// let original_point = Point3::zero();
-    /// let transform = Transform3D::translation(1.0, 2.0, 3.0);
-    /// let translated_point = original_point * transform;
-    /// assert_eq!(translated_point.x, 1.0);
-    /// assert_eq!(translated_point.y, 2.0);
-    /// assert_eq!(translated_point.z, 3.0);
-    /// ```
-    fn mul(self, rhs: Transform3D) -> Self::Output {
-        self.apply_transform(rhs)
-    }
-}
-
-impl MulAssign<Transform3D> for Point3 {
-    /// Применить преобразование `Transform3D` к точке `Point3`.
-    ///
-    /// # Examples
-    /// ```rust
-    /// let point = Point3::zero();
-    /// let transform = Transform3D::translation(1.0, 2.0, 3.0);
-    /// point *= transform;
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 2.0);
-    /// assert_eq!(point.z, 3.0);
-    /// ```
-    fn mul_assign(&mut self, rhs: Transform3D) {
-        *self = *self * rhs;
     }
 }
 
@@ -213,7 +177,7 @@ impl TryFrom<HVec3> for Point3 {
     /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
         if value.w == 0.0 {
-            Err(Self::Error)
+            Err(PointError(value))
         } else {
             Ok(Self::new(
                 value.x / value.w,
@@ -229,7 +193,7 @@ impl TryFrom<HVec3> for Point3 {
 /// Возникает когда компонента `w=0`, то есть `HVec3` обозначает направление,
 /// поэтому не может быть точкой.
 #[derive(Debug, Clone, Copy)]
-struct PointError(HVec3);
+pub struct PointError(HVec3);
 
 impl Display for PointError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

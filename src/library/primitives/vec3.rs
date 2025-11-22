@@ -1,6 +1,7 @@
 //! Объявление и реализация структуры `Vec3`.
 
 use super::{HVec3, Point3, Transform3D, UVec3};
+use crate::library::primitives::uvec3::UVecError;
 use std::{
     fmt::Display,
     ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign},
@@ -217,13 +218,8 @@ impl Vec3 {
     /// assert_eq!(uvec.z, 3.0 / 4.0);
     /// ```
     #[inline]
-    pub fn normalize(self) -> UVec3 {
-        debug_assert_ne!(
-            self.length_squared(),
-            0.0,
-            "Попытка нормализовать вектор с нулевой длиной"
-        );
-        UVec3::from(self)
+    pub fn normalize(self) -> Result<UVec3, UVecError> {
+        UVec3::try_from(self)
     }
 
     /// Является ли вектор нормализованным.
@@ -249,24 +245,8 @@ impl Vec3 {
 
     /// Применить преобразование к текущемы однородному `Vec3`. Эта операция **создаёт новый** вектор.
     #[inline]
-    pub fn apply_transform(self, transform: Transform3D) -> Self {
-        transform.apply_to_hvec(self.into()).into()
-    }
-}
-
-impl Mul<Transform3D> for Vec3 {
-    type Output = Vec3;
-
-    /// Применить преобразование `Transform3D` к однородному `Vec3`.
-    fn mul(self, rhs: Transform3D) -> Self::Output {
-        self.apply_transform(rhs)
-    }
-}
-
-impl MulAssign<Transform3D> for Vec3 {
-    /// Применить преобразование `Transform3D` к вектору `Vec3`.
-    fn mul_assign(&mut self, rhs: Transform3D) {
-        *self = *self * rhs;
+    pub fn apply_transform(self, transform: Transform3D) -> Result<Self, VecError> {
+        Vec3::try_from(transform.apply_to_hvec(self.into()))
     }
 }
 
@@ -476,11 +456,7 @@ impl Mul<Vec3> for f32 {
     /// assert_eq!(res.z, 6.0);
     /// ```
     fn mul(self, rhs: Vec3) -> Self::Output {
-        Self {
-            x: self.x * rhs,
-            y: self.y * rhs,
-            z: self.z * rhs,
-        }
+        rhs * self
     }
 }
 
@@ -562,6 +538,26 @@ impl From<Point3> for Vec3 {
     }
 }
 
+impl From<UVec3> for Vec3 {
+    /// Получить вектор из `UVec3`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let point = UVec3::new(0.0, 1.0, 0.0);
+    /// let vec = Vec3::from(point);
+    /// assert_eq!(vec.x, 0.0);
+    /// assert_eq!(vec.y, 1.0);
+    /// assert_eq!(vec.z, 0.0);
+    /// ```
+    fn from(value: UVec3) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
+    }
+}
+
 impl TryFrom<HVec3> for Vec3 {
     type Error = VecError;
 
@@ -586,7 +582,7 @@ impl TryFrom<HVec3> for Vec3 {
     /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
         if value.w != 0.0 {
-            Err(Self::Error)
+            Err(VecError(value))
         } else {
             Ok(Self::new(value.x, value.y, value.z))
         }
@@ -598,7 +594,7 @@ impl TryFrom<HVec3> for Vec3 {
 /// Возникает когда компонента `w != 0`, то есть `HVec3` обозначает позицию,
 /// поэтому не может быть направлением.
 #[derive(Debug, Clone, Copy)]
-struct VecError(HVec3);
+pub struct VecError(HVec3);
 
 impl Display for VecError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -616,6 +612,16 @@ mod tests {
         assert!(
             got.approx_equal(expected, tolerance),
             "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_uvectors(got: UVec3, expected: UVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался unit-вектор {:?}, но получен unit-вектор {:?}, одна из координат которого отличается более чем на {}",
             expected,
             got,
             tolerance
@@ -648,25 +654,21 @@ mod tests {
         let k = Vec3::new(0.0, 0.0, 1.0);
 
         // i × j = k
-        assert_vectors(i.cross_right(j), k, TOLERANCE);
-        assert_vectors(i.cross_left(j), -k, TOLERANCE);
+        assert_vectors(i.cross(j), k, TOLERANCE);
 
         // j × k = i
-        assert_vectors(j.cross_right(k), i, TOLERANCE);
-        assert_vectors(j.cross_left(k), -i, TOLERANCE);
+        assert_vectors(j.cross(k), i, TOLERANCE);
 
         // k × i = j
-        assert_vectors(k.cross_right(i), j, TOLERANCE);
-        assert_vectors(k.cross_left(i), -j, TOLERANCE);
+        assert_vectors(k.cross(i), j, TOLERANCE);
 
         // Антикоммутативность: j × i = -k
-        assert_vectors(j.cross_right(i), -k, TOLERANCE);
-        assert_vectors(j.cross_left(i), k, TOLERANCE);
+        assert_vectors(j.cross(i), -k, TOLERANCE);
 
         // Тест с произвольными векторами
         let v1 = Vec3::new(1.0, 2.0, 3.0);
         let v2 = Vec3::new(4.0, 5.0, 6.0);
-        let result = v1.cross_right(v2);
+        let result = v1.cross(v2);
         let expected = Vec3::new(-3.0, 6.0, -3.0); // (2*6 - 3*5, 3*4 - 1*6, 1*5 - 2*4)
         assert_vectors(result, expected, TOLERANCE);
     }
@@ -697,22 +699,21 @@ mod tests {
     fn test_normalize() {
         // Нормализация единичного вектора
         let unit = Vec3::new(1.0, 0.0, 0.0);
-        let normalized_unit = unit.normalize();
-        assert_vectors(normalized_unit, unit, 1e-6);
-        assert_floats(normalized_unit.length(), 1.0, 1e-6);
+        let expected = UVec3::new(1.0, 0.0, 0.0);
+        let normalized_unit = unit.normalize().unwrap();
+        assert_uvectors(normalized_unit, expected, 1e-6);
 
         // Нормализация ненулевого вектора
         let v = Vec3::new(3.0, 4.0, 0.0);
-        let normalized_v = v.normalize();
-        let expected = Vec3::new(0.6, 0.8, 0.0); // (3/5, 4/5, 0)
-        assert_vectors(normalized_v, expected, 1e-6);
-        assert_floats(normalized_v.length(), 1.0, 1e-6);
+        let normalized_v = v.normalize().unwrap();
+        let expected = UVec3::new(0.6, 0.8, 0.0); // (3/5, 4/5, 0)
+        assert_uvectors(normalized_v, expected, 1e-6);
 
         // Нормализация вектора с отрицательными координатами
         let v_neg = Vec3::new(-3.0, -4.0, 0.0);
-        let normalized_neg = v_neg.normalize();
-        let expected_neg = Vec3::new(-0.6, -0.8, 0.0);
-        assert_vectors(normalized_neg, expected_neg, 1e-6);
+        let normalized_neg = v_neg.normalize().unwrap();
+        let expected_neg = UVec3::new(-0.6, -0.8, 0.0);
+        assert_uvectors(normalized_neg, expected_neg, 1e-6);
     }
 
     #[test]

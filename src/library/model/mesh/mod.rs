@@ -1,35 +1,39 @@
-//! Реализация Mesh'а 3D модели.
+//! Объявление и реализация Mesh'а 3D модели.
 //!
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Mesh, Transform3D, Vec3};
+use crate::{CoordFrame, HVec3, Line3, Point3, Transform3D, UVec3, Vec3};
+
+mod polygon;
+// re-export в модель
+pub use polygon::Polygon;
 
 /// Mesh модели.
 ///
-/// Mesh представляет собой набор вершин (точек) и полигонов.
+/// Mesh представляет собой набор вершин (точек в пространстве), набор полигонов, которые объединяют
+/// вершины в сетку, а также набор нормалей и текстурных координат для дальнейшей отрисовки модели.
+/// Все векторы и точки хранятся в локальных координатах модели.
 #[derive(Debug, Clone)]
 pub struct Mesh {
     /// Все вершины Mesh'а модели.
     ///
-    /// Поскольку вершины будут подтвергнуты преобразованиям, они представлены в виде 4D векторов.
-    /// Иными словами, вершины являются 4D векторами, которые направлены из локальной системы координат
-    /// в точку самой вершины.
-    vertexes: Vec<HVec3>,
+    /// Вершины хранятся как 3D точки в **локальных** координатах Mesh'а.
+    vertexes: Vec<Point3>,
 
     /// Все полигоны Mesh'а модели.
     ///
     /// Для оптимизации хранения, полигоны задаются индексами вершин из `vertexes`, а не копиями вершин.
     /// Иными словами, полигон - это просто массив (вектор) индексов вершин модели.
-    polygons: Vec<classes3d::mesh::Polygon3>,
+    polygons: Vec<Polygon>,
 
     /// Локальные координаты Mesh'а в 3D пространстве.
-    local_frame: CoordFrame,
+    pub local_frame: CoordFrame,
 
-    /// Нормали вершин, используются те же индексы, что и в полигонах.
-    normals: Vec<Vec3>,
+    /// Нормали вершин. Индексируются в том же порядке, что и вершины Mesh'а.
+    normals: Vec<UVec3>,
 
-    /// Соответствие между UV-координатами текстуры и вершинами
+    /// Соответствие между UV-координатами текстуры и вершинами.
     texture_coords: Vec<(f32, f32)>,
 }
 
@@ -38,10 +42,8 @@ impl Mesh {
     // Вспомогательные статические методы
     // --------------------------------------------------
 
-    /// Сгенерировать карту нормалей по имеющимся полигонам.
-    pub fn generate_normals(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) -> Vec<Vec3> {
-        let mut normals = vec![Vec3::new(0.0, 0.0, 0.0); vertexes.len()];
-
+    /// Сгенерировать нормали по имеющимся полигонам.
+    pub fn generate_normals(vertexes: &Vec<Point3>, polygons: &Vec<Polygon>) -> Vec<UVec3> {
         let mut normals = vec![Vec3::zero(); vertexes.len()];
         let mut face_count = vec![0; vertexes.len()];
 
@@ -51,52 +53,39 @@ impl Mesh {
         // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
         // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
         for polygon in polygons {
-            let poly_normal = polygon.get_normal(vertexes, Some(mesh_center));
-            let vertex_indices = polygon.get_vertexes();
+            let poly_normal = polygon.plane_normal(Some(mesh_center));
 
-            for &vertex_index in vertex_indices {
+            for vertex_index in polygon.get_mesh_vertex_index_iter() {
                 normals[vertex_index] = normals[vertex_index] + poly_normal;
                 face_count[vertex_index] += 1;
             }
         }
 
-        // Усредняем нормали и нормализуем
+        // Усредняем нормали
         for i in 0..normals.len() {
             if face_count[i] > 0 {
                 normals[i] = normals[i] * (1.0 / face_count[i] as f32);
-                normals[i] = normals[i].normalize();
             }
         }
-        // for normal in normals {
-        //   if normal.length() > 0.0 {
-        //     normal = normal.normalize()
-        // } else {
-        //   normal = Vec3::new(0.0, 0.0, 1.0)
-        // }
-        //}
 
-        for i in 0..normals.len() {
-            if normals[i].length() > 0.0 {
-                normals[i] = normals[i].normalize() // Изменяем элемент в векторе
-            } else {
-                normals[i] = Vec3::new(0.0, 0.0, 1.0)
-            }
-        }
         normals
+            .iter()
+            .map(|&v| v.normalize().unwrap_or(UVec3::new(0.0, 0.0, 1.0)))
+            .collect()
     }
 
     /// Вычислить центр меша
-    fn calculate_center(vertexes: &Vec<HVec3>) -> Vec3 {
+    fn calculate_center(vertexes: &Vec<Point3>) -> Point3 {
         if vertexes.is_empty() {
-            return Vec3::zero();
+            return Point3::zero();
         }
 
         let sum: Vec3 = vertexes
             .iter()
-            .map(|v| Vec3::from(*v))
+            .map(|&p| Vec3::from(p))
             .fold(Vec3::zero(), |acc, v| acc + v);
 
-        sum * (1.0 / vertexes.len() as f32)
+        (sum * (1.0 / vertexes.len() as f32)).into()
     }
 
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
@@ -164,7 +153,7 @@ impl Mesh {
             }
 
             // Вычисляем нормаль полигона для определения плоскости проекции
-            let normal = polygon.get_normal(vertexes, None);
+            let normal = polygon.get_normal(None);
             let (u_axis, v_axis) = Self::get_projection_axes(normal);
 
             let (min_u, min_v, max_u, max_v) =
@@ -260,7 +249,7 @@ impl Mesh {
     /// Локальная система координат этого Mesh'а будет совпадать с глобальной.
     pub fn new(
         vertexes: Vec<HVec3>,
-        polygons: Vec<Polygon3>,
+        polygons: Vec<Polygon>,
         normals: Vec<Vec3>,
         texture_coords: Vec<(f32, f32)>,
     ) -> Self {
@@ -283,7 +272,7 @@ impl Mesh {
     /// Создать новый Mesh из вершин и полигонов.
     ///
     /// Нормали и координаты текстур будут сгенерированы автоматически.
-    pub fn from_polygons(vertexes: Vec<HVec3>, polygons: Vec<Polygon3>) -> Self {
+    pub fn from_polygons(vertexes: Vec<HVec3>, polygons: Vec<Polygon>) -> Self {
         #[cfg(debug_assertions)]
         for polygon in polygons.clone() {
             assert!(
@@ -346,7 +335,7 @@ impl Mesh {
                 let v1 = current_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v2 = next_ring_start + (segment_idx + 1) % vertices_per_profile;
                 let v3 = next_ring_start + segment_idx;
-                polygons.push(Polygon3::from_list(&[v0, v1, v2, v3]));
+                polygons.push(Polygon::from_list(&[v0, v1, v2, v3]));
             }
         }
 
@@ -358,7 +347,7 @@ impl Mesh {
 
     /// Создает верхнюю и нижнюю крышки для модели вращения
     fn create_rotation_caps(
-        polygons: &mut Vec<Polygon3>,
+        polygons: &mut Vec<Polygon>,
         profile_count: usize,
         vertices_per_profile: usize,
     ) {
@@ -369,7 +358,7 @@ impl Mesh {
                 bottom_cap.push(i);
             }
             if bottom_cap.len() >= 3 {
-                polygons.push(Polygon3::from_list(&bottom_cap));
+                polygons.push(Polygon::from_list(&bottom_cap));
             }
         }
 
@@ -383,7 +372,7 @@ impl Mesh {
             // Реверсируем для правильной ориентации нормали
             top_cap.reverse();
             if top_cap.len() >= 3 {
-                polygons.push(Polygon3::from_list(&top_cap));
+                polygons.push(Polygon::from_list(&top_cap));
             }
         }
     }
@@ -421,9 +410,9 @@ impl Mesh {
                 let z = func(x, y);
 
                 if z.is_finite() {
-                    vertexes.push(HVec3::new(x, y, z));
+                    vertexes.push(Point3::new(x, y, z));
                 } else {
-                    vertexes.push(HVec3::new(x, y, 0.0));
+                    vertexes.push(Point3::new(x, y, 0.0));
                 }
             }
         }
@@ -435,14 +424,14 @@ impl Mesh {
                 let idx = |i: usize, j: usize| -> usize { j * (x_steps + 1) + i };
 
                 // Первый треугольник
-                polygons.push(Polygon3::triangle(
+                polygons.push(Polygon::triangle(
                     idx(i, j),
                     idx(i + 1, j),
                     idx(i + 1, j + 1),
                 ));
 
                 // Второй треугольник
-                polygons.push(Polygon3::triangle(
+                polygons.push(Polygon::triangle(
                     idx(i, j),
                     idx(i + 1, j + 1),
                     idx(i, j + 1),
@@ -461,18 +450,18 @@ impl Mesh {
 
         let vertexes = vec![
             // Вершина тетраэдра
-            HVec3::new(0.0, 0.0, height),
+            Point3::new(0.0, 0.0, height),
             // Основание (равносторонний треугольник)
-            HVec3::new(0.0, base_height, 0.0),
-            HVec3::new(0.5, -base_height / 2.0, 0.0),
-            HVec3::new(-0.5, -base_height / 2.0, 0.0),
+            Point3::new(0.0, base_height, 0.0),
+            Point3::new(0.5, -base_height / 2.0, 0.0),
+            Point3::new(-0.5, -base_height / 2.0, 0.0),
         ];
 
         let polygons = vec![
-            Polygon3::triangle(0, 1, 2),
-            Polygon3::triangle(0, 2, 3),
-            Polygon3::triangle(0, 3, 1),
-            Polygon3::triangle(1, 3, 2),
+            Polygon::triangle(0, 1, 2),
+            Polygon::triangle(0, 2, 3),
+            Polygon::triangle(0, 3, 1),
+            Polygon::triangle(1, 3, 2),
         ];
 
         Self::from_polygons(vertexes, polygons)
@@ -485,24 +474,24 @@ impl Mesh {
 
         let vertexes = vec![
             // Нижняя грань
-            HVec3::new(-half, -half, -half),
-            HVec3::new(half, -half, -half),
-            HVec3::new(half, half, -half),
-            HVec3::new(-half, half, -half),
+            Point3::new(-half, -half, -half),
+            Point3::new(half, -half, -half),
+            Point3::new(half, half, -half),
+            Point3::new(-half, half, -half),
             // Верхняя грань
-            HVec3::new(-half, -half, half),
-            HVec3::new(half, -half, half),
-            HVec3::new(half, half, half),
-            HVec3::new(-half, half, half),
+            Point3::new(-half, -half, half),
+            Point3::new(half, -half, half),
+            Point3::new(half, half, half),
+            Point3::new(-half, half, half),
         ];
 
         let polygons = vec![
-            Polygon3::from_list(&[0, 1, 2, 3]),
-            Polygon3::from_list(&[4, 5, 6, 7]),
-            Polygon3::from_list(&[3, 2, 6, 7]),
-            Polygon3::from_list(&[0, 1, 5, 4]),
-            Polygon3::from_list(&[0, 3, 7, 4]),
-            Polygon3::from_list(&[1, 2, 6, 5]),
+            Polygon::from_list(&[0, 1, 2, 3]),
+            Polygon::from_list(&[4, 5, 6, 7]),
+            Polygon::from_list(&[3, 2, 6, 7]),
+            Polygon::from_list(&[0, 1, 5, 4]),
+            Polygon::from_list(&[0, 3, 7, 4]),
+            Polygon::from_list(&[1, 2, 6, 5]),
         ];
 
         Self::from_polygons(vertexes, polygons)
@@ -515,26 +504,26 @@ impl Mesh {
 
         let vertexes = vec![
             // Верхняя и нижняя вершины
-            HVec3::new(0.0, 0.0, a),
-            HVec3::new(0.0, 0.0, -a),
+            Point3::new(0.0, 0.0, a),
+            Point3::new(0.0, 0.0, -a),
             // Вершины в плоскости XY
-            HVec3::new(a, 0.0, 0.0),
-            HVec3::new(0.0, a, 0.0),
-            HVec3::new(-a, 0.0, 0.0),
-            HVec3::new(0.0, -a, 0.0),
+            Point3::new(a, 0.0, 0.0),
+            Point3::new(0.0, a, 0.0),
+            Point3::new(-a, 0.0, 0.0),
+            Point3::new(0.0, -a, 0.0),
         ];
 
         let polygons = vec![
             // Верхние треугольники
-            Polygon3::triangle(0, 2, 3), // верх-право-перед
-            Polygon3::triangle(0, 3, 4), // верх-перед-лево
-            Polygon3::triangle(0, 4, 5), // верх-лево-зад
-            Polygon3::triangle(0, 5, 2), // верх-зад-право
+            Polygon::triangle(0, 2, 3), // верх-право-перед
+            Polygon::triangle(0, 3, 4), // верх-перед-лево
+            Polygon::triangle(0, 4, 5), // верх-лево-зад
+            Polygon::triangle(0, 5, 2), // верх-зад-право
             // Нижние треугольники
-            Polygon3::triangle(1, 3, 2), // низ-перед-право
-            Polygon3::triangle(1, 4, 3), // низ-лево-перед
-            Polygon3::triangle(1, 5, 4), // низ-зад-лево
-            Polygon3::triangle(1, 2, 5), // низ-право-зад
+            Polygon::triangle(1, 3, 2), // низ-перед-право
+            Polygon::triangle(1, 4, 3), // низ-лево-перед
+            Polygon::triangle(1, 5, 4), // низ-зад-лево
+            Polygon::triangle(1, 2, 5), // низ-право-зад
         ];
 
         Self::from_polygons(vertexes, polygons)
@@ -547,21 +536,21 @@ impl Mesh {
 
         let vertexes = vec![
             // Верхние и нижние вершины
-            HVec3::new(0.0, 1.0, phi),   // 0: зад-верх
-            HVec3::new(0.0, 1.0, -phi),  // 1: перед-верх
-            HVec3::new(0.0, -1.0, phi),  // 2: зад-низ
-            HVec3::new(0.0, -1.0, -phi), // 3: перед-низ
+            Point3::new(0.0, 1.0, phi),   // 0: зад-верх
+            Point3::new(0.0, 1.0, -phi),  // 1: перед-верх
+            Point3::new(0.0, -1.0, phi),  // 2: зад-низ
+            Point3::new(0.0, -1.0, -phi), // 3: перед-низ
             // Боковые вершины - передние
-            HVec3::new(1.0, phi, 0.0),  // 4: верх-право
-            HVec3::new(-1.0, phi, 0.0), // 5: верх-лево
+            Point3::new(1.0, phi, 0.0),  // 4: верх-право
+            Point3::new(-1.0, phi, 0.0), // 5: верх-лево
             // Боковые вершины - задние
-            HVec3::new(1.0, -phi, 0.0),  // 6: низ-право
-            HVec3::new(-1.0, -phi, 0.0), // 7: низ-лево
+            Point3::new(1.0, -phi, 0.0),  // 6: низ-право
+            Point3::new(-1.0, -phi, 0.0), // 7: низ-лево
             // Передние и задние вершины
-            HVec3::new(phi, 0.0, 1.0),   // 8: право-зад
-            HVec3::new(phi, 0.0, -1.0),  // 9: право-перед
-            HVec3::new(-phi, 0.0, 1.0),  // 10: лево-зад
-            HVec3::new(-phi, 0.0, -1.0), // 11: лево-перед
+            Point3::new(phi, 0.0, 1.0),   // 8: право-зад
+            Point3::new(phi, 0.0, -1.0),  // 9: право-перед
+            Point3::new(-phi, 0.0, 1.0),  // 10: лево-зад
+            Point3::new(-phi, 0.0, -1.0), // 11: лево-перед
         ];
 
         // Нормализуем вершины
@@ -569,31 +558,31 @@ impl Mesh {
             .into_iter()
             .map(|p| {
                 let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
-                HVec3::new(p.x / len, p.y / len, p.z / len)
+                Point3::new(p.x / len, p.y / len, p.z / len)
             })
             .collect();
 
         let polygons = vec![
-            Polygon3::triangle(0, 4, 8),
-            Polygon3::triangle(0, 8, 2),
-            Polygon3::triangle(0, 2, 10),
-            Polygon3::triangle(0, 10, 5),
-            Polygon3::triangle(0, 5, 4),
-            Polygon3::triangle(1, 9, 4),
-            Polygon3::triangle(1, 4, 5),
-            Polygon3::triangle(1, 5, 11),
-            Polygon3::triangle(1, 11, 3),
-            Polygon3::triangle(1, 3, 9),
-            Polygon3::triangle(4, 9, 8),
-            Polygon3::triangle(8, 9, 6),
-            Polygon3::triangle(6, 9, 3),
-            Polygon3::triangle(11, 5, 10),
-            Polygon3::triangle(10, 5, 0),
-            Polygon3::triangle(7, 6, 2),
-            Polygon3::triangle(7, 6, 3),
-            Polygon3::triangle(7, 2, 10),
-            Polygon3::triangle(7, 10, 11),
-            Polygon3::triangle(7, 11, 3),
+            Polygon::triangle(0, 4, 8),
+            Polygon::triangle(0, 8, 2),
+            Polygon::triangle(0, 2, 10),
+            Polygon::triangle(0, 10, 5),
+            Polygon::triangle(0, 5, 4),
+            Polygon::triangle(1, 9, 4),
+            Polygon::triangle(1, 4, 5),
+            Polygon::triangle(1, 5, 11),
+            Polygon::triangle(1, 11, 3),
+            Polygon::triangle(1, 3, 9),
+            Polygon::triangle(4, 9, 8),
+            Polygon::triangle(8, 9, 6),
+            Polygon::triangle(6, 9, 3),
+            Polygon::triangle(11, 5, 10),
+            Polygon::triangle(10, 5, 0),
+            Polygon::triangle(7, 6, 2),
+            Polygon::triangle(7, 6, 3),
+            Polygon::triangle(7, 2, 10),
+            Polygon::triangle(7, 10, 11),
+            Polygon::triangle(7, 11, 3),
         ];
 
         Self::from_polygons(vertexes, polygons)
@@ -606,128 +595,137 @@ impl Mesh {
 
         let mut vertexes = vec![
             // (±1, ±1, ±1)
-            HVec3::new(1.0, 1.0, 1.0),    // 0
-            HVec3::new(1.0, 1.0, -1.0),   // 1
-            HVec3::new(1.0, -1.0, 1.0),   // 2
-            HVec3::new(1.0, -1.0, -1.0),  // 3
-            HVec3::new(-1.0, 1.0, 1.0),   // 4
-            HVec3::new(-1.0, 1.0, -1.0),  // 5
-            HVec3::new(-1.0, -1.0, 1.0),  // 6
-            HVec3::new(-1.0, -1.0, -1.0), // 7
+            Point3::new(1.0, 1.0, 1.0),    // 0
+            Point3::new(1.0, 1.0, -1.0),   // 1
+            Point3::new(1.0, -1.0, 1.0),   // 2
+            Point3::new(1.0, -1.0, -1.0),  // 3
+            Point3::new(-1.0, 1.0, 1.0),   // 4
+            Point3::new(-1.0, 1.0, -1.0),  // 5
+            Point3::new(-1.0, -1.0, 1.0),  // 6
+            Point3::new(-1.0, -1.0, -1.0), // 7
             // (0, ±φ, ±1/φ)
-            HVec3::new(0.0, phi, inv_phi),   // 8
-            HVec3::new(0.0, phi, -inv_phi),  // 9
-            HVec3::new(0.0, -phi, inv_phi),  // 10
-            HVec3::new(0.0, -phi, -inv_phi), // 11
+            Point3::new(0.0, phi, inv_phi),   // 8
+            Point3::new(0.0, phi, -inv_phi),  // 9
+            Point3::new(0.0, -phi, inv_phi),  // 10
+            Point3::new(0.0, -phi, -inv_phi), // 11
             // (±1/φ, 0, ±φ)
-            HVec3::new(inv_phi, 0.0, phi),   // 12
-            HVec3::new(-inv_phi, 0.0, phi),  // 13
-            HVec3::new(inv_phi, 0.0, -phi),  // 14
-            HVec3::new(-inv_phi, 0.0, -phi), // 15
+            Point3::new(inv_phi, 0.0, phi),   // 12
+            Point3::new(-inv_phi, 0.0, phi),  // 13
+            Point3::new(inv_phi, 0.0, -phi),  // 14
+            Point3::new(-inv_phi, 0.0, -phi), // 15
             // (±φ, ±1/φ, 0)
-            HVec3::new(phi, inv_phi, 0.0),   // 16
-            HVec3::new(-phi, inv_phi, 0.0),  // 17
-            HVec3::new(phi, -inv_phi, 0.0),  // 18
-            HVec3::new(-phi, -inv_phi, 0.0), // 19
+            Point3::new(phi, inv_phi, 0.0),   // 16
+            Point3::new(-phi, inv_phi, 0.0),  // 17
+            Point3::new(phi, -inv_phi, 0.0),  // 18
+            Point3::new(-phi, -inv_phi, 0.0), // 19
         ];
 
         vertexes = vertexes
             .into_iter()
             .map(|p| {
                 let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
-                HVec3::new(p.x / len, p.y / len, p.z / len)
+                Point3::new(p.x / len, p.y / len, p.z / len)
             })
             .collect();
 
         let polygons = vec![
-            Polygon3::from_list(&[0, 12, 2, 18, 16]),
-            Polygon3::from_list(&[0, 16, 1, 9, 8]),
-            Polygon3::from_list(&[0, 8, 4, 13, 12]),
-            Polygon3::from_list(&[10, 2, 12, 13, 6]),
-            Polygon3::from_list(&[10, 6, 19, 7, 11]),
-            Polygon3::from_list(&[10, 11, 3, 18, 2]),
-            Polygon3::from_list(&[5, 17, 4, 8, 9]),
-            Polygon3::from_list(&[5, 9, 1, 14, 15]),
-            Polygon3::from_list(&[5, 15, 7, 19, 17]),
-            Polygon3::from_list(&[3, 14, 1, 16, 18]),
-            Polygon3::from_list(&[3, 11, 7, 15, 14]),
-            Polygon3::from_list(&[4, 17, 19, 6, 13]),
+            Polygon::from_list(&[0, 12, 2, 18, 16]),
+            Polygon::from_list(&[0, 16, 1, 9, 8]),
+            Polygon::from_list(&[0, 8, 4, 13, 12]),
+            Polygon::from_list(&[10, 2, 12, 13, 6]),
+            Polygon::from_list(&[10, 6, 19, 7, 11]),
+            Polygon::from_list(&[10, 11, 3, 18, 2]),
+            Polygon::from_list(&[5, 17, 4, 8, 9]),
+            Polygon::from_list(&[5, 9, 1, 14, 15]),
+            Polygon::from_list(&[5, 15, 7, 19, 17]),
+            Polygon::from_list(&[3, 14, 1, 16, 18]),
+            Polygon::from_list(&[3, 11, 7, 15, 14]),
+            Polygon::from_list(&[4, 17, 19, 6, 13]),
         ];
 
         Self::from_polygons(vertexes, polygons)
     }
 
     // --------------------------------------------------
-    // setter'ы и getter'ы
+    // доступ к элементам модели
     // --------------------------------------------------
 
-    /// Получить систему координат Mesh'а.
-    pub fn get_local_frame(&self) -> &CoordFrame {
-        &self.local_frame
+    /// Получить количество вершин в модели.
+    pub fn vertex_count(&self) -> usize {
+        self.vertexes.len()
     }
 
-    /// Получить изменяемую систему координат Mesh'а.
-    pub fn get_local_frame_mut(&mut self) -> &mut CoordFrame {
-        &mut self.local_frame
+    /// Получить i-ую вершину модели в **локальных** координатах.
+    pub fn get_local_vertex(&self, i: usize) -> Point3 {
+        self.vertexes[i]
     }
 
-    /// Возвращает итератор вершин Mesh'а в **локальных** координатах.
-    pub fn get_local_vertexes(&self) -> impl Iterator<Item = HVec3> {
+    /// Получить i-ую вершину модели в **глобальных** координатах.
+    pub fn get_global_vertex(&self, i: usize) -> Point3 {
+        self.vertexes[i] * self.local_frame.local_to_global_matrix()
+    }
+
+    /// Получить нормаль i-ой вершины модели в **локальных** координатах.
+    pub fn get_local_normal(&self, i: usize) -> UVec3 {
+        self.normals[i]
+    }
+
+    /// Получить нормаль i-ой вершины модели в **глобальных** координатах.
+    pub fn get_global_normal(&self, i: usize) -> UVec3 {
+        // нормали ведут себя по-другому и умножаются на инвертированную матрицу.
+        // так как нормаль вектор - то смещение применено не будет, тут всё ок
+        let transform = self
+            .local_frame
+            .local_to_global_matrix()
+            .inverse()
+            .expect("Ожидалось наличие обратной матрицы");
+        (self.normals[i] * transform).normalize()
+    }
+
+    /// Получить текстурные координаты i-ой вершины модели.
+    pub fn get_texture_coord(&self, i: usize) -> (f32, f32) {
+        self.texture_coords[i]
+    }
+
+    /// Получить итератор по всем вершинам модели в **локальных** координатах.
+    pub fn get_local_vertex_iter(&self) -> impl Iterator<Item = Point3> {
         self.vertexes.iter().copied()
     }
 
-    /// Возвращает итератор вершин Mesh'а в **глобальных** координатах.
-    pub fn get_global_vertexes(&self) -> impl Iterator<Item = HVec3> {
-        self.vertexes
-            .iter()
-            .copied()
-            .map(|v| v * self.local_frame.local_to_global_matrix())
+    /// Получить итератор по всем вершинам модели в **глобальных** координатах.
+    pub fn get_global_vertex_iter(&self) -> impl Iterator<Item = Point3> {
+        let transform = self.local_frame.local_to_global_matrix();
+        self.vertexes.iter().map(move |&p| p * transform)
     }
 
-    /// Возвращает итератор на полигоны.
+    /// Получить итератор по всем нормалям модели в **локальных** координатах.
     ///
-    /// Полигон представляет собой набор индексов вершин.
-    pub fn get_polygons(&self) -> impl Iterator<Item = &Polygon3> {
-        self.polygons.iter()
-    }
-
-    /// Возвращает итератор нормалей вершин Mesh'а в **локальных** координатах.
-    pub fn get_local_normals(&self) -> impl Iterator<Item = Vec3> {
-        #[cfg(debug_assertions)]
-        if self.normals.len() != self.vertexes.len() {
-            eprintln!(
-                "Warning: используются нормали модели, но их количество не совпадает с количеством вершин"
-            );
-        }
-
+    /// Нормали идут в порядке соответствующих им вершин
+    pub fn get_local_normals_iter(&self) -> impl Iterator<Item = UVec3> {
         self.normals.iter().copied()
     }
 
-    /// Возвращает итератор нормалей вершин Mesh'а в **глобальных** координатах.
-    pub fn get_global_normals(&self) -> impl Iterator<Item = Vec3> {
-        #[cfg(debug_assertions)]
-        if self.normals.len() != self.vertexes.len() {
-            eprintln!(
-                "Warning: используются нормали модели, но их количество не совпадает с количеством вершин"
-            );
-        }
-
+    /// Получить итератор по всем нормалям модели в **глобальных** координатах.
+    ///
+    /// Нормали идут в порядке соответствующих им вершин
+    pub fn get_global_normals_iter(&self) -> impl Iterator<Item = UVec3> {
+        // нормали ведут себя по-другому и умножаются на инвертированную матрицу.
+        // так как нормаль вектор - то смещение применено не будет, тут всё ок
+        let transform = self
+            .local_frame
+            .local_to_global_matrix()
+            .inverse()
+            .expect("Ожидалось наличие обратной матрицы");
         self.normals
             .iter()
-            .copied()
-            .map(|n| n * self.local_frame.local_to_global_matrix())
+            .map(move |&n| (n * transform).normalize())
     }
 
-    /// Получить текстурные координаты модели.
-    pub fn get_texture_coords(&self) -> &Vec<(f32, f32)> {
-        #[cfg(debug_assertions)]
-        if self.texture_coords.len() != self.vertexes.len() {
-            eprintln!(
-                "Warning: используются текстурные координаты модели, но их количество не совпадает с количеством вершин"
-            );
-        }
-
-        &self.texture_coords
+    /// Получить итератор по всем текстурным координатам модели.
+    ///
+    /// Текстурные координаты идут в порядке соответсвующих им вершин.
+    pub fn get_texture_coord_iter(&self) -> impl Iterator<Item = (f32, f32)> {
+        self.texture_coords.iter().copied()
     }
 
     // --------------------------------------------------
@@ -777,144 +775,8 @@ impl Mesh {
     }
 }
 
-/// Представление одного полигона модели. Только для внутреннего использования.
-/// Дабы избежать копирования вершин, полигоны только хранят индексы вершин из Mesh'а.
-///
-/// Полигоны должны быть построены строго **по часовой стрелке**, в противном случае не получится
-/// построить нормали для модели.
-#[derive(Debug, Clone)]
-pub struct Polygon3 {
-    vertexes: Vec<usize>,
-}
-
-impl Polygon3 {
-    // --------------------------------------------------
-    // Конструкторы
-    // --------------------------------------------------
-
-    /// Создание пустого полигона.
-    pub fn new() -> Self {
-        Self { vertexes: vec![] }
-    }
-
-    /// Создать треугольник.
-    pub fn triangle(p1: usize, p2: usize, p3: usize) -> Self {
-        Self {
-            vertexes: vec![p1, p2, p3],
-        }
-    }
-
-    /// Создать полигон из списка индексов вершин.
-    pub fn from_list(vertexes: &[usize]) -> Self {
-        Self {
-            vertexes: vertexes.into(),
-        }
-    }
-
-    // --------------------------------------------------
-    // Вспомогательные методы
-    // --------------------------------------------------
-
-    /// Добавить вершину (точку) в полигон.
-    pub fn add_vertex(&mut self, index: usize) {
-        self.vertexes.push(index);
-    }
-
-    /// Состоит ли полигон только из одной вершины?
-    pub fn is_vertex(&self) -> bool {
-        self.vertexes.len() == 1
-    }
-
-    /// Состоит ли полигон только из одного ребра?
-    pub fn is_edge(&self) -> bool {
-        self.vertexes.len() == 2
-    }
-
-    /// Полигон является треугольником?
-    pub fn is_triangle(&self) -> bool {
-        self.vertexes.len() == 3
-    }
-
-    pub fn is_rectangle(&self) -> bool {
-        self.vertexes.len() == 0
-    }
-
-    /// Полигон является хотя бы треугольником.
-    ///
-    /// Иными словами, в нём хотя бы 3 вершины.
-    pub fn is_valid(&self) -> bool {
-        self.vertexes.len() >= 3
-    }
-
-    /// Получить список индексов вершин.
-    pub fn get_vertexes(&self) -> &Vec<usize> {
-        &self.vertexes
-    }
-
-    pub fn is_point_in_convex_polygon(&self, vertexes: &Vec<Vec3>, point: Vec3) -> bool {
-        let vert_index = self.get_vertexes();
-        let n = vert_index.len();
-        let mut sign = 0.0;
-
-        for i in 0..n {
-            let j = (i + 1) % n;
-            let edge = vertexes[vert_index[j]] - vertexes[vert_index[i]];
-            let to_point = point - vertexes[vert_index[i]];
-
-            let cross = edge.dot(to_point);
-
-            if i == 0 {
-                sign = cross;
-            } else if cross * sign < 0.0 {
-                return false; // Разные знаки - точка снаружи
-            }
-        }
-
-        true
-    }
-
-    /// Получить нормаль к полигону
-    pub fn get_normal(&self, vertexes: &Vec<HVec3>, mesh_center: Option<Vec3>) -> Vec3 {
-        let vertex_indices = self.get_vertexes();
-
-        // Достаточно 3х вершин для определения плоскости
-        if vertex_indices.len() < 3 {
-            return Vec3::new(0.0, 0.0, 1.0);
-        }
-
-        // Берем первые 3 вершины (можно любые 3 неколлинеарные), так как мы ищем нормаль к плоскости полигона
-        let v0 = Vec3::from(vertexes[vertex_indices[0]]);
-        let v1 = Vec3::from(vertexes[vertex_indices[1]]);
-        let v2 = Vec3::from(vertexes[vertex_indices[2]]);
-
-        let edge1 = v1 - v0;
-        let edge2 = v2 - v0;
-
-        // Векторное произведение дает нормаль к плоскости
-        let mut normal = edge1.cross_right(edge2);
-
-        // Ориентируем нормаль ВНЕ объекта
-        if let Some(center) = mesh_center {
-            let face_center = (v0 + v1 + v2) * (1.0 / 3.0);
-            let center_to_face = face_center - center;
-
-            if normal.dot(center_to_face) < 0.0 {
-                normal = -normal;
-            }
-        }
-
-        if normal.length() > 0.0 {
-            normal.normalize()
-        } else {
-            Vec3::new(0.0, 0.0, 1.0)
-        }
-    }
-}
-
 #[cfg(test)]
 mod mesh_tests {
-    use crate::HVec3;
-
     use super::*;
 
     const TOLERANCE: f32 = 1e-6;
@@ -939,16 +801,16 @@ mod mesh_tests {
         );
     }
 
-    fn generate_cube() -> Mesh {
+    fn generate_cube<'p>() -> Mesh<'p> {
         let vertexes = vec![
-            HVec3::new(0.0, 0.0, 0.0),
-            HVec3::new(1.0, 0.0, 0.0),
-            HVec3::new(0.0, 1.0, 0.0),
-            HVec3::new(1.0, 1.0, 0.0),
-            HVec3::new(0.0, 0.0, 1.0),
-            HVec3::new(1.0, 0.0, 1.0),
-            HVec3::new(0.0, 1.0, 1.0),
-            HVec3::new(1.0, 1.0, 1.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(1.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+            Point3::new(1.0, 0.0, 1.0),
+            Point3::new(0.0, 1.0, 1.0),
+            Point3::new(1.0, 1.0, 1.0),
         ];
         let polygons = vec![
             Polygon3::from_list(&vec![0, 1, 2, 3]),
@@ -967,14 +829,14 @@ mod mesh_tests {
 
         let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
         let expected_vertexes = vec![
-            HVec3::new(0.0, 0.0, 0.0),
-            HVec3::new(1.0, 0.0, 0.0),
-            HVec3::new(0.0, 1.0, 0.0),
-            HVec3::new(1.0, 1.0, 0.0),
-            HVec3::new(0.0, 0.0, 1.0),
-            HVec3::new(1.0, 0.0, 1.0),
-            HVec3::new(0.0, 1.0, 1.0),
-            HVec3::new(1.0, 1.0, 1.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(1.0, 1.0, 0.0),
+            Point3::new(0.0, 0.0, 1.0),
+            Point3::new(1.0, 0.0, 1.0),
+            Point3::new(0.0, 1.0, 1.0),
+            Point3::new(1.0, 1.0, 1.0),
         ];
 
         for i in 0..global_vertexes.len() {
@@ -989,14 +851,14 @@ mod mesh_tests {
 
         let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
         let expected_vertexes = vec![
-            HVec3::new(0.0, 5.0, 0.0),
-            HVec3::new(1.0, 5.0, 0.0),
-            HVec3::new(0.0, 6.0, 0.0),
-            HVec3::new(1.0, 6.0, 0.0),
-            HVec3::new(0.0, 5.0, 1.0),
-            HVec3::new(1.0, 5.0, 1.0),
-            HVec3::new(0.0, 6.0, 1.0),
-            HVec3::new(1.0, 6.0, 1.0),
+            Point3::new(0.0, 5.0, 0.0),
+            Point3::new(1.0, 5.0, 0.0),
+            Point3::new(0.0, 6.0, 0.0),
+            Point3::new(1.0, 6.0, 0.0),
+            Point3::new(0.0, 5.0, 1.0),
+            Point3::new(1.0, 5.0, 1.0),
+            Point3::new(0.0, 6.0, 1.0),
+            Point3::new(1.0, 6.0, 1.0),
         ];
 
         for i in 0..global_vertexes.len() {
@@ -1012,14 +874,14 @@ mod mesh_tests {
 
         let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
         let expected_vertexes = vec![
-            HVec3::new(0.0, 0.0, 0.0),
-            HVec3::new(1.0, 0.0, 0.0),
-            HVec3::new(0.0, 0.0, -1.0),
-            HVec3::new(1.0, 0.0, -1.0),
-            HVec3::new(0.0, 1.0, 0.0),
-            HVec3::new(1.0, 1.0, 0.0),
-            HVec3::new(0.0, 1.0, -1.0),
-            HVec3::new(1.0, 1.0, -1.0),
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, -1.0),
+            Point3::new(1.0, 0.0, -1.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Point3::new(1.0, 1.0, 0.0),
+            Point3::new(0.0, 1.0, -1.0),
+            Point3::new(1.0, 1.0, -1.0),
         ];
 
         for i in 0..global_vertexes.len() {

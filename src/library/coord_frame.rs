@@ -17,9 +17,9 @@ pub struct CoordFrame {
     up: UVec3,
     /// Точка (0.0, 0.0, 0.0) локальной координатной системы. Сама точка `origin` указывается в
     /// **глобальных** координатах,задаёт нулевую точку локальных координат.
-    origin: Point3,
+    pub origin: Point3,
     /// Вектор масштабирования каждой координатной оси локальной системы.
-    scale: Vec3,
+    pub scale: Vec3,
 }
 
 impl CoordFrame {
@@ -107,11 +107,6 @@ impl CoordFrame {
         self.right
     }
 
-    /// Положение (точка отчёта) локальной координатной системы.
-    pub fn get_origin(&self) -> Point3 {
-        self.origin
-    }
-
     /// Получить матрицу преобразования из текущих локальных координат в глобальные.
     ///
     /// Эта матрица преобразует вектор из локальной системы координат в глобальную.
@@ -155,25 +150,15 @@ impl CoordFrame {
         self.origin = self.origin + vec;
     }
 
-    /// Установить новую точку отчёта локальной системы координат.
-    pub fn set_origin(&mut self, new_pos: Point3) {
-        self.origin = new_pos;
-    }
-
     /// Масштабирует координатную систему в соответсвии с `vec`.
     ///
     /// Каждая координата `vec` является коэфициентом масштабирования каждой из осей.
-    pub fn scale_vec(&mut self, vec: Vec3) {
+    pub fn scale_by_vec(&mut self, vec: Vec3) {
         self.scale = Vec3::new(
             self.scale.x * vec.x,
             self.scale.y * vec.y,
             self.scale.z * vec.z,
         );
-    }
-
-    /// Выставить масштабирование локальной системы в значение `scale`.
-    pub fn set_scale(&mut self, scale: Vec3) {
-        self.scale = scale;
     }
 
     /// Повернуть локальную систему координат через `transform`.

@@ -1,7 +1,6 @@
 //! Объявление и реализация структуры `Line3`.
 
-use super::{Point3, Transform3D, UVec3};
-use std::ops::{Mul, MulAssign};
+use super::{Point3, UVec3};
 
 /// Линия в 3D пространстве.
 ///
@@ -44,31 +43,7 @@ impl Line3 {
             p1, p2
         );
 
-        let direction = (p2 - p1).normalize();
+        let direction = (p2 - p1).normalize().unwrap();
         Self::new(p1, direction)
-    }
-
-    /// Применить преобразование к текущей линии `Line3`. Эта операция **создаёт новую** линию.
-    pub fn apply_transform(self, transform: Transform3D) -> Self {
-        Self::new(
-            transform.apply_to_hvec(self.origin.into()).into(),
-            transform.apply_to_hvec(self.direction.into()).into(),
-        )
-    }
-}
-
-impl Mul<Transform3D> for Line3 {
-    type Output = Line3;
-
-    /// Применить преобразование `Transform3D` к `Line3`.
-    fn mul(self, rhs: Transform3D) -> Self::Output {
-        self.apply_transform(rhs)
-    }
-}
-
-impl MulAssign<Transform3D> for Line3 {
-    /// Применить преобразование `Transform3D` к `Line3`.
-    fn mul_assign(&mut self, rhs: Transform3D) {
-        *self = *self * rhs;
     }
 }

@@ -3,7 +3,7 @@
 use super::{HVec3, Point3, Transform3D, Vec3};
 use std::{
     fmt::Display,
-    ops::{Add, Div, Mul, MulAssign, Neg, Sub},
+    ops::{Add, Div, Mul, Neg, Sub},
 };
 
 /// Направление единичной длины в 3D пространстве с координатами `x`, `y`, `z`.
@@ -181,7 +181,8 @@ impl UVec3 {
     /// ```
     #[inline]
     pub fn cos(self, other: Self) -> f32 {
-        self.dot(other) / (self.length() * other.length())
+        // векторы единичной длины, так что dot = cos
+        self.dot(other)
     }
 
     /// Возвращает угл в радианах между 2-мя векторами.
@@ -266,25 +267,8 @@ impl UVec3 {
 
     /// Применить преобразование к текущему вектору `UVec3`. Эта операция **создаёт новый** вектор.
     /// Вектор остаётся нормализованным после преобразования.
-    pub fn apply_transform(self, transform: Transform3D) -> Self {
-        todo!("А точно ли это стоит реализовывать вот так вот?");
-        UVec3::from(HVec3::from(self) * transform)
-    }
-}
-
-impl Mul<Transform3D> for UVec3 {
-    type Output = Vec3;
-
-    /// Применить преобразование `Transform3D` к вектору `UVec3`.
-    fn mul(self, rhs: Transform3D) -> Self::Output {
-        self.apply_transform(rhs)
-    }
-}
-
-impl MulAssign<Transform3D> for UVec3 {
-    /// Применить преобразование `Transform3D` к вектору `Vec3`.
-    fn mul_assign(&mut self, rhs: Transform3D) {
-        *self = *self * rhs;
+    pub fn apply_transform(self, transform: Transform3D) -> Result<Self, UVecError> {
+        UVec3::try_from(HVec3::from(self) * transform)
     }
 }
 
@@ -531,7 +515,7 @@ impl TryFrom<HVec3> for UVec3 {
 
 /// Ошибки при преобразовании в UVec
 #[derive(Debug, Clone, Copy)]
-enum UVecError {
+pub enum UVecError {
     /// Vec3 является нулевым
     ZeroVec,
     /// Point3 является нулевой

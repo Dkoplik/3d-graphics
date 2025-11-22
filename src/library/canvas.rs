@@ -1,7 +1,7 @@
 //! Реализация холста для 2D рисования.
 
 use egui::{Color32, ColorImage, Pos2, Vec2};
-use std::collections::VecDeque;
+// use std::collections::VecDeque;
 use std::ops::{Index, IndexMut};
 
 /// Холст для рисования 2D объектов.
@@ -161,245 +161,6 @@ impl IndexMut<(usize, usize)> for Canvas {
 }
 
 // --------------------------------------------------
-// Заливка
-// --------------------------------------------------
-
-impl Canvas {
-    /// Вспомогательная функция для нахождения границ линии
-    fn find_line_bounds(&self, x: usize, y: usize, old_color: Color32) -> (usize, usize) {
-        let mut left = x;
-        let mut right = x;
-
-        while self.check_bounds(left, y) && self[(left, y)] == old_color {
-            left -= 1;
-        }
-        left += 1;
-
-        while self.check_bounds(right, y) && self[(right, y)] == old_color {
-            right += 1;
-        }
-        right -= 1;
-
-        (left, right)
-    }
-
-    /// Вспомогательная функция для проверки и добавления точки в стек
-    fn check_and_push(
-        &self,
-        x: usize,
-        y: usize,
-        old_color: Color32,
-        stack: &mut VecDeque<(usize, usize)>,
-    ) {
-        if self.check_bounds(x, y) && self[(x, y)] == old_color {
-            stack.push_back((x, y));
-        }
-    }
-
-    /// Рекурсивная заливка изображения.
-    /// pos - позиция, в которой применяется заливка;
-    /// color - цвет заливки;
-    /// connectivity - тип заливки (4-х или 8-ми связная);
-    pub fn fill_with_color(&mut self, pos: Pos2, color: Color32, connectivity: Connectivity) {
-        let start_x = pos.x as usize;
-        let start_y = pos.y as usize;
-
-        if !self.check_bounds(start_x, start_y) {
-            return;
-        }
-
-        let old_color = self[(start_x, start_y)];
-        if old_color == color {
-            return;
-        }
-
-        let mut stack = VecDeque::new();
-        stack.push_back((start_x, start_y));
-
-        while let Some((x, y)) = stack.pop_front() {
-            if !self.check_bounds(x, y) || self[(x, y)] != old_color {
-                continue;
-            }
-
-            let (left, right) = self.find_line_bounds(x, y, old_color);
-
-            for i in left..=right {
-                if self.check_bounds(i, y) {
-                    self[(i, y)] = color;
-                }
-            }
-
-            for i in left..=right {
-                self.check_and_push(i, y - 1, old_color, &mut stack);
-                self.check_and_push(i, y + 1, old_color, &mut stack);
-            }
-            match connectivity {
-                Connectivity::FOUR => {}
-                Connectivity::EIGHT => {
-                    if left > 0 {
-                        self.check_and_push(left - 1, y - 1, old_color, &mut stack);
-                        self.check_and_push(left - 1, y + 1, old_color, &mut stack);
-                    }
-                    self.check_and_push(right + 1, y - 1, old_color, &mut stack);
-                    self.check_and_push(right + 1, y + 1, old_color, &mut stack);
-                }
-            }
-        }
-    }
-
-    /// Рекурсивная заливка изображения.
-    /// pos - позиция, в которой применяется заливка;
-    /// img - изображение для заливки;
-    /// connectivity - тип заливки (4-х или 8-ми связная);
-    pub fn fill_with_img(&mut self, pos: Pos2, img: &ColorImage, connectivity: Connectivity) {
-        let start_x = pos.x as usize;
-        let start_y = pos.y as usize;
-
-        if !self.check_bounds(start_x, start_y) {
-            return;
-        }
-
-        let old_color = self[(start_x, start_y)];
-        let img_width = img.width();
-        let img_height = img.height();
-
-        let mut stack = VecDeque::new();
-        stack.push_back((start_x, start_y));
-
-        while let Some((x, y)) = stack.pop_front() {
-            if !self.check_bounds(x, y) || self[(x, y)] != old_color {
-                continue;
-            }
-
-            let (left, right) = self.find_line_bounds(x, y, old_color);
-
-            let mut im_y = (y as i32 - start_y as i32) as i32;
-            while im_y <= 0 {
-                im_y += img_height as i32;
-            }
-
-            for i in left..=right {
-                let mut im_x = i as i32 - start_x as i32;
-                while im_x <= 0 {
-                    im_x += img_width as i32;
-                }
-
-                let img_x = (im_x as usize).rem_euclid(img_width);
-                let img_y = (im_y as usize).rem_euclid(img_height);
-
-                if img_x < img_width && img_y < img_height {
-                    self[(i, y)] = img[(img_x, img_y)];
-                }
-            }
-
-            for i in left..=right {
-                self.check_and_push(i, y - 1, old_color, &mut stack);
-                self.check_and_push(i, y + 1, old_color, &mut stack);
-            }
-            match connectivity {
-                Connectivity::FOUR => {}
-                Connectivity::EIGHT => {
-                    if left > 0 {
-                        self.check_and_push(left - 1, y - 1, old_color, &mut stack);
-                        self.check_and_push(left - 1, y + 1, old_color, &mut stack);
-                    }
-                    self.check_and_push(right + 1, y - 1, old_color, &mut stack);
-                    self.check_and_push(right + 1, y + 1, old_color, &mut stack);
-                }
-            }
-        }
-    }
-
-    /// Выделение границы связной области
-    /// start_pos - начальная точка на границе;
-    /// boundary_color - цвет границы;
-    /// Возвращает список точек границы в порядке обхода
-    pub fn trace_boundary(&self, start_pos: Pos2) -> Vec<Pos2> {
-        let mut boundary_points = Vec::new();
-        let start_x = start_pos.x as usize;
-        let start_y = start_pos.y as usize;
-
-        if !self.check_bounds(start_x, start_y) {
-            return boundary_points;
-        }
-
-        let boundary_color = self[(start_x, start_y)];
-
-        let mut current_x = start_x;
-        let mut current_y = start_y;
-
-        let mut prev_direction = 0;
-        let directions: [(i32, i32); 8] = [
-            (1, 0),   // вправо
-            (1, -1),  // вправо-вверх
-            (0, -1),  // вверх
-            (-1, -1), // влево-вверх
-            (-1, 0),  // влево
-            (-1, 1),  // влево-вниз
-            (0, 1),   // вниз
-            (1, 1),   // вправо-вниз
-        ];
-
-        loop {
-            boundary_points.push(Pos2::new(current_x as f32, current_y as f32));
-
-            let mut found_next = false;
-            prev_direction = (prev_direction + 6) % 8;
-
-            for offset in 0..8 {
-                let direction_index = (prev_direction + offset) % 8;
-                let (dx, dy) = directions[direction_index];
-
-                let next_x = if dx >= 0 {
-                    current_x + dx as usize
-                } else {
-                    current_x - (-dx) as usize
-                };
-
-                let next_y = if dy >= 0 {
-                    current_y + dy as usize
-                } else {
-                    current_y - (-dy) as usize
-                };
-
-                if self[(next_x, next_y)] == boundary_color && self.check_bounds(next_x, next_y) {
-                    current_x = next_x;
-                    current_y = next_y;
-                    prev_direction = direction_index;
-                    found_next = true;
-                    break;
-                }
-            }
-
-            if current_x == start_x && current_y == start_y {
-                break;
-            }
-
-            if !found_next {
-                break;
-            }
-
-            if boundary_points.len() > self.width * self.height {
-                break;
-            }
-        }
-
-        boundary_points
-    }
-
-    /// Нарисовать границу поверх изображения
-    /// boundary_points - список точек границы;
-    /// color - цвет для рисования границы;
-    pub fn draw_boundary(&mut self, boundary_points: &[Pos2], color: Color32) {
-        for &point in boundary_points {
-            let x = point.x as usize;
-            let y = point.y as usize;
-            self[(x, y)] = color;
-        }
-    }
-}
-
-// --------------------------------------------------
 // Рисование линий
 // --------------------------------------------------
 
@@ -491,20 +252,16 @@ impl Canvas {
 
             if steep {
                 if (y_floor as usize) < self.height && (x as usize) < self.width {
-                    // ✅ ДОБАВЬТЕ
                     self.set_pixel(y_floor, x, color, intensity1);
                 }
                 if ((y_floor + 1) as usize) < self.height && (x as usize) < self.width {
-                    // ✅ ДОБАВЬТЕ
                     self.set_pixel(y_floor + 1, x, color, intensity2);
                 }
             } else {
                 if (x as usize) < self.width && (y_floor as usize) < self.height {
-                    // ✅ ДОБАВЬТЕ
                     self.set_pixel(x, y_floor, color, intensity1);
                 }
                 if (x as usize) < self.width && ((y_floor + 1) as usize) < self.height {
-                    // ✅ ДОБАВЬТЕ
                     self.set_pixel(x, y_floor + 1, color, intensity2);
                 }
             }
@@ -561,21 +318,260 @@ impl Canvas {
     }
 }
 
-#[derive(Default, PartialEq, Clone, Copy)]
-/// Вариант связности, нужен для заливки.
-pub enum Connectivity {
-    /// 4-х связная заливка
-    FOUR,
-    #[default]
-    /// 8-ми связная заливка
-    EIGHT,
-}
+// --------------------------------------------------
+// Заливка
+// --------------------------------------------------
 
-impl Connectivity {
-    pub fn get_name(&self) -> String {
-        match self {
-            Connectivity::FOUR => String::from("4-х связная"),
-            Connectivity::EIGHT => String::from("8-ми связная"),
-        }
-    }
-}
+// impl Canvas {
+//     /// Вспомогательная функция для нахождения границ линии
+//     fn find_line_bounds(&self, x: usize, y: usize, old_color: Color32) -> (usize, usize) {
+//         let mut left = x;
+//         let mut right = x;
+
+//         while self.check_bounds(left, y) && self[(left, y)] == old_color {
+//             left -= 1;
+//         }
+//         left += 1;
+
+//         while self.check_bounds(right, y) && self[(right, y)] == old_color {
+//             right += 1;
+//         }
+//         right -= 1;
+
+//         (left, right)
+//     }
+
+//     /// Вспомогательная функция для проверки и добавления точки в стек
+//     fn check_and_push(
+//         &self,
+//         x: usize,
+//         y: usize,
+//         old_color: Color32,
+//         stack: &mut VecDeque<(usize, usize)>,
+//     ) {
+//         if self.check_bounds(x, y) && self[(x, y)] == old_color {
+//             stack.push_back((x, y));
+//         }
+//     }
+
+//     /// Рекурсивная заливка изображения.
+//     /// pos - позиция, в которой применяется заливка;
+//     /// color - цвет заливки;
+//     /// connectivity - тип заливки (4-х или 8-ми связная);
+//     pub fn fill_with_color(&mut self, pos: Pos2, color: Color32, connectivity: Connectivity) {
+//         let start_x = pos.x as usize;
+//         let start_y = pos.y as usize;
+
+//         if !self.check_bounds(start_x, start_y) {
+//             return;
+//         }
+
+//         let old_color = self[(start_x, start_y)];
+//         if old_color == color {
+//             return;
+//         }
+
+//         let mut stack = VecDeque::new();
+//         stack.push_back((start_x, start_y));
+
+//         while let Some((x, y)) = stack.pop_front() {
+//             if !self.check_bounds(x, y) || self[(x, y)] != old_color {
+//                 continue;
+//             }
+
+//             let (left, right) = self.find_line_bounds(x, y, old_color);
+
+//             for i in left..=right {
+//                 if self.check_bounds(i, y) {
+//                     self[(i, y)] = color;
+//                 }
+//             }
+
+//             for i in left..=right {
+//                 self.check_and_push(i, y - 1, old_color, &mut stack);
+//                 self.check_and_push(i, y + 1, old_color, &mut stack);
+//             }
+//             match connectivity {
+//                 Connectivity::FOUR => {}
+//                 Connectivity::EIGHT => {
+//                     if left > 0 {
+//                         self.check_and_push(left - 1, y - 1, old_color, &mut stack);
+//                         self.check_and_push(left - 1, y + 1, old_color, &mut stack);
+//                     }
+//                     self.check_and_push(right + 1, y - 1, old_color, &mut stack);
+//                     self.check_and_push(right + 1, y + 1, old_color, &mut stack);
+//                 }
+//             }
+//         }
+//     }
+
+//     /// Рекурсивная заливка изображения.
+//     /// pos - позиция, в которой применяется заливка;
+//     /// img - изображение для заливки;
+//     /// connectivity - тип заливки (4-х или 8-ми связная);
+//     pub fn fill_with_img(&mut self, pos: Pos2, img: &ColorImage, connectivity: Connectivity) {
+//         let start_x = pos.x as usize;
+//         let start_y = pos.y as usize;
+
+//         if !self.check_bounds(start_x, start_y) {
+//             return;
+//         }
+
+//         let old_color = self[(start_x, start_y)];
+//         let img_width = img.width();
+//         let img_height = img.height();
+
+//         let mut stack = VecDeque::new();
+//         stack.push_back((start_x, start_y));
+
+//         while let Some((x, y)) = stack.pop_front() {
+//             if !self.check_bounds(x, y) || self[(x, y)] != old_color {
+//                 continue;
+//             }
+
+//             let (left, right) = self.find_line_bounds(x, y, old_color);
+
+//             let mut im_y = (y as i32 - start_y as i32) as i32;
+//             while im_y <= 0 {
+//                 im_y += img_height as i32;
+//             }
+
+//             for i in left..=right {
+//                 let mut im_x = i as i32 - start_x as i32;
+//                 while im_x <= 0 {
+//                     im_x += img_width as i32;
+//                 }
+
+//                 let img_x = (im_x as usize).rem_euclid(img_width);
+//                 let img_y = (im_y as usize).rem_euclid(img_height);
+
+//                 if img_x < img_width && img_y < img_height {
+//                     self[(i, y)] = img[(img_x, img_y)];
+//                 }
+//             }
+
+//             for i in left..=right {
+//                 self.check_and_push(i, y - 1, old_color, &mut stack);
+//                 self.check_and_push(i, y + 1, old_color, &mut stack);
+//             }
+//             match connectivity {
+//                 Connectivity::FOUR => {}
+//                 Connectivity::EIGHT => {
+//                     if left > 0 {
+//                         self.check_and_push(left - 1, y - 1, old_color, &mut stack);
+//                         self.check_and_push(left - 1, y + 1, old_color, &mut stack);
+//                     }
+//                     self.check_and_push(right + 1, y - 1, old_color, &mut stack);
+//                     self.check_and_push(right + 1, y + 1, old_color, &mut stack);
+//                 }
+//             }
+//         }
+//     }
+
+//     /// Выделение границы связной области
+//     /// start_pos - начальная точка на границе;
+//     /// boundary_color - цвет границы;
+//     /// Возвращает список точек границы в порядке обхода
+//     pub fn trace_boundary(&self, start_pos: Pos2) -> Vec<Pos2> {
+//         let mut boundary_points = Vec::new();
+//         let start_x = start_pos.x as usize;
+//         let start_y = start_pos.y as usize;
+
+//         if !self.check_bounds(start_x, start_y) {
+//             return boundary_points;
+//         }
+
+//         let boundary_color = self[(start_x, start_y)];
+
+//         let mut current_x = start_x;
+//         let mut current_y = start_y;
+
+//         let mut prev_direction = 0;
+//         let directions: [(i32, i32); 8] = [
+//             (1, 0),   // вправо
+//             (1, -1),  // вправо-вверх
+//             (0, -1),  // вверх
+//             (-1, -1), // влево-вверх
+//             (-1, 0),  // влево
+//             (-1, 1),  // влево-вниз
+//             (0, 1),   // вниз
+//             (1, 1),   // вправо-вниз
+//         ];
+
+//         loop {
+//             boundary_points.push(Pos2::new(current_x as f32, current_y as f32));
+
+//             let mut found_next = false;
+//             prev_direction = (prev_direction + 6) % 8;
+
+//             for offset in 0..8 {
+//                 let direction_index = (prev_direction + offset) % 8;
+//                 let (dx, dy) = directions[direction_index];
+
+//                 let next_x = if dx >= 0 {
+//                     current_x + dx as usize
+//                 } else {
+//                     current_x - (-dx) as usize
+//                 };
+
+//                 let next_y = if dy >= 0 {
+//                     current_y + dy as usize
+//                 } else {
+//                     current_y - (-dy) as usize
+//                 };
+
+//                 if self[(next_x, next_y)] == boundary_color && self.check_bounds(next_x, next_y) {
+//                     current_x = next_x;
+//                     current_y = next_y;
+//                     prev_direction = direction_index;
+//                     found_next = true;
+//                     break;
+//                 }
+//             }
+
+//             if current_x == start_x && current_y == start_y {
+//                 break;
+//             }
+
+//             if !found_next {
+//                 break;
+//             }
+
+//             if boundary_points.len() > self.width * self.height {
+//                 break;
+//             }
+//         }
+
+//         boundary_points
+//     }
+
+//     /// Нарисовать границу поверх изображения
+//     /// boundary_points - список точек границы;
+//     /// color - цвет для рисования границы;
+//     pub fn draw_boundary(&mut self, boundary_points: &[Pos2], color: Color32) {
+//         for &point in boundary_points {
+//             let x = point.x as usize;
+//             let y = point.y as usize;
+//             self[(x, y)] = color;
+//         }
+//     }
+// }
+
+// #[derive(Default, PartialEq, Clone, Copy)]
+// /// Вариант связности, нужен для заливки.
+// pub enum Connectivity {
+//     /// 4-х связная заливка
+//     FOUR,
+//     #[default]
+//     /// 8-ми связная заливка
+//     EIGHT,
+// }
+
+// impl Connectivity {
+//     pub fn get_name(&self) -> String {
+//         match self {
+//             Connectivity::FOUR => String::from("4-х связная"),
+//             Connectivity::EIGHT => String::from("8-ми связная"),
+//         }
+//     }
+// }

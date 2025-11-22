@@ -1,39 +1,6 @@
-use crate::Material;
+use super::Texture;
 use egui::Color32;
 use std::fmt::Display;
-
-/// Взаимодействие между текстурой и цветом материала.
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub enum TextureBlendMode {
-    /// Текстура полностью заменяет цвет материала.
-    Replace,
-    /// Текстура умножется на цвет материала.
-    #[default]
-    Modulate,
-    /// К текстуре добавляется цвет материала.
-    Additive,
-}
-
-impl TextureBlendMode {
-    /// Смешать пиксель текстуры и материала.
-    fn blend(&self, texture_color: Color32, material_color: Color32) -> Color32 {
-        match self {
-            Self::Replace => texture_color,
-            Self::Modulate => texture_color * material_color,
-            Self::Additive => texture_color + material_color,
-        }
-    }
-}
-
-impl Display for TextureBlendMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Replace => f.write_str("Замена"),
-            Self::Modulate => f.write_str("Умножение"),
-            Self::Additive => f.write_str("Сложение"),
-        }
-    }
-}
 
 /// Материал модели.
 ///
@@ -45,7 +12,7 @@ pub struct Material {
     /// Текстура объекта, если имеется
     pub texture: Option<Texture>,
     /// Как совмещать текстуру с цветом материала
-    pub blend_mode: classes3d::material::TextureBlendMode,
+    pub blend_mode: TextureBlendMode,
 }
 
 impl Default for Material {
@@ -79,5 +46,38 @@ impl Material {
         let new_u = if u == 1.0 { 1.0 } else { u.fract() };
         let new_v = if v == 1.0 { 1.0 } else { v.fract() };
         (new_u, new_v)
+    }
+}
+
+/// Тип взаимодействия между текстурой и цветом материала.
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub enum TextureBlendMode {
+    /// Текстура полностью заменяет цвет материала.
+    Replace,
+    /// Текстура умножется на цвет материала.
+    #[default]
+    Modulate,
+    /// К текстуре добавляется цвет материала.
+    Additive,
+}
+
+impl TextureBlendMode {
+    /// Объединить пиксель текстуры и материала.
+    fn blend(&self, texture_color: Color32, material_color: Color32) -> Color32 {
+        match self {
+            Self::Replace => texture_color,
+            Self::Modulate => texture_color * material_color,
+            Self::Additive => texture_color + material_color,
+        }
+    }
+}
+
+impl Display for TextureBlendMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Replace => f.write_str("Замена"),
+            Self::Modulate => f.write_str("Умножение"),
+            Self::Additive => f.write_str("Сложение"),
+        }
     }
 }

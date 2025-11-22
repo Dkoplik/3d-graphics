@@ -1,7 +1,10 @@
 //! Объявление и реализация структуры `HVec3`.
 
 use super::{Point3, Transform3D, UVec3, Vec3};
-use std::ops::{Mul, MulAssign};
+use std::{
+    fmt::Display,
+    ops::{Mul, MulAssign},
+};
 
 /// Однородный (homogeneous) вектор в 3D пространстве.
 ///
@@ -103,6 +106,16 @@ impl HVec3 {
     /// одну и ту же матрицу.
     pub fn apply_transform(self, transform: Transform3D) -> Self {
         transform.apply_to_hvec(self)
+    }
+}
+
+impl Display for HVec3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "HVec3(x: {}, y: {}, z: {}, w: {})",
+            self.x, self.y, self.z, self.w
+        )
     }
 }
 

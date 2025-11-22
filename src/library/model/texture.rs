@@ -1,21 +1,32 @@
-//! Реализация текстуры для 3D модели
+//! Объявление и реализация текстуры для 3D модели
 
-use crate::Texture;
 use egui::Color32;
-use image::DynamicImage;
+use image::{DynamicImage, RgbImage};
 
 /// Текстура модели.
 ///
 /// Благодаря текстуре модель может быть обёрнута в какую-то картинку вместо сплошного цвета.
 #[derive(Debug, Clone)]
-pub struct Texture(image::RgbImage);
+pub struct Texture {
+    image: RgbImage,
+}
 
 impl Texture {
+    /// Создать новую текстуру из `DynamicImage`.
+    ///
+    /// При загрузке картинок, crate `image` обычно возвращает `DynamicImage`,
+    /// из которого можно сделать текстуру, конструктор сам сделает перевод в удобное представление.
     pub fn new(image: DynamicImage) -> Self {
-        Self(image.to_rgb8())
+        // в RgbImage
+        let image = image.to_rgb8();
+        Self { image }
     }
 
     /// Получить цвет текстуры в пикселе по UV-координатам.
+    ///
+    /// - `u` - горизонтальная ось в диапазоне [0.0, 1.0]
+    /// - `v` - вертикальная ось в диапазоне [0.0, 1.0]
+    #[inline]
     pub fn get_pixel_color(&self, u: f32, v: f32) -> Color32 {
         let (x, y) = self.transform_uv(u, v);
 
@@ -36,7 +47,7 @@ impl Texture {
         x < self.0.width() && y < self.0.height() && x > 0 && y > 0
     }
 
-    /// Преобразовать UV-координаты в целочисленные
+    /// Преобразовать UV-координаты в целочисленные.
     #[inline]
     fn transform_uv(&self, u: f32, v: f32) -> (u32, u32) {
         debug_assert!(
@@ -56,6 +67,8 @@ impl Texture {
     }
 }
 
+/// Преобразовать пиксель `Rgb<u8>` в `Color32`.
+#[inline]
 fn pixel_to_color(pixel: image::Rgb<u8>) -> Color32 {
     Color32::from_rgb(pixel[0], pixel[1], pixel[2])
 }

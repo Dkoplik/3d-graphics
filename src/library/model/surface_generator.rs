@@ -1,6 +1,16 @@
 use crate::classes3d::mesh::Polygon3;
 use crate::{HVec3, Mesh, SurfaceFunction};
 
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub enum SurfaceFunction {
+    #[default]
+    Paraboloid,
+    Saddle,
+    Wave,
+    Ripple,
+    Gaussian,
+}
+
 impl SurfaceFunction {
     pub fn evaluate(&self, x: f64, y: f64) -> f64 {
         match self {
