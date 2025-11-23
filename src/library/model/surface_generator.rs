@@ -1,5 +1,4 @@
-use crate::classes3d::mesh::Polygon3;
-use crate::{HVec3, Mesh, SurfaceFunction};
+use crate::{Mesh, Point3, Polygon};
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum SurfaceFunction {
@@ -12,7 +11,7 @@ pub enum SurfaceFunction {
 }
 
 impl SurfaceFunction {
-    pub fn evaluate(&self, x: f64, y: f64) -> f64 {
+    pub fn evaluate(&self, x: f32, y: f32) -> f32 {
         match self {
             Self::Paraboloid => x * x + y * y,
             Self::Saddle => x * x - y * y,
@@ -34,62 +33,92 @@ impl SurfaceFunction {
             Self::Gaussian => "Гаусс (z = e^(-(x²+y²)))",
         }
     }
-}
 
-/// Генерация сетки поверхности из функции f(x, y) = z
-pub fn generate_surface_mesh(
-    func: SurfaceFunction,
-    x_range: (f64, f64),
-    y_range: (f64, f64),
-    divisions: (usize, usize),
-) -> Mesh {
-    let (x0, x1) = x_range;
-    let (y0, y1) = y_range;
-    let (nx, ny) = divisions;
+    /// Генерация сетки поверхности из функции f(x, y) = z
+    pub fn generate_surface_mesh(
+        &self,
+        x_range: (f32, f32),
+        y_range: (f32, f32),
+        divisions: (usize, usize),
+    ) -> Mesh {
+        let (x0, x1) = x_range;
+        let (y0, y1) = y_range;
+        let (nx, ny) = divisions;
 
-    let dx = (x1 - x0) / nx as f64;
-    let dy = (y1 - y0) / ny as f64;
+        let dx = (x1 - x0) / nx as f32;
+        let dy = (y1 - y0) / ny as f32;
 
-    let mut vertices = Vec::new();
+        let mut vertices = Vec::new();
 
-    // Генерация вершин
-    for j in 0..=ny {
-        for i in 0..=nx {
-            let x = x0 + i as f64 * dx;
-            let y = y0 + j as f64 * dy;
-            let z = func.evaluate(x, y);
+        // Генерация вершин
+        for j in 0..=ny {
+            for i in 0..=nx {
+                let x = x0 + i as f32 * dx;
+                let y = y0 + j as f32 * dy;
+                let z = self.evaluate(x, y);
 
-            if z.is_finite() {
-                // HVec3::new() создаёт однородный вектор (x, y, z, 1.0)
-                vertices.push(HVec3::new(x as f32, y as f32, z as f32));
-            } else {
-                vertices.push(HVec3::new(x as f32, y as f32, 0.0));
+                if z.is_finite() {
+                    // HVec3::new() создаёт однородный вектор (x, y, z, 1.0)
+                    vertices.push(Point3::new(x, y, z));
+                } else {
+                    vertices.push(Point3::new(x, y, 0.0));
+                }
             }
         }
+
+        // Генерация полигонов (треугольников)
+        let mut polygons = Vec::new();
+        for j in 0..ny {
+            for i in 0..nx {
+                let idx = |i: usize, j: usize| -> usize { j * (nx + 1) + i };
+
+                // Первый треугольник
+                polygons.push(Polygon::triangle(
+                    idx(i, j),
+                    idx(i + 1, j),
+                    idx(i + 1, j + 1),
+                ));
+
+                // Второй треугольник
+                polygons.push(Polygon::triangle(
+                    idx(i, j),
+                    idx(i + 1, j + 1),
+                    idx(i, j + 1),
+                ));
+            }
+        }
+
+        // Используем from_polygons, которая сама сгенерирует нормали и текстуры
+        Mesh::from_polygons(vertices, polygons)
     }
+}
 
-    // Генерация полигонов (треугольников)
-    let mut polygons = Vec::new();
-    for j in 0..ny {
-        for i in 0..nx {
-            let idx = |i: usize, j: usize| -> usize { j * (nx + 1) + i };
+#[cfg(test)]
+mod test_surface_generator {
+    use crate::SurfaceFunction;
 
-            // Первый треугольник
-            polygons.push(Polygon3::triangle(
-                idx(i, j),
-                idx(i + 1, j),
-                idx(i + 1, j + 1),
-            ));
+    #[test]
+    fn test_mesh_is_inside_range() {
+        let surface = SurfaceFunction::Gaussian;
+        let x_range = (-10.0, 10.0);
+        let y_range = (-5.0, 5.0);
+        let mesh = surface.generate_surface_mesh(x_range, y_range, (10, 10));
+        for vertex in mesh.get_local_vertex_iter() {
+            assert!(
+                x_range.0 <= vertex.x && vertex.x <= x_range.1,
+                "все вершины графика должны соблюдать пределы, но {} не в пределах оси x [{}, {}]",
+                vertex,
+                x_range.0,
+                x_range.1
+            );
 
-            // Второй треугольник
-            polygons.push(Polygon3::triangle(
-                idx(i, j),
-                idx(i + 1, j + 1),
-                idx(i, j + 1),
-            ));
+            assert!(
+                y_range.0 <= vertex.y && vertex.y <= y_range.1,
+                "все вершины графика должны соблюдать пределы, но {} не в пределах оси y [{}, {}]",
+                vertex,
+                y_range.0,
+                y_range.1
+            );
         }
     }
-
-    // Используем from_polygons, которая сама сгенерирует нормали и текстуры
-    Mesh::from_polygons(vertices, polygons)
 }

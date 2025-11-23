@@ -153,6 +153,16 @@ impl MulAssign<Transform3D> for HVec3 {
 
 impl From<Vec3> for HVec3 {
     /// Создать `HVec3` из `Vec3`. Однородная компонента `w = 0.0`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let hvec = HVec3::from(vec);
+    /// assert_eq!(hvec.x, 1.0);
+    /// assert_eq!(hvec.y, 2.0);
+    /// assert_eq!(hvec.z, 3.0);
+    /// assert_eq!(hvec.w, 0.0);
+    /// ```
     fn from(value: Vec3) -> Self {
         Self::new_direction(value.x, value.y, value.z)
     }
@@ -160,6 +170,16 @@ impl From<Vec3> for HVec3 {
 
 impl From<UVec3> for HVec3 {
     /// Создать `HVec3` из `UVec3`. Однородная компонента `w = 0.0`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let uvec = UVec3::new(0.0, 1.0, 0.0);
+    /// let hvec = HVec3::from(uvec);
+    /// assert_eq!(hvec.x, 0.0);
+    /// assert_eq!(hvec.y, 1.0);
+    /// assert_eq!(hvec.z, 0.0);
+    /// assert_eq!(hvec.w, 0.0);
+    /// ```
     fn from(value: UVec3) -> Self {
         Self::new_direction(value.x, value.y, value.z)
     }
@@ -167,6 +187,16 @@ impl From<UVec3> for HVec3 {
 
 impl From<Point3> for HVec3 {
     /// Создать `HVec3` из `Point3`. Однородная компонента `w = 1.0`.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let point = Point3::new(1.0, 2.0, 3.0);
+    /// let hvec = HVec3::from(point);
+    /// assert_eq!(hvec.x, 1.0);
+    /// assert_eq!(hvec.y, 2.0);
+    /// assert_eq!(hvec.z, 3.0);
+    /// assert_eq!(hvec.w, 1.0);
+    /// ```
     fn from(value: Point3) -> Self {
         Self::new_position(value.x, value.y, value.z)
     }

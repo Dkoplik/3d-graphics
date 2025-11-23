@@ -3,7 +3,7 @@
 use super::{HVec3, Transform3D, UVec3, Vec3};
 use std::{
     fmt::Display,
-    ops::{Add, Sub},
+    ops::{Add, AddAssign, Sub},
 };
 
 /// Точка в 3D пространстве с координатами `x`, `y`, `z`.
@@ -63,6 +63,7 @@ impl Point3 {
     /// let original_point = Point3::zero();
     /// let transform = Transform3D::translation(1.0, 2.0, 3.0);
     /// let translated_point = original_point.apply_transform(transform);
+    ///
     /// assert_eq!(translated_point.x, 1.0);
     /// assert_eq!(translated_point.y, 2.0);
     /// assert_eq!(translated_point.z, 3.0);
@@ -118,6 +119,65 @@ impl Add<Vec3> for Point3 {
     /// ```
     fn add(self, rhs: Vec3) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl AddAssign<Vec3> for Point3 {
+    /// Выполняет операцию `+` между точкой и вектором.
+    ///
+    /// По смыслу операция представляет собой смещение текущей точки на заданный вектор.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let mut point = Point3::new(1.0, 2.0, 3.0);
+    /// let vec = Vec3::new(-2.0, 3.0, 1.0);
+    /// point += vec;
+    /// assert_eq!(point.x, -1.0);
+    /// assert_eq!(point.y, 5.0);
+    /// assert_eq!(point.z, 4.0);
+    /// ```
+    fn add_assign(&mut self, rhs: Vec3) {
+        *self = *self + rhs;
+    }
+}
+
+impl Add<UVec3> for Point3 {
+    type Output = Self;
+
+    /// Выполняет операцию `+` между точкой и вектором.
+    ///
+    /// По смыслу операция представляет собой смещение текущей точки на заданный вектор.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let original_point = Point3::new(1.0, 2.0, 3.0);
+    /// let vec = UVec3::new(0.0, 0.0, 1.0);
+    /// let moved_point = original_point + vec;
+    /// assert_eq!(moved_point.x, 1.0);
+    /// assert_eq!(moved_point.y, 2.0);
+    /// assert_eq!(moved_point.z, 4.0);
+    /// ```
+    fn add(self, rhs: UVec3) -> Self::Output {
+        Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
+    }
+}
+
+impl AddAssign<UVec3> for Point3 {
+    /// Выполняет операцию `+` между точкой и вектором.
+    ///
+    /// По смыслу операция представляет собой смещение текущей точки на заданный вектор.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let mut point = Point3::new(1.0, 2.0, 3.0);
+    /// let vec = UVec3::new(0.0, 0.0, 1.0);
+    /// point += vec;
+    /// assert_eq!(point.x, 1.0);
+    /// assert_eq!(point.y, 2.0);
+    /// assert_eq!(point.z, 4.0);
+    /// ```
+    fn add_assign(&mut self, rhs: UVec3) {
+        *self = *self + rhs;
     }
 }
 

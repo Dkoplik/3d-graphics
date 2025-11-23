@@ -3,13 +3,11 @@
 use crate::{Mesh, Point3, UVec3, Vec3};
 
 /// Представление одного полигона модели. Дабы избежать копирования вершин,
-/// полигоны только хранят индексы вершин из Mesh'а и ссылку на родительский Mesh.
+/// полигоны только хранят индексы вершин из Mesh'а.
 #[derive(Debug, Clone)]
 pub struct Polygon {
     /// Индексы вершин, которые соединяет этот полигон.
     vertex_indexes: Vec<usize>,
-    /// Mesh, к которому этот полигон принадлежит.
-    parent_mesh: &Mesh,
 }
 
 impl Polygon {
@@ -18,27 +16,22 @@ impl Polygon {
     // --------------------------------------------------
 
     /// Создать треугольник.
-    pub fn triangle(parent_mesh: &Mesh, p1: usize, p2: usize, p3: usize) -> Self {
+    pub fn triangle(p1: usize, p2: usize, p3: usize) -> Self {
         Self {
             vertex_indexes: vec![p1, p2, p3],
-            parent_mesh,
         }
     }
 
     /// Создать полигон из списка индексов вершин.
-    pub fn from_list(parent_mesh: &Mesh, vertex_indexes: &[usize]) -> Self {
+    pub fn from_list(vertex_indexes: &[usize]) -> Self {
         Self {
             vertex_indexes: vertex_indexes.into(),
-            parent_mesh,
         }
     }
 
     /// Создать полигон из вектора индексов.
-    pub fn from_vec(parent_mesh: &Mesh, vertex_indexes: Vec<usize>) -> Self {
-        Self {
-            vertex_indexes,
-            parent_mesh,
-        }
+    pub fn from_vec(vertex_indexes: Vec<usize>) -> Self {
+        Self { vertex_indexes }
     }
 
     // --------------------------------------------------
@@ -62,58 +55,59 @@ impl Polygon {
     }
 
     /// Получить i-ую вершину полигона в **локальных** координатах.
-    pub fn get_local_vertex(&self, i: usize) -> Point3 {
+    pub fn get_local_vertex(&self, parent_mesh: &Mesh, i: usize) -> Point3 {
         debug_assert!(
             i < self.vertex_count(),
             "Попытка получить вершину {} в полигоне из {} вершин",
             i,
             self.vertex_count()
         );
-        self.parent_mesh.get_local_vertex(self.vertex_indexes[i])
+
+        parent_mesh.get_local_vertex(self.vertex_indexes[i])
     }
 
     /// Получить i-ую вершину полигона в **глобальных** координатах.
-    pub fn get_global_vertex(&self, i: usize) -> Point3 {
+    pub fn get_global_vertex(&self, parent_mesh: &Mesh, i: usize) -> Point3 {
         debug_assert!(
             i < self.vertex_count(),
             "Попытка получить вершину {} в полигоне из {} вершин",
             i,
             self.vertex_count()
         );
-        self.parent_mesh.get_global_vertex(self.vertex_indexes[i])
+        parent_mesh.get_global_vertex(self.vertex_indexes[i])
     }
 
     /// Получить нормаль i-ой вершины полигона в **локальных** координатах.
-    pub fn get_local_normal(&self, i: usize) -> UVec3 {
+    pub fn get_local_normal(&self, parent_mesh: &Mesh, i: usize) -> Option<UVec3> {
         debug_assert!(
             i < self.vertex_count(),
             "Попытка получить вершину {} в полигоне из {} вершин",
             i,
             self.vertex_count()
         );
-        self.parent_mesh.get_local_normal(self.vertex_indexes[i])
+        parent_mesh.get_local_normal(self.vertex_indexes[i])
     }
 
     /// Получить нормаль i-ой вершины полигона в **глобальных** координатах.
-    pub fn get_global_normal(&self, i: usize) -> UVec3 {
+    pub fn get_global_normal(&self, parent_mesh: &Mesh, i: usize) -> Option<UVec3> {
         debug_assert!(
             i < self.vertex_count(),
             "Попытка получить вершину {} в полигоне из {} вершин",
             i,
             self.vertex_count()
         );
-        self.parent_mesh.get_global_normal(self.vertex_indexes[i])
+        parent_mesh.get_global_normal(self.vertex_indexes[i])
     }
 
     /// Получить текстурные координаты i-ой вершины полигона.
-    pub fn get_texture_coord(&self, i: usize) -> (f32, f32) {
+    pub fn get_texture_coord(&self, parent_mesh: &Mesh, i: usize) -> Option<(f32, f32)> {
         debug_assert!(
             i < self.vertex_count(),
             "Попытка получить вершину {} в полигоне из {} вершин",
             i,
             self.vertex_count()
         );
-        self.parent_mesh.get_texture_coord(self.vertex_indexes[i])
+        parent_mesh.get_texture_coord(self.vertex_indexes[i])
     }
 
     /// Возвращает итератор по номерам вершин полигона в нумерации из всего Mesh'а.
@@ -122,44 +116,71 @@ impl Polygon {
     }
 
     /// Получить итератор по всем вершинам полигона в **локальных** координатах.
-    pub fn get_local_vertex_iter(&self) -> impl Iterator<Item = Point3> {
+    pub fn get_local_vertex_iter(&self, parent_mesh: &Mesh) -> impl Iterator<Item = Point3> {
         self.vertex_indexes
             .iter()
-            .map(|&i| self.parent_mesh.get_local_vertex(i))
+            .map(|&i| parent_mesh.get_local_vertex(i))
     }
 
     /// Получить итератор по всем вершинам полигона в **глобальных** координатах.
-    pub fn get_global_vertex_iter(&self) -> impl Iterator<Item = Point3> {
+    pub fn get_global_vertex_iter(&self, parent_mesh: &Mesh) -> impl Iterator<Item = Point3> {
         self.vertex_indexes
             .iter()
-            .map(|&i| self.parent_mesh.get_global_vertex(i))
+            .map(|&i| parent_mesh.get_global_vertex(i))
     }
 
     /// Получить итератор по всем нормалям полигона в **локальных** координатах.
     ///
     /// Нормали идут в порядке соответствующих им вершин
-    pub fn get_local_normals_iter(&self) -> impl Iterator<Item = UVec3> {
-        self.vertex_indexes
-            .iter()
-            .map(|&i| self.parent_mesh.get_local_normal(i))
+    pub fn get_local_normals_iter(
+        &self,
+        parent_mesh: &Mesh,
+    ) -> Option<impl Iterator<Item = UVec3>> {
+        if !parent_mesh.has_normals() {
+            None
+        } else {
+            Some(
+                self.vertex_indexes
+                    .iter()
+                    .map(|&i| parent_mesh.get_local_normal(i).unwrap()),
+            )
+        }
     }
 
     /// Получить итератор по всем нормалям полигона в **глобальных** координатах.
     ///
     /// Нормали идут в порядке соответствующих им вершин
-    pub fn get_global_normals_iter(&self) -> impl Iterator<Item = UVec3> {
-        self.vertex_indexes
-            .iter()
-            .map(|&i| self.parent_mesh.get_global_normal(i))
+    pub fn get_global_normals_iter(
+        &self,
+        parent_mesh: &Mesh,
+    ) -> Option<impl Iterator<Item = UVec3>> {
+        if !parent_mesh.has_normals() {
+            None
+        } else {
+            Some(
+                self.vertex_indexes
+                    .iter()
+                    .map(|&i| parent_mesh.get_global_normal(i).unwrap()),
+            )
+        }
     }
 
     /// Получить итератор по всем текстурным координатам полигона.
     ///
     /// Текстурные координаты идут в порядке соответсвующих им вершин.
-    pub fn get_texture_coord_iter(&self) -> impl Iterator<Item = (f32, f32)> {
-        self.vertex_indexes
-            .iter()
-            .map(|&i| self.parent_mesh.get_texture_coord(i))
+    pub fn get_texture_coord_iter(
+        &self,
+        parent_mesh: &Mesh,
+    ) -> Option<impl Iterator<Item = (f32, f32)>> {
+        if !parent_mesh.has_texture_coords() {
+            None
+        } else {
+            Some(
+                self.vertex_indexes
+                    .iter()
+                    .map(|&i| parent_mesh.get_texture_coord(i).unwrap()),
+            )
+        }
     }
 
     // --------------------------------------------------
@@ -194,14 +215,14 @@ impl Polygon {
     }
 
     /// Находится ли точка внутри полигона?
-    pub fn is_point_in_convex_polygon(&self, point: Point3) -> bool {
+    pub fn is_point_in_convex_polygon(&self, parent_mesh: &Mesh, point: Point3) -> bool {
         let n = self.vertex_indexes.len();
         let mut sign = 0.0;
 
         for i in 0..n {
             let j = (i + 1) % n;
-            let vi = self.get_local_vertex(i);
-            let vj = self.get_local_vertex(j);
+            let vi = self.get_local_vertex(parent_mesh, i);
+            let vj = self.get_local_vertex(parent_mesh, j);
             let edge = vj - vi;
             let to_point = point - vi;
 
@@ -220,16 +241,16 @@ impl Polygon {
     /// Считает нормаль к полигону как к плоскости в **локальных** координатах.
     ///
     /// Этому методу нужны только позиции вершин.
-    pub fn plane_normal(&self, mesh_center: Option<Point3>) -> UVec3 {
+    pub fn plane_normal(&self, parent_mesh: &Mesh, mesh_center: Option<Point3>) -> UVec3 {
         // Необходимо хотя бы 3 вершины для образования плоскости
         if !self.is_valid() {
             return UVec3::new(0.0, 0.0, 1.0);
         }
 
         // Берем первые 3 вершины (можно любые 3 неколлинеарные), так как мы ищем нормаль к плоскости полигона
-        let p0 = self.get_local_vertex(0);
-        let p1 = self.get_local_vertex(1);
-        let p2 = self.get_local_vertex(2);
+        let p0 = self.get_local_vertex(parent_mesh, 0);
+        let p1 = self.get_local_vertex(parent_mesh, 1);
+        let p2 = self.get_local_vertex(parent_mesh, 2);
 
         let edge1 = p1 - p0;
         let edge2 = p2 - p0;
@@ -254,28 +275,30 @@ impl Polygon {
     }
 
     /// Считает нормаль к полигону через нормали вершин в **локальных** координатах.
-    ///
-    /// Соответственно, вершины полигона должны содежрать свои нормали перед использованием метода.
-    pub fn smoothed_local_normal(&self) -> UVec3 {
+    pub fn smoothed_local_normal(&self, parent_mesh: &Mesh) -> Option<UVec3> {
         let normals_sum = self
-            .get_local_normals_iter()
+            .get_local_normals_iter(parent_mesh)?
             .fold(Vec3::zero(), |acc, n| acc + n);
 
-        (normals_sum / self.vertex_count() as f32)
-            .normalize()
-            .unwrap_or(UVec3::new(0.0, 0.0, 1.0))
+        Some(
+            (normals_sum / self.vertex_count() as f32)
+                .normalize()
+                .unwrap_or(UVec3::new(0.0, 0.0, 1.0)),
+        )
     }
 
     /// Считает нормаль к полигону через нормали вершин в **глобальных** координатах.
     ///
     /// Соответственно, вершины полигона должны содежрать свои нормали перед использованием метода.
-    pub fn smoothed_global_normal(&self) -> UVec3 {
+    pub fn smoothed_global_normal(&self, parent_mesh: &Mesh) -> Option<UVec3> {
         let normals_sum = self
-            .get_global_normals_iter()
+            .get_global_normals_iter(parent_mesh)?
             .fold(Vec3::zero(), |acc, n| acc + n);
 
-        (normals_sum / self.vertex_count() as f32)
-            .normalize()
-            .unwrap_or(UVec3::new(0.0, 0.0, 1.0))
+        Some(
+            (normals_sum / self.vertex_count() as f32)
+                .normalize()
+                .unwrap_or(UVec3::new(0.0, 0.0, 1.0)),
+        )
     }
 }

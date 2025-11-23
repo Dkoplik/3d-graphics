@@ -14,19 +14,9 @@ pub use library::primitives::*;
 pub use library::model::*;
 
 // re-export прочих структур в корень библиотеки
-pub use library::camera3::*;
+pub use library::camera::*;
 pub use library::canvas::*;
 pub use library::coord_frame::*;
-// pub use library::scene::*;
-// pub use library::scene_renderer::*;
-// pub use library::surface_generator::*;
-
-/// Точечный источник света.
-///
-/// Свет от этого источника направлен по все стороны.
-#[derive(Debug, Clone, Copy)]
-pub struct LightSource {
-    pub position: Point3,
-    pub color: egui::Color32,
-    pub intensity: f32,
-}
+pub use library::light_source::*;
+pub use library::scene::*;
+pub use library::scene_renderer::*;

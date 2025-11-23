@@ -1,9 +1,6 @@
 use crate::{
-    LightSource, Point3, Vec3,
-    classes3d::{
-        mesh::Polygon3,
-        scene_renderer::{Shader, shader_utils},
-    },
+    Camera, Canvas, LightSource, Model, Point3, Polygon, ProjectionType, Shader, UVec3,
+    library::utils,
 };
 
 pub struct PhongToonShading {
@@ -24,7 +21,7 @@ impl PhongToonShading {
     /// Для каждой вершины считает значение `интенсивность * цвет света * угол между поверхностью и светом`.
     fn toon_shading(
         position: Point3,
-        normal: Vec3,
+        normal: UVec3,
         lights: &Vec<LightSource>,
         bands: usize,
     ) -> egui::Color32 {
@@ -35,7 +32,7 @@ impl PhongToonShading {
         let mut light_color = egui::Color32::BLACK;
         // Влияние каждого источника
         for light in lights {
-            let light_dir = (light.position - position).normalize();
+            let light_dir = (light.position - position).normalize().unwrap();
             let cos = normal.dot(light_dir).max(0.0);
             light_color = light_color + light.color.gamma_multiply(light.intensity * cos);
         }
@@ -51,56 +48,54 @@ impl PhongToonShading {
 impl Shader for PhongToonShading {
     fn shade_model(
         &self,
-        model: &crate::Model3,
-        polygons: &Vec<Polygon3>,
-        global_to_screen_transform: crate::Transform3D,
-        lights: &Vec<crate::LightSource>,
-        canvas: &mut crate::Canvas,
+        model: &Model,
+        polygons: &Vec<Polygon>,
+        camera: &Camera,
+        projection_type: ProjectionType,
+        lights: &Vec<LightSource>,
+        canvas: &mut Canvas,
     ) {
+        // матрица преобразования на экран
+        let global_to_screen_transform = camera.global_to_screen_transform(projection_type, canvas);
         // проекция вершин на экран
-        let projected_vertexes: Vec<Vec3> = model
+        let projected_vertexes: Vec<Point3> = model
             .mesh
-            .get_global_vertexes()
-            .map(|v| Vec3::from(v * global_to_screen_transform))
+            .get_global_vertex_iter()
+            .map(|v| v.apply_transform(global_to_screen_transform).unwrap())
             .collect();
-        // текстурные координаты модели
-        let texture_coords = model.mesh.get_texture_coords();
-        // глобальные позиции вершин
-        let global_vertex_poses: Vec<Vec3> = model
-            .mesh
-            .get_global_vertexes()
-            .map(|v| Vec3::from(v))
-            .collect();
-        // глобальные нормали
-        let global_normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
 
         for polygon in polygons {
             // если четырёхугольник - билинейная интерполяция
-            if polygon.is_rectangle() {
-                let rectangle = polygon.get_vertexes();
+            if polygon.is_quad() {
+                // индексы вершин
+                let i0 = polygon.get_mesh_vertex_index(0);
+                let i1 = polygon.get_mesh_vertex_index(1);
+                let i2 = polygon.get_mesh_vertex_index(2);
+                let i3 = polygon.get_mesh_vertex_index(3);
+
                 // проекция вершин треугольника
-                let v0 = projected_vertexes[rectangle[0]];
-                let v1 = projected_vertexes[rectangle[1]];
-                let v2 = projected_vertexes[rectangle[2]];
-                let v3 = projected_vertexes[rectangle[3]];
+                let v0 = projected_vertexes[i0];
+                let v1 = projected_vertexes[i1];
+                let v2 = projected_vertexes[i2];
+                let v3 = projected_vertexes[i3];
 
                 // текстурные UV-координаты вершин треугольника
-                let tx0 = texture_coords[rectangle[0]];
-                let tx1 = texture_coords[rectangle[1]];
-                let tx2 = texture_coords[rectangle[2]];
-                let tx3 = texture_coords[rectangle[3]];
+                let tx0 = polygon.get_texture_coord(&model.mesh, i0).unwrap();
+                let tx1 = polygon.get_texture_coord(&model.mesh, i1).unwrap();
+                let tx2 = polygon.get_texture_coord(&model.mesh, i2).unwrap();
+                let tx3 = polygon.get_texture_coord(&model.mesh, i3).unwrap();
 
-                // глобальные нормали вершин треугольника
-                let normal0 = global_normals[rectangle[0]];
-                let normal1 = global_normals[rectangle[1]];
-                let normal2 = global_normals[rectangle[2]];
-                let normal3 = global_normals[rectangle[3]];
+                // глобальные координаты вершин
+                let gv0 = polygon.get_global_vertex(&model.mesh, i0);
+                let gv1 = polygon.get_global_vertex(&model.mesh, i1);
+                let gv2 = polygon.get_global_vertex(&model.mesh, i2);
+                let gv3 = polygon.get_global_vertex(&model.mesh, i3);
 
-                // глобальные позиции вершин треугольника
-                let pos0 = global_vertex_poses[rectangle[0]];
-                let pos1 = global_vertex_poses[rectangle[1]];
-                let pos2 = global_vertex_poses[rectangle[2]];
-                let pos3 = global_vertex_poses[rectangle[3]];
+                // глобальные нормали
+                let n0 = polygon.get_global_normal(&model.mesh, i0).unwrap();
+                let n1 = polygon.get_global_normal(&model.mesh, i1).unwrap();
+                let n2 = polygon.get_global_normal(&model.mesh, i2).unwrap();
+                let n3 = polygon.get_global_normal(&model.mesh, i3).unwrap();
 
                 // ограничивающий прямоугольник
                 let min_x = *vec![v0.x as usize, v1.x as usize, v2.x as usize, v3.x as usize]
@@ -122,12 +117,12 @@ impl Shader for PhongToonShading {
 
                 for y in min_y..=max_y {
                     for x in min_x..=max_x {
-                        if x >= canvas.width || y >= canvas.height {
+                        if x >= canvas.width() || y >= canvas.height() {
                             continue;
                         }
 
                         let cur_point = Point3::new(x as f32, y as f32, 0.0);
-                        if let Some((alpha, beta)) = shader_utils::find_uv_for_bilerp(
+                        if let Some((alpha, beta)) = utils::find_uv_for_bilerp(
                             v0.into(),
                             v1.into(),
                             v2.into(),
@@ -140,24 +135,18 @@ impl Shader for PhongToonShading {
                             }
 
                             if self.z_buffer_enabled {
-                                let z =
-                                    shader_utils::bilerp_float(v0.z, v1.z, v2.z, v3.z, alpha, beta);
+                                let z = utils::bilerp_float(v0.z, v1.z, v2.z, v3.z, alpha, beta);
                                 if !canvas.test_and_set_z(x, y, z) {
                                     continue;
                                 }
                             }
 
-                            let position =
-                                shader_utils::bilerp_vec(pos0, pos1, pos2, pos3, alpha, beta);
-                            let normal = shader_utils::bilerp_vec(
-                                normal0, normal1, normal2, normal3, alpha, beta,
-                            );
+                            let position = utils::bilerp_point(gv0, gv1, gv2, gv3, alpha, beta);
+                            let normal = utils::bilerp_uvec(n0, n1, n2, n3, alpha, beta);
 
                             // текстурные координаты пикселя
-                            let u =
-                                shader_utils::bilerp_float(tx0.0, tx1.0, tx2.0, tx3.0, alpha, beta);
-                            let v =
-                                shader_utils::bilerp_float(tx0.1, tx1.1, tx2.0, tx3.0, alpha, beta);
+                            let u = utils::bilerp_float(tx0.0, tx1.0, tx2.0, tx3.0, alpha, beta);
+                            let v = utils::bilerp_float(tx0.1, tx1.1, tx2.0, tx3.0, alpha, beta);
                             let base_color = model.material.get_uv_color(u, v);
 
                             // освещённость в данной точке
@@ -168,26 +157,33 @@ impl Shader for PhongToonShading {
                     }
                 }
             } else {
-                for triangle in shader_utils::triangulate_polygon(&polygon.get_vertexes()) {
+                // иначе барицентрическая интерполяция с триангуляцией
+                let indexes: Vec<usize> = polygon.get_mesh_vertex_index_iter().collect();
+                for triangle in utils::triangulate_polygon(&indexes) {
+                    // индексы вершин
+                    let i0 = triangle[0];
+                    let i1 = triangle[1];
+                    let i2 = triangle[2];
+
                     // проекция вершин треугольника
-                    let v0 = projected_vertexes[triangle[0]];
-                    let v1 = projected_vertexes[triangle[1]];
-                    let v2 = projected_vertexes[triangle[2]];
+                    let v0 = projected_vertexes[i0];
+                    let v1 = projected_vertexes[i1];
+                    let v2 = projected_vertexes[i2];
 
                     // текстурные UV-координаты вершин треугольника
-                    let tx0 = texture_coords[triangle[0]];
-                    let tx1 = texture_coords[triangle[1]];
-                    let tx2 = texture_coords[triangle[2]];
+                    let tx0 = polygon.get_texture_coord(&model.mesh, i0).unwrap();
+                    let tx1 = polygon.get_texture_coord(&model.mesh, i1).unwrap();
+                    let tx2 = polygon.get_texture_coord(&model.mesh, i2).unwrap();
 
-                    // глобальные нормали вершин треугольника
-                    let normal0 = global_normals[triangle[0]];
-                    let normal1 = global_normals[triangle[1]];
-                    let normal2 = global_normals[triangle[2]];
+                    // глобальные координаты вершин
+                    let gv0 = polygon.get_global_vertex(&model.mesh, i0);
+                    let gv1 = polygon.get_global_vertex(&model.mesh, i1);
+                    let gv2 = polygon.get_global_vertex(&model.mesh, i2);
 
-                    // глобальные позиции вершин треугольника
-                    let pos0 = global_vertex_poses[triangle[0]];
-                    let pos1 = global_vertex_poses[triangle[1]];
-                    let pos2 = global_vertex_poses[triangle[2]];
+                    // глобальные нормали
+                    let n0 = polygon.get_global_normal(&model.mesh, i0).unwrap();
+                    let n1 = polygon.get_global_normal(&model.mesh, i1).unwrap();
+                    let n2 = polygon.get_global_normal(&model.mesh, i2).unwrap();
 
                     let min_x = v0.x.min(v1.x.min(v2.x)) as usize;
                     let max_x = v0.x.max(v1.x.max(v2.x)) as usize;
@@ -196,27 +192,26 @@ impl Shader for PhongToonShading {
 
                     for y in min_y..=max_y {
                         for x in min_x..=max_x {
-                            if x >= canvas.width || y >= canvas.height {
+                            if x >= canvas.width() || y >= canvas.height() {
                                 continue;
                             }
 
                             let p = Point3::new(x as f32, y as f32, 0.0);
-                            let bary = shader_utils::barycentric_coordinates(&[v0, v1, v2], p);
+                            let bary = utils::barycentric_coordinates(&[v0, v1, v2], p);
 
                             if self.z_buffer_enabled {
-                                let z = shader_utils::interpolate_float(bary, v0.z, v1.z, v2.z);
+                                let z = utils::interpolate_float(bary, v0.z, v1.z, v2.z);
                                 if !canvas.test_z(x, y, z) {
                                     continue;
                                 }
                             }
 
-                            let position = shader_utils::interpolate_vec(bary, pos0, pos1, pos2);
-                            let normal =
-                                shader_utils::interpolate_vec(bary, normal0, normal1, normal2);
+                            let position = utils::interpolate_point(bary, gv0, gv1, gv2);
+                            let normal = utils::interpolate_uvec(bary, n0, n1, n2);
 
                             // текстурные коодринаты пикселя
-                            let u = shader_utils::interpolate_float(bary, tx0.0, tx1.0, tx2.0);
-                            let v = shader_utils::interpolate_float(bary, tx0.1, tx1.1, tx2.1);
+                            let u = utils::interpolate_float(bary, tx0.0, tx1.0, tx2.0);
+                            let v = utils::interpolate_float(bary, tx0.1, tx1.1, tx2.1);
                             let base_color = model.material.get_uv_color(u, v);
 
                             // освещённость в данной точке

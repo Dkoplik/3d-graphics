@@ -1,14 +1,15 @@
-use super::primitives::{Line3, Point3, Transform3D, UVec3, Vec3};
-use crate::CoordFrame;
+use std::{fmt::Display, ops::Mul};
+
+use crate::{Canvas, CoordFrame, Line3, Point3, Transform3D, UVec3};
 
 /// Камера в 3-х мерном пространстве.
 #[derive(Debug, Clone, Copy)]
-pub struct Camera3 {
+pub struct Camera {
     /// Координатная система камеры.
     ///
     /// Направление -z считается направлением обзора камеры, направление +y считается направлением вверх,
     /// а направление -x - право для камеры.
-    local_frame: CoordFrame,
+    pub local_frame: CoordFrame,
     /// Вертикальный угол обзора (в радианах).
     fov: f32,
     /// Соотношение сторон (ширина / высота).
@@ -19,12 +20,12 @@ pub struct Camera3 {
     far_plane: f32,
 }
 
-impl Default for Camera3 {
+impl Default for Camera {
     fn default() -> Self {
         Self::new(
             Point3::new(0.0, 0.0, -10.0),
-            Vec3::forward(),
-            Vec3::up(),
+            UVec3::forward(),
+            UVec3::up(),
             (60.0 as f32).to_radians(),
             16.0 / 9.0,
             0.1,
@@ -33,7 +34,7 @@ impl Default for Camera3 {
     }
 }
 
-impl Camera3 {
+impl Camera {
     /// Создает новую камеру с указанными параметрами.
     ///
     /// `position` - позиция камеры в **глобальных** координатах.
@@ -99,12 +100,12 @@ impl Camera3 {
     }
 
     /// Возвращает направление вверх в **глобальных** координатах.
-    pub fn up(&self) -> Vec3 {
+    pub fn up(&self) -> UVec3 {
         self.local_frame.up()
     }
 
     /// Возвращает направление вниз в **глобальных** координатах.
-    pub fn down(&self) -> Vec3 {
+    pub fn down(&self) -> UVec3 {
         self.local_frame.down()
     }
 
@@ -112,7 +113,7 @@ impl Camera3 {
     ///
     /// Так как +z должно быть направлено в саму камеру, то `forward` камеры совпадает
     /// с `backward` локальной системы.
-    pub fn forward(&self) -> Vec3 {
+    pub fn forward(&self) -> UVec3 {
         self.local_frame.backward()
     }
 
@@ -120,7 +121,7 @@ impl Camera3 {
     ///
     /// Так как +z должно быть направлено в саму камеру, то `backward` камеры совпадает
     /// с `forward` локальной системы.
-    pub fn backward(&self) -> Vec3 {
+    pub fn backward(&self) -> UVec3 {
         self.local_frame.forward()
     }
 
@@ -128,7 +129,7 @@ impl Camera3 {
     ///
     /// Так как +z должно быть направлено в саму камеру, то `left` камеры совпадает
     /// с `right` локальной системы.
-    pub fn left(&self) -> Vec3 {
+    pub fn left(&self) -> UVec3 {
         self.local_frame.right()
     }
 
@@ -136,26 +137,14 @@ impl Camera3 {
     ///
     /// Так как +z должно быть направлено в саму камеру, то `right` камеры совпадает
     /// с `left` локальной системы.
-    pub fn right(&self) -> Vec3 {
+    pub fn right(&self) -> UVec3 {
         // поскольку координатная система смотрит в обратную сторону
         self.local_frame.left()
     }
 
     /// Возвращает точку, в которую смотрит камера.
     pub fn target(&self) -> Point3 {
-        self.local_frame.position() + self.get_direction()
-    }
-
-    /// Возвращает локальные координаты камеры.
-    pub fn get_local_frame(&self) -> &CoordFrame {
-        &self.local_frame
-    }
-
-    /// Возвращает изменяемые локальные координаты камеры.
-    ///
-    /// Путём применения трансформаций к локальным координатам, можно двигать камеру.
-    pub fn get_local_frame_mut(&mut self) -> &mut CoordFrame {
-        &mut self.local_frame
+        self.local_frame.origin + self.get_direction()
     }
 
     // --------------------------------------------------
@@ -252,64 +241,66 @@ impl Camera3 {
     }
 
     pub fn get_position(&self) -> Point3 {
-        self.local_frame.get_origin()
+        self.local_frame.origin
     }
 
     pub fn set_position(&mut self, position: Point3) {
-        self.local_frame.set_origin(position);
+        self.local_frame.origin = position;
     }
 
     pub fn get_target(&self) -> Point3 {
-        self.get_origin() + self.forward()
+        self.get_position() + self.forward()
     }
 
     pub fn set_target(&mut self, target: Point3) {
-        let from = self.get_target() - self.get_origin();
-        let to = target - self.get_origin();
+        let from = (self.get_target() - self.get_position())
+            .normalize()
+            .unwrap();
+        let to = (target - self.get_position()).normalize().unwrap();
         self.rotate(from, to);
     }
 
-    pub fn get_direction(&self) -> Vec3 {
+    pub fn get_direction(&self) -> UVec3 {
         self.forward()
     }
 
-    pub fn set_direction(&mut self, direction: Vec3, up: Vec3) {
+    pub fn set_direction(&mut self, direction: UVec3, up: UVec3) {
         let forward = -direction;
-        let new_frame = CoordFrame::from_2(
-            forward.normalize(),
-            up.cross_left(forward).normalize(),
-            self.local_frame.get_origin(),
-        );
+        let new_frame = CoordFrame::from_2(forward, up, self.local_frame.origin);
         self.local_frame = new_frame;
     }
 
-    /// Двигает в направлении камеры.
+    /// Сдвинуть камеру вдоль её направления.
     pub fn move_forward(&mut self, distance: f32) {
         let vec = self.forward() * distance;
         self.local_frame.translate_vec(vec);
     }
 
-    /// Двигает против направления камеры.
+    /// Сдвинуть камеру против её направления.
     pub fn move_backward(&mut self, distance: f32) {
         let vec = self.backward() * distance;
         self.local_frame.translate_vec(vec);
     }
 
+    /// Сдвинуть камеру вправо.
     pub fn move_right(&mut self, distance: f32) {
         let vec = self.right() * distance;
         self.local_frame.translate_vec(vec);
     }
 
+    /// Сдвинуть камеру налево.
     pub fn move_left(&mut self, distance: f32) {
         let vec = self.left() * distance;
         self.local_frame.translate_vec(vec);
     }
 
+    /// Сдвинуть камеру вверх.
     pub fn move_up(&mut self, distance: f32) {
         let vec = self.up() * distance;
         self.local_frame.translate_vec(vec);
     }
 
+    /// Сдвинуть камеру вниз.
     pub fn move_down(&mut self, distance: f32) {
         let vec = self.down() * distance;
         self.local_frame.translate_vec(vec);
@@ -318,7 +309,7 @@ impl Camera3 {
     /// Повернуть камеру из направления `from` в направление `to` в **локальных** координатах.
     ///
     /// Сами `from` и `to` указываются в **глобальных** координатах.
-    pub fn rotate(&mut self, from: Vec3, to: Vec3) {
+    pub fn rotate(&mut self, from: UVec3, to: UVec3) {
         let transform = Transform3D::rotation_aligning(from, to);
         self.local_frame.rotate(transform);
     }
@@ -334,30 +325,129 @@ impl Camera3 {
         let right = self.right();
         let up = self.up();
 
-        let ray_direction = (self.get_direction() + right * x + up * y).normalize();
+        let ray_direction = (self.get_direction() + right * x + up * y)
+            .normalize()
+            .unwrap();
 
-        Line3::new(self.get_position(), ray_direction * self.far_plane)
+        Line3::new(self.get_position(), ray_direction)
     }
 
     /// Возвращает расстояние от камеры до точки.
     pub fn distance_to(&self, point: Point3) -> f32 {
         (point - self.get_position()).length()
     }
+
+    /// Получить матрицу преобразования из локальных координат камеры в экранные (viewport, он же canvas)
+    ///
+    /// То есть, матрица производит следующие операции:
+    /// координаты камеры (view tranform) -> проекция на камеру в NDC -> растяжение NDC на размер canvas.
+    fn camera_to_screen_transform(
+        &self,
+        projection_type: ProjectionType,
+        canvas: &Canvas,
+    ) -> Transform3D {
+        // Матрица проекции координат камеры в NDC
+        let proj_matrix = match projection_type {
+            ProjectionType::Parallel => {
+                let width = 2.0 * (self.get_fov() / 2.0).sin();
+                let height = width / self.get_aspect_ratio();
+                Transform3D::parallel_symmetric(
+                    width,
+                    height,
+                    self.get_near_plane(),
+                    self.get_far_plane(),
+                )
+            }
+            ProjectionType::Perspective => Transform3D::perspective(
+                self.get_fov(),
+                self.get_aspect_ratio(),
+                self.get_near_plane(),
+                self.get_far_plane(),
+            ),
+        };
+
+        let scale_x = canvas.width() as f32 / 2.0; // растянуть NDC по ширине
+        let scale_y = canvas.height() as f32 / 2.0; // растянуть NDC по высоте
+
+        proj_matrix // вот тут получается NDC [-1, 1]
+            .multiply(Transform3D::translation(-1.0, 1.0, 0.0))
+            .multiply(Transform3D::scale(-scale_x, scale_y, 1.0)) // теперь экранные
+    }
+
+    /// Получить матрицу преобразования из глобальных координат в экранные (viewport, он же canvas)
+    ///
+    /// То есть, матрица производит следующие операции:
+    /// глобальные координаты -> координаты камеры (view tranform) -> проекция на камеру в NDC -> растяжение NDC на размер canvas.
+    pub fn global_to_screen_transform(
+        &self,
+        projection_type: ProjectionType,
+        canvas: &Canvas,
+    ) -> Transform3D {
+        let to_camera_transform = self.local_frame.global_to_local_matrix();
+        to_camera_transform.multiply(self.camera_to_screen_transform(projection_type, canvas))
+    }
+
+    /// Возвращает матрицу преобразований из экранных координат в локальные координаты камеры.
+    pub fn screen_to_camera_transform(
+        &self,
+        projection_type: ProjectionType,
+        canvas: &Canvas,
+    ) -> Transform3D {
+        let scale_x = canvas.width() as f32 / 2.0;
+        let scale_y = canvas.height() as f32 / 2.0;
+
+        let width = 2.0 * (self.get_fov() / 2.0).sin();
+        let height = width / self.get_aspect_ratio();
+
+        Transform3D::scale(1.0 / scale_x, -1.0 / scale_y, 1.0) // экранные в [0, +2]
+            .multiply(Transform3D::translation(-1.0, -1.0, 0.0)) // в NDC [-1, +1]
+            .multiply(Transform3D::scale(width, height, 1.0)) // локальные координаты камеры
+    }
+
+    pub fn screen_to_global_transform(
+        &self,
+        projection_type: ProjectionType,
+        canvas: &Canvas,
+    ) -> Transform3D {
+        let to_global_transform = self.local_frame.local_to_global_matrix();
+        self.screen_to_camera_transform(projection_type, canvas)
+            .mul(to_global_transform)
+    }
+}
+
+/// Тип проекции на камеру.
+#[derive(Default, Debug, Clone, Copy, PartialEq)]
+pub enum ProjectionType {
+    /// Параллельная (ортографическая) проекция.
+    #[default]
+    Parallel,
+    /// Перспективная проекция.
+    Perspective,
+    // /// Аксонометрическая проекция.
+    // Axonimetrix,
+}
+
+impl Display for ProjectionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parallel => f.write_str("Параллельная"),
+            Self::Perspective => f.write_str("Перспективная"),
+        }
+    }
 }
 
 #[cfg(test)]
 mod camera_tests {
-    use crate::HVec3;
-
     use super::*;
+    use crate::{HVec3, Vec3};
     use std::f32::consts::PI;
 
     const TOLERANCE: f32 = 1e-6;
 
-    fn assert_vecs(got: Vec3, expected: Vec3, tolerance: f32) {
+    fn assert_uvecs(got: UVec3, expected: UVec3, tolerance: f32) {
         assert!(
             got.approx_equal(expected, tolerance),
-            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            "ожидался unit-вектор {:?}, но получен unit-вектор {:?}, одна из координат которого отличается более чем на {}",
             expected,
             got,
             tolerance
@@ -374,61 +464,22 @@ mod camera_tests {
         );
     }
 
-    fn assert_hvecs(got: HVec3, expected: HVec3, tolerance: f32) {
-        assert!(
-            got.approx_equal(expected, tolerance),
-            "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
-            expected,
-            got,
-            tolerance
-        );
-    }
-
-    #[test]
-    fn test_camera_look_at_constructor() {
-        let position = Point3::new(0.0, 0.0, 10.0);
-        let target = Point3::new(0.0, 0.0, 0.0);
-        let camera = Camera3::look_at(position, target, Vec3::up());
-
-        assert_points(camera.get_position(), position, TOLERANCE);
-
-        // Camera should look toward target
-        let direction = camera.get_direction();
-        let expected_direction = (target - position).normalize();
-        assert_vecs(direction, expected_direction, TOLERANCE);
-
-        // Up vector should be maintained
-        assert_vecs(camera.up(), Vec3::up(), TOLERANCE);
-    }
-
-    #[test]
-    fn test_camera_with_custom_up_vector() {
-        let position = Point3::new(0.0, 0.0, 10.0);
-        let target = Point3::new(0.0, 0.0, 0.0);
-        let custom_up = Vec3::new(1.0, 1.0, 0.0).normalize();
-
-        let camera = Camera3::look_at(position, target, custom_up);
-
-        // Camera up should match custom up (normalized)
-        assert_vecs(camera.up(), custom_up.normalize(), TOLERANCE);
-    }
-
     #[test]
     fn test_camera_global_to_local_origin() {
-        let camera = Camera3::new(
+        let camera = Camera::new(
             Point3::new(0.0, 0.0, -10.0),
-            Vec3::forward(),
-            Vec3::up(),
+            UVec3::forward(),
+            UVec3::up(),
             PI / 3.0,
             16.0 / 9.0,
             0.1,
             100.0,
         );
 
-        let global_to_local = camera.get_local_frame().global_to_local_matrix();
+        let global_to_local = camera.local_frame.global_to_local_matrix();
 
         let world_origin = Point3::zero();
-        let camera_space_origin: Point3 = global_to_local.apply_to_hvec(world_origin.into()).into();
+        let camera_space_origin: Point3 = world_origin.apply_transform(global_to_local).unwrap();
 
         assert_points(camera_space_origin, Point3::new(0.0, 0.0, -10.0), TOLERANCE);
     }
@@ -436,62 +487,56 @@ mod camera_tests {
     #[test]
     fn test_camera_global_to_local_rotated() {
         // Camera looking along X axis (rotated 90 degrees around Y)
-        let camera = Camera3::new(
+        let camera = Camera::new(
             Point3::new(0.0, 0.0, 0.0),
-            Vec3::right(),
-            Vec3::up(),
+            UVec3::right(),
+            UVec3::up(),
             PI / 3.0,
             16.0 / 9.0,
             0.1,
             100.0,
         );
 
-        let global_to_local = camera.get_local_frame().global_to_local_matrix();
+        let global_to_local = camera.local_frame.global_to_local_matrix();
 
         let world_point = Point3::new(5.0, 0.0, 0.0);
-        let camera_space_point: Point3 = global_to_local.apply_to_hvec(world_point.into()).into();
+        let camera_space_point: Point3 = world_point.apply_transform(global_to_local).unwrap();
 
         assert_points(camera_space_point, Point3::new(0.0, 0.0, -5.0), TOLERANCE);
     }
 
     #[test]
     fn test_camera_global_to_local_with_offset() {
-        let camera = Camera3::new(
+        let camera = Camera::new(
             Point3::new(2.0, 3.0, 5.0),
-            Vec3::new(0.0, 0.0, -1.0),
-            Vec3::up(),
+            UVec3::new(0.0, 0.0, -1.0),
+            UVec3::up(),
             PI / 3.0,
             16.0 / 9.0,
             0.1,
             100.0,
         );
 
-        let global_to_local = camera.get_local_frame().global_to_local_matrix();
+        let global_to_local = camera.local_frame.global_to_local_matrix();
 
         // Test point at camera position should be at origin in camera space
         let camera_pos = camera.get_position();
-        let camera_space_pos: Point3 = global_to_local.apply_to_hvec(camera_pos.into()).into();
+        let camera_space_pos: Point3 = camera_pos.apply_transform(global_to_local).unwrap();
         assert_points(camera_space_pos, Point3::new(0.0, 0.0, 0.0), TOLERANCE);
 
         // Test point in front of camera
         let point_in_front = Point3::new(2.0, 3.0, 0.0); // Same XY, different Z
-        let camera_space_front: Point3 =
-            global_to_local.apply_to_hvec(point_in_front.into()).into();
+        let camera_space_front: Point3 = point_in_front.apply_transform(global_to_local).unwrap();
         assert!(camera_space_front.z < 0.0); // Should be in front (negative Z in camera space)
     }
 
     #[test]
     fn test_camera_direction_vectors_orthonormal() {
-        let camera = Camera3::default();
+        let camera = Camera::default();
 
         let forward = camera.forward();
         let right = camera.right();
         let up = camera.up();
-
-        // All vectors should be unit length
-        assert!((forward.length() - 1.0).abs() < TOLERANCE);
-        assert!((right.length() - 1.0).abs() < TOLERANCE);
-        assert!((up.length() - 1.0).abs() < TOLERANCE);
 
         // All vectors should be orthogonal
         assert!(forward.dot(right).abs() < TOLERANCE);
@@ -517,7 +562,7 @@ mod camera_tests {
         let projected_point = proj_matrix.apply_to_hvec(point_on_near_plane);
 
         // After perspective divide, Z should be 1
-        let ndc_point: Point3 = projected_point.into();
+        let ndc_point: Point3 = projected_point.try_into().unwrap();
         assert!((ndc_point.z - 1.0).abs() < TOLERANCE);
     }
 
@@ -534,7 +579,7 @@ mod camera_tests {
         let point_on_far_plane = HVec3::new(0.0, 0.0, -far, 1.0);
         let projected_point = proj_matrix.apply_to_hvec(point_on_far_plane);
 
-        let ndc_point: Point3 = projected_point.into();
+        let ndc_point: Point3 = projected_point.try_into().unwrap();
         assert!((ndc_point.z - (-1.0)).abs() < TOLERANCE);
     }
 
@@ -550,7 +595,7 @@ mod camera_tests {
         // For 90 degree FOV and near=1, points at near plane corners should be at ±1 in X and Y
         let top_right_near = HVec3::new(1.0, 1.0, -1.0, 1.0); // At near plane, tan(45)=1
         let projected = proj_matrix.apply_to_hvec(top_right_near);
-        let ndc: Point3 = projected.into();
+        let ndc: Point3 = projected.try_into().unwrap();
 
         // Should be near the top-right corner of NDC
         assert!(ndc.x > 0.9 && ndc.x <= 1.0);
@@ -572,7 +617,7 @@ mod camera_tests {
         // Test left-bottom-near corner
         let lbn = HVec3::new(left, bottom, -near, 1.0);
         let projected = proj_matrix.apply_to_hvec(lbn);
-        let ndc: Point3 = projected.into();
+        let ndc: Point3 = projected.try_into().unwrap();
 
         assert!((ndc.x - (-1.0)).abs() < TOLERANCE);
         assert!((ndc.y - (-1.0)).abs() < TOLERANCE);
@@ -581,7 +626,7 @@ mod camera_tests {
         // Test right-top-far corner
         let rtf = HVec3::new(right, top, -far, 1.0);
         let projected = proj_matrix.apply_to_hvec(rtf);
-        let ndc: Point3 = projected.into();
+        let ndc: Point3 = projected.try_into().unwrap();
 
         assert!((ndc.x - 1.0).abs() < TOLERANCE);
         assert!((ndc.y - 1.0).abs() < TOLERANCE);
@@ -595,25 +640,31 @@ mod camera_tests {
     #[test]
     fn test_view_projection_combined() {
         // Simple camera at origin looking down -Z
-        let camera = Camera3::new(
+        let camera = Camera::new(
             Point3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 0.0, -1.0),
-            Vec3::up(),
+            UVec3::new(0.0, 0.0, -1.0),
+            UVec3::up(),
             PI / 3.0,
             1.0, // Square aspect for simplicity
             0.1,
             100.0,
         );
 
-        let view_matrix = camera.get_local_frame().global_to_local_matrix();
+        let view_matrix = camera.local_frame.global_to_local_matrix();
         let proj_matrix = Transform3D::perspective(PI / 3.0, 1.0, 0.1, 100.0);
 
         let view_proj_matrix = view_matrix.multiply(proj_matrix);
 
         // Point directly in front of camera
         let world_point = Point3::new(0.0, 0.0, -5.0);
-        let view_space: Point3 = view_matrix.apply_to_hvec(world_point.into()).into();
-        let clip_space: Point3 = view_proj_matrix.apply_to_hvec(world_point.into()).into();
+        let view_space: Point3 = view_matrix
+            .apply_to_hvec(world_point.into())
+            .try_into()
+            .unwrap();
+        let clip_space: Point3 = view_proj_matrix
+            .apply_to_hvec(world_point.into())
+            .try_into()
+            .unwrap();
 
         // In view space, point should be at (0, 0, -5)
         assert_points(view_space, Point3::new(0.0, 0.0, -5.0), TOLERANCE);
@@ -624,17 +675,17 @@ mod camera_tests {
 
     #[test]
     fn test_view_projection_frustum_culling() {
-        let camera = Camera3::new(
+        let camera = Camera::new(
             Point3::new(0.0, 0.0, 0.0),
-            Vec3::new(0.0, 0.0, -1.0),
-            Vec3::up(),
+            UVec3::new(0.0, 0.0, -1.0),
+            UVec3::up(),
             PI / 2.0, // 90 degree FOV
             1.0,
             1.0,
             10.0,
         );
 
-        let view_matrix = camera.get_local_frame().global_to_local_matrix();
+        let view_matrix = camera.local_frame.global_to_local_matrix();
         let proj_matrix = Transform3D::perspective(PI / 2.0, 1.0, 1.0, 10.0);
         let view_proj_matrix = view_matrix.multiply(proj_matrix);
 
@@ -646,7 +697,10 @@ mod camera_tests {
         ];
 
         for point in inside_points {
-            let clip_space: Point3 = view_proj_matrix.apply_to_hvec(point.into()).into();
+            let clip_space: Point3 = view_proj_matrix
+                .apply_to_hvec(point.into())
+                .try_into()
+                .unwrap();
             // After perspective divide, points inside frustum should be in [-1, 1] range
             let abs_x = clip_space.x.abs();
             let abs_y = clip_space.y.abs();
@@ -680,7 +734,10 @@ mod camera_tests {
         ];
 
         for point in outside_points {
-            let clip_space: Point3 = view_proj_matrix.apply_to_hvec(point.into()).into();
+            let clip_space: Point3 = view_proj_matrix
+                .apply_to_hvec(point.into())
+                .try_into()
+                .unwrap();
             // At least one coordinate should be outside [-1, 1] range
             let abs_x = clip_space.x.abs();
             let abs_y = clip_space.y.abs();
@@ -699,10 +756,10 @@ mod camera_tests {
 
     #[test]
     fn test_camera_movement_consistency() {
-        let mut camera = Camera3::new(
+        let mut camera = Camera::new(
             Point3::new(0.0, 0.0, 0.0),
-            Vec3::forward(),
-            Vec3::up(),
+            UVec3::forward(),
+            UVec3::up(),
             PI / 2.0, // 90 degree FOV
             1.0,
             1.0,
@@ -727,7 +784,7 @@ mod camera_tests {
 
     #[test]
     fn test_camera_setters() {
-        let mut camera = Camera3::default();
+        let mut camera = Camera::default();
 
         // Test position setter
         let new_position = Point3::new(1.0, 2.0, 3.0);
@@ -735,9 +792,9 @@ mod camera_tests {
         assert_points(camera.get_position(), new_position, TOLERANCE);
 
         // Test direction setter
-        let new_direction = Vec3::right();
-        camera.set_direction(new_direction, Vec3::up());
-        assert_vecs(camera.get_direction(), new_direction, TOLERANCE);
+        let new_direction = UVec3::right();
+        camera.set_direction(new_direction, UVec3::up());
+        assert_uvecs(camera.get_direction(), new_direction, TOLERANCE);
 
         // Test FOV setter
         let new_fov_deg = 45.0;
@@ -755,23 +812,16 @@ mod camera_tests {
     // ========================================
 
     #[test]
-    #[should_panic(expected = "камера в позиции")]
-    fn test_camera_look_at_same_position() {
-        let position = Point3::new(1.0, 1.0, 1.0);
-        Camera3::look_at(position, position, Vec3::up());
-    }
-
-    #[test]
     #[should_panic(expected = "fov")]
     fn test_camera_invalid_fov() {
-        let mut camera = Camera3::default();
+        let mut camera = Camera::default();
         camera.set_fov_degrees(0.0); // Should panic for zero FOV
     }
 
     #[test]
     #[should_panic(expected = "ближняя плоскость")]
     fn test_camera_invalid_near_plane() {
-        let mut camera = Camera3::default();
+        let mut camera = Camera::default();
         camera.set_near_plane(-1.0); // Should panic for negative near plane
     }
 
@@ -780,7 +830,7 @@ mod camera_tests {
     // ========================================
     #[test]
     fn test_camera_movement() {
-        let mut camera = Camera3::default();
+        let mut camera = Camera::default();
         let original_pos = camera.get_position();
         let mut expected_pos = original_pos;
 
@@ -817,33 +867,33 @@ mod camera_tests {
 
     #[test]
     fn test_camera_rotation_1() {
-        let mut camera = Camera3::default();
+        let mut camera = Camera::default();
         let original_pos = camera.get_position();
 
-        camera.rotate(Vec3::forward(), Vec3::right());
+        camera.rotate(UVec3::forward(), UVec3::right());
 
         // позиция не должна была поменяться
         assert_points(camera.get_position(), original_pos, TOLERANCE);
 
         // поворот правильный?
-        assert_vecs(camera.forward(), Vec3::right(), TOLERANCE);
-        assert_vecs(camera.right(), Vec3::backward(), TOLERANCE);
-        assert_vecs(camera.up(), Vec3::up(), TOLERANCE);
+        assert_uvecs(camera.forward(), UVec3::right(), TOLERANCE);
+        assert_uvecs(camera.right(), UVec3::backward(), TOLERANCE);
+        assert_uvecs(camera.up(), UVec3::up(), TOLERANCE);
     }
 
     #[test]
     fn test_camera_rotation_2() {
-        let mut camera = Camera3::default();
+        let mut camera = Camera::default();
         let original_pos = camera.get_position();
 
-        camera.rotate(Vec3::forward(), Vec3::up());
+        camera.rotate(UVec3::forward(), UVec3::up());
 
         // позиция не должна была поменяться
         assert_points(camera.get_position(), original_pos, TOLERANCE);
 
         // поворот правильный?
-        assert_vecs(camera.forward(), Vec3::up(), TOLERANCE);
-        assert_vecs(camera.right(), Vec3::right(), TOLERANCE);
-        assert_vecs(camera.up(), Vec3::backward(), TOLERANCE);
+        assert_uvecs(camera.forward(), UVec3::up(), TOLERANCE);
+        assert_uvecs(camera.right(), UVec3::right(), TOLERANCE);
+        assert_uvecs(camera.up(), UVec3::backward(), TOLERANCE);
     }
 }

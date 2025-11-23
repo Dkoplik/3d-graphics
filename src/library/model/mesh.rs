@@ -3,7 +3,7 @@
 //! По сути, это является каркасом модели, которого достаточно только
 //! для рендера в формате wireframe.
 
-use crate::{CoordFrame, HVec3, Line3, Point3, Transform3D, UVec3, Vec3};
+use crate::{CoordFrame, Line3, Point3, Transform3D, UVec3, Vec3, library::utils};
 
 mod polygon;
 // re-export в модель
@@ -31,10 +31,10 @@ pub struct Mesh {
     pub local_frame: CoordFrame,
 
     /// Нормали вершин. Индексируются в том же порядке, что и вершины Mesh'а.
-    normals: Vec<UVec3>,
+    normals: Option<Vec<UVec3>>,
 
     /// Соответствие между UV-координатами текстуры и вершинами.
-    texture_coords: Vec<(f32, f32)>,
+    texture_coords: Option<Vec<(f32, f32)>>,
 }
 
 impl Mesh {
@@ -43,17 +43,19 @@ impl Mesh {
     // --------------------------------------------------
 
     /// Сгенерировать нормали по имеющимся полигонам.
-    pub fn generate_normals(vertexes: &Vec<Point3>, polygons: &Vec<Polygon>) -> Vec<UVec3> {
-        let mut normals = vec![Vec3::zero(); vertexes.len()];
-        let mut face_count = vec![0; vertexes.len()];
+    ///
+    /// Если в модели уже содержатся какие-то нормали, то они будут удалены.
+    pub fn generate_normals(&mut self) {
+        let mut normals = vec![Vec3::zero(); self.vertexes.len()];
+        let mut face_count = vec![0; self.vertexes.len()];
 
         // Вычисляем центр меша для согласованной ориентации нормалей
-        let mesh_center = Self::calculate_center(vertexes);
+        let mesh_center = utils::calculate_center(&self.vertexes);
 
         // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
         // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
-        for polygon in polygons {
-            let poly_normal = polygon.plane_normal(Some(mesh_center));
+        for polygon in &self.polygons {
+            let poly_normal = polygon.plane_normal(self, Some(mesh_center));
 
             for vertex_index in polygon.get_mesh_vertex_index_iter() {
                 normals[vertex_index] = normals[vertex_index] + poly_normal;
@@ -68,100 +70,63 @@ impl Mesh {
             }
         }
 
-        normals
-            .iter()
-            .map(|&v| v.normalize().unwrap_or(UVec3::new(0.0, 0.0, 1.0)))
-            .collect()
-    }
+        self.normals = Some(
+            normals
+                .iter()
+                .map(|&v| v.normalize().unwrap_or(UVec3::new(0.0, 0.0, 1.0)))
+                .collect(),
+        );
 
-    /// Вычислить центр меша
-    fn calculate_center(vertexes: &Vec<Point3>) -> Point3 {
-        if vertexes.is_empty() {
-            return Point3::zero();
-        }
-
-        let sum: Vec3 = vertexes
-            .iter()
-            .map(|&p| Vec3::from(p))
-            .fold(Vec3::zero(), |acc, v| acc + v);
-
-        (sum * (1.0 / vertexes.len() as f32)).into()
+        // sanity check
+        #[cfg(debug_assertions)]
+        Self::assert_normals(&self.vertexes, self.normals.as_ref().unwrap());
     }
 
     /// Сгенерировать текстурные координаты по имеющимся полигонам.
-    pub fn generate_texture_coord(
-        vertexes: &Vec<HVec3>,
-        polygons: &Vec<Polygon3>,
-    ) -> Vec<(f32, f32)> {
-        #[cfg(debug_assertions)]
-        Self::assert_polygons(vertexes, polygons);
-
+    ///
+    /// Если в модели уже содержатся какие-то текстурные координаты, то они будут удалены.
+    pub fn generate_texture_coord(&mut self) {
         // Автоматически выбираем метод развертки на основе геометрии(возможно, реализуем в будущем. Сейчас - planar)
-        if Self::is_cylindrical_shape(vertexes) {
-            Self::generate_texture_coord_cylindrical(vertexes, polygons)
+        if self.is_cylindrical_shape() {
+            self.generate_texture_coord_cylindrical();
         } else {
-            Self::generate_texture_coord_planar(vertexes, polygons)
+            self.generate_texture_coord_planar();
         }
+
+        // sanity check
+        #[cfg(debug_assertions)]
+        Self::assert_texture(&self.vertexes, self.texture_coords.as_ref().unwrap());
     }
 
     /// Сгенерировать текстурные координаты с цилиндрической разверткой
-    pub fn generate_texture_coord_cylindrical(
-        vertexes: &Vec<HVec3>,
-        polygons: &Vec<Polygon3>,
-    ) -> Vec<(f32, f32)> {
+    fn generate_texture_coord_cylindrical(&mut self) {
         //todo
         todo!()
     }
 
-    /// Вычислить ограничивающий параллелепипед вершин
-    fn calculate_bounds(vertexes: &Vec<HVec3>) -> (Vec3, Vec3) {
-        if vertexes.is_empty() {
-            return (Vec3::zero(), Vec3::zero());
-        }
-
-        let first = Vec3::from(vertexes[0]);
-        let mut min = first;
-        let mut max = first;
-
-        for vertex in vertexes.iter().skip(1) {
-            let v = Vec3::from(*vertex);
-            min.x = min.x.min(v.x);
-            min.y = min.y.min(v.y);
-            min.z = min.z.min(v.z);
-            max.x = max.x.max(v.x);
-            max.y = max.y.max(v.y);
-            max.z = max.z.max(v.z);
-        }
-
-        (min, max)
-    }
-
     /// Планарная развертка
-    fn generate_texture_coord_planar(
-        vertexes: &Vec<HVec3>,
-        polygons: &Vec<Polygon3>,
-    ) -> Vec<(f32, f32)> {
-        let mut texture_coords = vec![(0.0, 0.0); vertexes.len()];
-        let mut usage_count = vec![0; vertexes.len()];
+    fn generate_texture_coord_planar(&mut self) {
+        let mut texture_coords = vec![(0.0, 0.0); self.vertexes.len()];
+        let mut usage_count = vec![0; self.vertexes.len()];
 
         // Для каждого полигона вычисляем свою проекцию
-        for polygon in polygons {
-            let vertex_indices = polygon.get_vertexes();
+        for polygon in &self.polygons {
+            let vertex_indices: Vec<usize> = polygon.get_mesh_vertex_index_iter().collect();
 
             if vertex_indices.len() < 3 {
                 continue;
             }
 
             // Вычисляем нормаль полигона для определения плоскости проекции
-            let normal = polygon.get_normal(None);
+            let normal = polygon.plane_normal(self, None);
             let (u_axis, v_axis) = Self::get_projection_axes(normal);
 
             let (min_u, min_v, max_u, max_v) =
-                Self::get_polygon_bounds(vertexes, vertex_indices, u_axis, v_axis);
+                Self::get_polygon_bounds(&self.vertexes, &vertex_indices, u_axis, v_axis);
 
             // Назначаем UV координаты для вершин этого полигона
-            for &vertex_index in vertex_indices {
-                let vertex = Vec3::from(vertexes[vertex_index]);
+            for vertex_index in vertex_indices {
+                let vertex = Vec3::from(self.vertexes[vertex_index]);
                 let u = (vertex.dot(u_axis) - min_u) / (max_u - min_u);
                 let v = (vertex.dot(v_axis) - min_v) / (max_v - min_v);
 
@@ -180,11 +145,11 @@ impl Mesh {
             }
         }
 
-        texture_coords
+        self.texture_coords = Some(texture_coords);
     }
 
     /// Определяет оси проекции на основе нормали
-    fn get_projection_axes(normal: Vec3) -> (Vec3, Vec3) {
+    fn get_projection_axes(normal: UVec3) -> (Vec3, Vec3) {
         // Выбираем плоскость проекции в зависимости от доминирующей оси нормали
         let abs_normal = Vec3::new(normal.x.abs(), normal.y.abs(), normal.z.abs());
 
@@ -202,7 +167,7 @@ impl Mesh {
 
     /// Вычисляет границы полигона в выбранной плоскости проекции
     fn get_polygon_bounds(
-        vertexes: &Vec<HVec3>,
+        vertexes: &Vec<Point3>,
         vertex_indices: &[usize],
         u_axis: Vec3,
         v_axis: Vec3,
@@ -235,7 +200,7 @@ impl Mesh {
     }
 
     /// Проверить, является ли форма цилиндрической (подходит для вращения)
-    fn is_cylindrical_shape(vertexes: &Vec<HVec3>) -> bool {
+    fn is_cylindrical_shape(&self) -> bool {
         //TODO
         false
     }
@@ -247,22 +212,26 @@ impl Mesh {
     /// Создать новый Mesh из уже известных данных.
     ///
     /// Локальная система координат этого Mesh'а будет совпадать с глобальной.
-    pub fn new(
-        vertexes: Vec<HVec3>,
+    fn new(
+        vertexes: Vec<Point3>,
         polygons: Vec<Polygon>,
-        normals: Vec<Vec3>,
-        texture_coords: Vec<(f32, f32)>,
+        normals: Option<Vec<UVec3>>,
+        texture_coords: Option<Vec<(f32, f32)>>,
     ) -> Self {
         #[cfg(debug_assertions)]
         {
             Self::assert_polygons(&vertexes, &polygons);
-            Self::assert_normals(&normals);
-            Self::assert_texture(&texture_coords);
+            if let Some(normals) = &normals {
+                Self::assert_normals(&vertexes, normals);
+            }
+            if let Some(texture_coords) = &texture_coords {
+                Self::assert_texture(&vertexes, texture_coords);
+            }
         }
 
         Mesh {
             vertexes,
-            polygons,
+            polygons: Vec::new(),
             local_frame: CoordFrame::global(),
             normals,
             texture_coords,
@@ -272,23 +241,15 @@ impl Mesh {
     /// Создать новый Mesh из вершин и полигонов.
     ///
     /// Нормали и координаты текстур будут сгенерированы автоматически.
-    pub fn from_polygons(vertexes: Vec<HVec3>, polygons: Vec<Polygon>) -> Self {
+    pub fn from_polygons(vertexes: Vec<Point3>, polygons: Vec<Polygon>) -> Self {
         #[cfg(debug_assertions)]
-        for polygon in polygons.clone() {
-            assert!(
-                polygon.get_vertexes().len() >= 3,
-                "Полигон должен быть хотя бы из 3 вершин"
-            );
-            for index in polygon.get_vertexes() {
-                if *index >= vertexes.len() {
-                    panic!("Полигон содержит индекс несуществующей вершины");
-                }
-            }
-        }
+        Self::assert_polygons(&vertexes, &polygons);
 
-        let normals = Self::generate_normals(&vertexes, &polygons);
-        let texture_coords = Self::generate_texture_coord(&vertexes, &polygons);
-        Self::new(vertexes, polygons, normals, texture_coords)
+        let mut mesh = Self::new(vertexes, polygons, None, None);
+        mesh.generate_normals();
+        mesh.generate_texture_coord();
+
+        mesh
     }
 
     /// Создать Mesh как модель вращения.
@@ -296,7 +257,7 @@ impl Mesh {
     /// `profile_points` - изначальные точки, на основе которых строится модель
     /// `axis` - ось, вокруг которой происходит вращение
     /// `parts` - количество разбиений
-    pub fn create_rotation_model(profile_points: &[HVec3], axis: Line3, parts: usize) -> Self {
+    pub fn create_rotation_model(profile_points: &[Point3], axis: Line3, parts: usize) -> Self {
         if parts < 3 {
             panic!("Количество разбиений должно быть не менее 3");
         }
@@ -315,7 +276,7 @@ impl Mesh {
             for i in 0..parts {
                 let angle = angle_step * i as f32;
                 let rotation = Transform3D::rotation_around_line(axis, angle);
-                let rotated_point = rotation.apply_to_hvec(*profile_point);
+                let rotated_point = profile_point.apply_transform(rotation).unwrap();
                 vertexes.push(rotated_point);
             }
         }
@@ -554,7 +515,7 @@ impl Mesh {
         ];
 
         // Нормализуем вершины
-        let vertexes: Vec<HVec3> = vertexes
+        let vertexes: Vec<Point3> = vertexes
             .into_iter()
             .map(|p| {
                 let len = (p.x * p.x + p.y * p.y + p.z * p.z).sqrt();
@@ -655,6 +616,11 @@ impl Mesh {
         self.vertexes.len()
     }
 
+    /// Получить количество полигонов в модели.
+    pub fn polygon_count(&self) -> usize {
+        self.polygons.len()
+    }
+
     /// Получить i-ую вершину модели в **локальных** координатах.
     pub fn get_local_vertex(&self, i: usize) -> Point3 {
         self.vertexes[i]
@@ -662,16 +628,24 @@ impl Mesh {
 
     /// Получить i-ую вершину модели в **глобальных** координатах.
     pub fn get_global_vertex(&self, i: usize) -> Point3 {
-        self.vertexes[i] * self.local_frame.local_to_global_matrix()
+        self.vertexes[i]
+            .apply_transform(self.local_frame.local_to_global_matrix())
+            .unwrap()
+    }
+
+    /// Получить i-ый полигон модели.
+    pub fn get_polygon(&self, i: usize) -> &Polygon {
+        &self.polygons[i]
     }
 
     /// Получить нормаль i-ой вершины модели в **локальных** координатах.
-    pub fn get_local_normal(&self, i: usize) -> UVec3 {
-        self.normals[i]
+    pub fn get_local_normal(&self, i: usize) -> Option<UVec3> {
+        let normals = self.normals.as_ref()?;
+        normals.get(i).copied()
     }
 
     /// Получить нормаль i-ой вершины модели в **глобальных** координатах.
-    pub fn get_global_normal(&self, i: usize) -> UVec3 {
+    pub fn get_global_normal(&self, i: usize) -> Option<UVec3> {
         // нормали ведут себя по-другому и умножаются на инвертированную матрицу.
         // так как нормаль вектор - то смещение применено не будет, тут всё ок
         let transform = self
@@ -679,12 +653,14 @@ impl Mesh {
             .local_to_global_matrix()
             .inverse()
             .expect("Ожидалось наличие обратной матрицы");
-        (self.normals[i] * transform).normalize()
+        let local_normal = self.get_local_normal(i)?;
+        Some(local_normal.apply_transform(transform).unwrap())
     }
 
     /// Получить текстурные координаты i-ой вершины модели.
-    pub fn get_texture_coord(&self, i: usize) -> (f32, f32) {
-        self.texture_coords[i]
+    pub fn get_texture_coord(&self, i: usize) -> Option<(f32, f32)> {
+        let texture_coords = self.texture_coords.as_ref()?;
+        texture_coords.get(i).copied()
     }
 
     /// Получить итератор по всем вершинам модели в **локальных** координатах.
@@ -695,20 +671,28 @@ impl Mesh {
     /// Получить итератор по всем вершинам модели в **глобальных** координатах.
     pub fn get_global_vertex_iter(&self) -> impl Iterator<Item = Point3> {
         let transform = self.local_frame.local_to_global_matrix();
-        self.vertexes.iter().map(move |&p| p * transform)
+        self.vertexes
+            .iter()
+            .map(move |&p| p.apply_transform(transform).unwrap())
+    }
+
+    /// Получить итератор по всем полигонам модели.
+    pub fn get_polygon_iter(&self) -> impl Iterator<Item = &Polygon> {
+        self.polygons.iter()
     }
 
     /// Получить итератор по всем нормалям модели в **локальных** координатах.
     ///
     /// Нормали идут в порядке соответствующих им вершин
-    pub fn get_local_normals_iter(&self) -> impl Iterator<Item = UVec3> {
-        self.normals.iter().copied()
+    pub fn get_local_normals_iter(&self) -> Option<impl Iterator<Item = UVec3>> {
+        let normals = self.normals.as_ref()?;
+        Some(normals.iter().copied())
     }
 
     /// Получить итератор по всем нормалям модели в **глобальных** координатах.
     ///
     /// Нормали идут в порядке соответствующих им вершин
-    pub fn get_global_normals_iter(&self) -> impl Iterator<Item = UVec3> {
+    pub fn get_global_normals_iter(&self) -> Option<impl Iterator<Item = UVec3>> {
         // нормали ведут себя по-другому и умножаются на инвертированную матрицу.
         // так как нормаль вектор - то смещение применено не будет, тут всё ок
         let transform = self
@@ -716,50 +700,61 @@ impl Mesh {
             .local_to_global_matrix()
             .inverse()
             .expect("Ожидалось наличие обратной матрицы");
-        self.normals
-            .iter()
-            .map(move |&n| (n * transform).normalize())
+        Some(
+            self.get_local_normals_iter()?
+                .map(move |n| (n.apply_transform(transform).unwrap())),
+        )
     }
 
     /// Получить итератор по всем текстурным координатам модели.
     ///
     /// Текстурные координаты идут в порядке соответсвующих им вершин.
-    pub fn get_texture_coord_iter(&self) -> impl Iterator<Item = (f32, f32)> {
-        self.texture_coords.iter().copied()
+    pub fn get_texture_coord_iter(&self) -> Option<impl Iterator<Item = (f32, f32)>> {
+        let texture_coords = self.texture_coords.as_ref()?;
+        Some(texture_coords.iter().copied())
     }
 
     // --------------------------------------------------
     // Вспомогательные методы
     // --------------------------------------------------
 
+    /// Содержит ли модель нормали?
+    pub fn has_normals(&self) -> bool {
+        self.normals.is_some()
+    }
+
+    /// Содержит ли модель текстурные координаты?
+    pub fn has_texture_coords(&self) -> bool {
+        self.texture_coords.is_some()
+    }
+
     /// Проверка полигонов на корректность.
-    fn assert_polygons(vertexes: &Vec<HVec3>, polygons: &Vec<Polygon3>) {
+    fn assert_polygons(vertexes: &Vec<Point3>, polygons: &Vec<Polygon>) {
         for polygon in polygons {
-            assert!(
-                polygon.get_vertexes().len() >= 3,
-                "Полигон должен быть хотя бы из 3 вершин"
-            );
-            for index in polygon.get_vertexes() {
-                if *index >= vertexes.len() {
+            for index in polygon.get_mesh_vertex_index_iter() {
+                if index >= vertexes.len() {
                     panic!("Полигон содержит индекс несуществующей вершины");
                 }
             }
         }
     }
 
-    /// Проверка нормалей на корректность
-    fn assert_normals(normals: &Vec<Vec3>) {
-        for normal in normals {
-            assert!(
-                (normal.length() - 1.0).abs() < 2.0 * f32::EPSILON,
-                "Нормаль вершины длиной {} должена быть нормированной",
-                normal.length()
-            );
-        }
+    /// Проверка нормалей на корректность.
+    fn assert_normals(vertexes: &Vec<Point3>, normals: &Vec<UVec3>) {
+        assert_eq!(
+            vertexes.len(),
+            normals.len(),
+            "Количество нормалей должно совпадать с количеством вершин Mesh'а"
+        );
     }
 
     /// Проверка текстурных координат на корректность
-    fn assert_texture(texture_coords: &Vec<(f32, f32)>) {
+    fn assert_texture(vertexes: &Vec<Point3>, texture_coords: &Vec<(f32, f32)>) {
+        assert_eq!(
+            vertexes.len(),
+            texture_coords.len(),
+            "Количество текстурных координат должно совпадать с количесвтом вершин Mesh'а"
+        );
         for (u, v) in texture_coords.clone() {
             assert!(
                 (u >= 0.0) && (u <= 1.0),
@@ -777,6 +772,8 @@ impl Mesh {
 
 #[cfg(test)]
 mod mesh_tests {
+    use crate::HVec3;
+
     use super::*;
 
     const TOLERANCE: f32 = 1e-6;
@@ -785,6 +782,16 @@ mod mesh_tests {
         assert!(
             got.approx_equal(expected, tolerance),
             "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_uvecs(got: UVec3, expected: UVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался unit-вектор {:?}, но получен unit-вектор {:?}, одна из координат которого отличается более чем на {}",
             expected,
             got,
             tolerance
@@ -801,7 +808,17 @@ mod mesh_tests {
         );
     }
 
-    fn generate_cube<'p>() -> Mesh<'p> {
+    fn assert_points(got: Point3, expected: Point3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидалась точка {:?}, но получена точка {:?}, одна из координат которой отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn generate_cube() -> Mesh {
         let vertexes = vec![
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 0.0, 0.0),
@@ -813,21 +830,21 @@ mod mesh_tests {
             Point3::new(1.0, 1.0, 1.0),
         ];
         let polygons = vec![
-            Polygon3::from_list(&vec![0, 1, 2, 3]),
-            Polygon3::from_list(&vec![0, 1, 4, 5]),
-            Polygon3::from_list(&vec![4, 5, 6, 7]),
-            Polygon3::from_list(&vec![6, 7, 2, 3]),
-            Polygon3::from_list(&vec![1, 3, 5, 7]),
-            Polygon3::from_list(&vec![0, 2, 4, 6]),
+            Polygon::from_list(&vec![0, 1, 2, 3]),
+            Polygon::from_list(&vec![0, 1, 4, 5]),
+            Polygon::from_list(&vec![4, 5, 6, 7]),
+            Polygon::from_list(&vec![6, 7, 2, 3]),
+            Polygon::from_list(&vec![1, 3, 5, 7]),
+            Polygon::from_list(&vec![0, 2, 4, 6]),
         ];
         Mesh::from_polygons(vertexes, polygons)
     }
 
     #[test]
-    fn test_global_to_global() {
+    fn test_vertex_global_to_global() {
         let cube = generate_cube();
 
-        let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
+        let global_vertexes: Vec<Point3> = cube.get_global_vertex_iter().collect();
         let expected_vertexes = vec![
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 0.0, 0.0),
@@ -840,16 +857,16 @@ mod mesh_tests {
         ];
 
         for i in 0..global_vertexes.len() {
-            assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+            assert_points(global_vertexes[i], expected_vertexes[i], TOLERANCE);
         }
     }
 
     #[test]
-    fn test_local_translated_to_global() {
+    fn test_vertex_local_translated_to_global() {
         let mut cube = generate_cube();
-        cube.get_local_frame_mut().origin.y += 5.0;
+        cube.local_frame.origin.y += 5.0;
 
-        let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
+        let global_vertexes: Vec<Point3> = cube.get_global_vertex_iter().collect();
         let expected_vertexes = vec![
             Point3::new(0.0, 5.0, 0.0),
             Point3::new(1.0, 5.0, 0.0),
@@ -862,17 +879,19 @@ mod mesh_tests {
         ];
 
         for i in 0..global_vertexes.len() {
-            assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+            assert_points(global_vertexes[i], expected_vertexes[i], TOLERANCE);
         }
     }
 
     #[test]
-    fn test_local_rotated_to_global() {
+    fn test_vertex_local_rotated_to_global() {
         let mut cube = generate_cube();
-        cube.get_local_frame_mut()
-            .rotate(Transform3D::rotation_aligning(Vec3::forward(), Vec3::up()));
+        cube.local_frame.rotate(Transform3D::rotation_aligning(
+            UVec3::forward(),
+            UVec3::up(),
+        ));
 
-        let global_vertexes: Vec<HVec3> = cube.get_global_vertexes().collect();
+        let global_vertexes: Vec<Point3> = cube.get_global_vertex_iter().collect();
         let expected_vertexes = vec![
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 0.0, 0.0),
@@ -885,68 +904,66 @@ mod mesh_tests {
         ];
 
         for i in 0..global_vertexes.len() {
-            assert_hvecs(global_vertexes[i], expected_vertexes[i], TOLERANCE);
+            assert_points(global_vertexes[i], expected_vertexes[i], TOLERANCE);
         }
     }
 
     #[test]
-    fn test_translated_normals_1() {
+    fn test_normals_local_translated() {
         let mut cube = generate_cube();
-        // сдвиг по y
-        cube.get_local_frame_mut().origin.y += 5.0;
+        cube.local_frame.origin.y += 5.0;
 
-        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
-        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
+        let local_normals: Vec<UVec3> = cube.get_local_normals_iter().unwrap().collect();
+        let global_normals: Vec<UVec3> = cube.get_global_normals_iter().unwrap().collect();
+
+        // нормали не должны были поменяться при смещении фигуры.
         for i in 0..global_normals.len() {
-            let expected_global_normal = local_normals[i] + Vec3::new(0.0, 5.0, 0.0);
-            assert_vecs(global_normals[i], expected_global_normal, TOLERANCE);
+            assert_uvecs(global_normals[i], local_normals[i], TOLERANCE);
         }
     }
 
     #[test]
-    fn test_translated_normals_2() {
+    fn test_normals_local_rotated() {
         let mut cube = generate_cube();
-        // сдвиг по y
-        cube.get_local_frame_mut().origin.x += 5.0;
+        cube.local_frame.rotate(Transform3D::rotation_aligning(
+            UVec3::forward(),
+            UVec3::up(),
+        ));
 
-        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
-        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
-        for i in 0..global_normals.len() {
-            let expected_global_normal = local_normals[i] + Vec3::new(5.0, 0.0, 0.0);
-            assert_vecs(global_normals[i], expected_global_normal, TOLERANCE);
+        let global_normals: Vec<UVec3> = cube.get_global_normals_iter().unwrap().collect();
+
+        // генерируем нормали сразу в глобальных координатах
+        let global_vertexes: Vec<Point3> = cube.get_global_vertex_iter().collect();
+        let mut normals = vec![Vec3::zero(); global_vertexes.len()];
+        let mut face_count = vec![0; global_vertexes.len()];
+        let mesh_center = utils::calculate_center(&global_vertexes);
+
+        // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
+        // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
+        for polygon in cube.get_polygon_iter() {
+            let poly_normal = polygon.plane_normal(&cube, Some(mesh_center));
+
+            for vertex_index in polygon.get_mesh_vertex_index_iter() {
+                normals[vertex_index] = normals[vertex_index] + poly_normal;
+                face_count[vertex_index] += 1;
+            }
         }
-    }
 
-    #[test]
-    fn test_translated_normals_3() {
-        let mut cube = Mesh::hexahedron();
-        // сдвиг по y
-        cube.get_local_frame_mut().origin.x += 5.0;
-
-        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
-        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
-        for i in 0..global_normals.len() {
-            let expected_global_normal = local_normals[i] + Vec3::new(5.0, 0.0, 0.0);
-            assert_vecs(global_normals[i], expected_global_normal, TOLERANCE);
+        // Усредняем нормали
+        for i in 0..normals.len() {
+            if face_count[i] > 0 {
+                normals[i] = normals[i] * (1.0 / face_count[i] as f32);
+            }
         }
-    }
 
-    #[test]
-    fn test_translated() {
-        let mut cube = Mesh::hexahedron();
-        // сдвиг по y
-        cube.get_local_frame_mut()
-            .translate_vec(Vec3::new(2.0, 4.0, 6.0));
+        let recalculated_normals: Vec<UVec3> = normals
+            .iter()
+            .map(|&v| v.normalize().unwrap_or(UVec3::new(0.0, 0.0, 1.0)))
+            .collect();
 
-        let global_normals: Vec<Vec3> = cube.get_global_normals().collect();
-        let local_normals: Vec<Vec3> = cube.get_local_normals().collect();
-        let global_vertexes: Vec<Vec3> =
-            cube.get_global_vertexes().map(|v| Vec3::from(v)).collect();
-        let local_vertexes: Vec<Vec3> = cube.get_local_vertexes().map(|v| Vec3::from(v)).collect();
+        // проверка на корректность поворота нормалей
         for i in 0..global_normals.len() {
-            let delta_normal = global_normals[i] - local_normals[i];
-            let delta_vertex = global_vertexes[i] - local_vertexes[i];
-            assert_vecs(delta_normal, delta_vertex, TOLERANCE);
+            assert_uvecs(global_normals[i], recalculated_normals[i], TOLERANCE);
         }
     }
 }

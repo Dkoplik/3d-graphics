@@ -64,6 +64,16 @@ impl Canvas {
         [self.width, self.height]
     }
 
+    /// Ширина холста
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    /// Высота холста
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
     /// Заполнить весь холст указанным цветом и очистить z-буфер.
     pub fn clear(&mut self, color: Color32) {
         self.pixels.fill(color);

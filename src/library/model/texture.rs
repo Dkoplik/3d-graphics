@@ -1,5 +1,6 @@
 //! Объявление и реализация текстуры для 3D модели
 
+use crate::library::utils;
 use egui::Color32;
 use image::{DynamicImage, RgbImage};
 
@@ -38,13 +39,13 @@ impl Texture {
             y
         );
 
-        pixel_to_color(*self.0.get_pixel(x, y))
+        utils::pixel_to_color(*self.image.get_pixel(x, y))
     }
 
     /// Проверить границы текстуры.
     #[inline]
     fn check_bounds(&self, x: u32, y: u32) -> bool {
-        x < self.0.width() && y < self.0.height() && x > 0 && y > 0
+        x < self.image.width() && y < self.image.height() && x > 0 && y > 0
     }
 
     /// Преобразовать UV-координаты в целочисленные.
@@ -61,14 +62,8 @@ impl Texture {
             v
         );
 
-        let x = (u * self.0.width() as f32).round() as u32;
-        let y = (v * self.0.height() as f32).round() as u32;
+        let x = (u * self.image.width() as f32).round() as u32;
+        let y = (v * self.image.height() as f32).round() as u32;
         (x, y)
     }
-}
-
-/// Преобразовать пиксель `Rgb<u8>` в `Color32`.
-#[inline]
-fn pixel_to_color(pixel: image::Rgb<u8>) -> Color32 {
-    Color32::from_rgb(pixel[0], pixel[1], pixel[2])
 }

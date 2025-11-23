@@ -315,6 +315,20 @@ impl Transform3D {
     }
 
     /// Создаёт матрицу вращения из глобального базиса в указанный локальный.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let local_forward = UVec3::up();
+    /// let local_right = UVec3::right();
+    /// let local_up = UVec3::backward();
+    /// let transform = Transform3D::rotation_to_basis(local_forward, local_right, local_up);
+    /// let res = hvec * transform;
+    ///
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, -3.0);
+    /// assert_eq!(res.z, 2.0);
+    /// ```
     pub fn rotation_to_basis(forward: UVec3, right: UVec3, up: UVec3) -> Self {
         debug_assert_eq!(
             forward.dot(right),
@@ -339,6 +353,20 @@ impl Transform3D {
     }
 
     /// Создаёт матрицу вращения из указанного локального базиса в глобальный.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let local_forward = UVec3::up();
+    /// let local_right = UVec3::right();
+    /// let local_up = UVec3::backward();
+    /// let transform = Transform3D::rotation_from_basis(local_forward, local_right, local_up);
+    /// let res = hvec * transform;
+    ///
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, 3.0);
+    /// assert_eq!(res.z, -2.0);
+    /// ```
     pub fn rotation_from_basis(forward: UVec3, right: UVec3, up: UVec3) -> Self {
         debug_assert_eq!(
             forward.dot(right),
@@ -369,6 +397,19 @@ impl Transform3D {
 
 impl Transform3D {
     /// Масштабирование относительно точки anchor.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let anchor = Point3::new(1.0, 1.0, 1.0);
+    /// let scale = Transform3D::scale_relative_to_point(anchor, 2.0, 3.0, 4.0);
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
+    /// let res = hvec * transform;
+    ///
+    /// asssert_eq!(res.x, 1.0);
+    /// asssert_eq!(res.y, 3.0);
+    /// asssert_eq!(res.z, 8.0);
+    /// asssert_eq!(res.w, 1.0);
+    /// ```
     pub fn scale_relative_to_point(anchor: Point3, sx: f32, sy: f32, sz: f32) -> Self {
         // Перенос якоря в начало координат -> масштабирование -> обратный перенос
         Self::translation(-anchor.x, -anchor.y, -anchor.z)
@@ -377,16 +418,52 @@ impl Transform3D {
     }
 
     /// Отражение относительно плоскости XY.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let transform = Transform3D::reflection_xy();
+    /// let res = hvec * transform;
+    ///
+    /// asssert_eq!(res.x, 1.0);
+    /// asssert_eq!(res.y, 2.0);
+    /// asssert_eq!(res.z, -3.0);
+    /// asssert_eq!(res.w, 0.0);
+    /// ```
     pub fn reflection_xy() -> Self {
         Self::scale(1.0, 1.0, -1.0)
     }
 
     /// Отражение относительно плоскости XZ.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let transform = Transform3D::reflection_xz();
+    /// let res = hvec * transform;
+    ///
+    /// asssert_eq!(res.x, 1.0);
+    /// asssert_eq!(res.y, -2.0);
+    /// asssert_eq!(res.z, 3.0);
+    /// asssert_eq!(res.w, 0.0);
+    /// ```
     pub fn reflection_xz() -> Self {
         Self::scale(1.0, -1.0, 1.0)
     }
 
     /// Отражение относительно плоскости YZ.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let transform = Transform3D::reflection_yz();
+    /// let res = hvec * transform;
+    ///
+    /// asssert_eq!(res.x, -1.0);
+    /// asssert_eq!(res.y, 2.0);
+    /// asssert_eq!(res.z, 3.0);
+    /// asssert_eq!(res.w, 0.0);
+    /// ```
     pub fn reflection_yz() -> Self {
         Self::scale(-1.0, 1.0, 1.0)
     }
@@ -394,6 +471,19 @@ impl Transform3D {
     /// Создаёт матрицу поворота, которая совмещает вектор `from` с вектором `to`.
     ///
     /// Оба вектора должны быть нормализованы (иметь длину 1).
+    ///
+    /// # Examples
+    /// ```rust
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// let from = UVec3::forward();
+    /// let to = UVec3::up();
+    /// let transform = Transform3D::rotation_aligning(from, to);
+    /// let res = hvec * transform;
+    ///
+    /// assert_eq!(res.x, 1.0);
+    /// assert_eq!(res.y, -3.0);
+    /// assert_eq!(res.z, 2.0);
+    /// ```
     pub fn rotation_aligning(from: UVec3, to: UVec3) -> Self {
         if from.approx_equal(to, 1e-9) {
             return Self::identity();
@@ -1143,7 +1233,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_aligning_complex_to_basis() {
+    fn test_rotation_aligning_complex_vector_to_basis_vector() {
         let from = UVec3::new(2.0, 3.0, 4.0);
         let to = UVec3::left();
 
@@ -1153,7 +1243,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_aligning_basis_to_complex() {
+    fn test_rotation_aligning_basis_vector_to_complex_vector() {
         let from = UVec3::left();
         let to = UVec3::new(2.0, 3.0, 4.0);
 
@@ -1163,7 +1253,7 @@ mod tests {
     }
 
     #[test]
-    fn test_rotation_aligning_complex_to_complex() {
+    fn test_rotation_aligning_complex_vector_to_complex_vector() {
         let from = UVec3::new(2.0, 3.0, 4.0);
         let to = UVec3::new(-6.0, 3.0, -1.0);
 
@@ -1313,6 +1403,30 @@ mod tests {
     fn test_inverse_rotation() {
         // Тест обратной матрицы для поворота
         let rotation = Transform3D::rotation_x_deg(45.0);
+        let inverse_rotation = rotation.inverse().expect("Should have inverse");
+
+        let test_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
+        let rotated = rotation.apply_to_hvec(test_vec);
+        let restored_rotation = inverse_rotation.apply_to_hvec(rotated);
+
+        assert_hvecs(restored_rotation, test_vec, TOLERANCE);
+    }
+
+    #[test]
+    fn test_inverse_rotation_to_basis() {
+        // Тест обратной матрицы для поворота к новому базису
+        let forward = UVec3::new(
+            0.0,
+            (45.0 as f32).to_radians().sin(),
+            (45.0 as f32).to_radians().cos(),
+        ); // поворот на 45 градусов от глобального forward к up
+        let right = UVec3::right(); // поворота нет
+        let up = UVec3::new(
+            0.0,
+            (135.0 as f32).to_radians().sin(),
+            (135.0 as f32).to_radians().cos(),
+        ); // поворот на 45 градусов от глобального up к backward
+        let rotation = Transform3D::rotation_to_basis(forward, right, up);
         let inverse_rotation = rotation.inverse().expect("Should have inverse");
 
         let test_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);

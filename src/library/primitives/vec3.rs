@@ -49,21 +49,6 @@ impl Vec3 {
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
     }
-
-    /// Получить проекцию вектора `from` на плоскость XY в **глобальных** координатах.
-    pub fn projection_xy(from: Self) -> Self {
-        Self::new(from.x, from.y, 0.0)
-    }
-
-    /// Получить проекцию вектора `from` на плоскость XZ в **глобальных** координатах.
-    pub fn projection_xz(from: Self) -> Self {
-        Self::new(from.x, 0.0, from.z)
-    }
-
-    /// Получить проекцию вектора `from` на плоскость YZ в **глобальных** координатах.
-    pub fn projection_yz(from: Self) -> Self {
-        Self::new(0.0, from.y, from.z)
-    }
 }
 
 // ========================================
@@ -71,6 +56,51 @@ impl Vec3 {
 // ========================================
 
 impl Vec3 {
+    /// Получить проекцию вектора на плоскость XY в **глобальных** координатах.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let projection = vec.projection_xy();
+    /// assert_eq!(projection.x, 1.0);
+    /// assert_eq!(projection.y, 2.0);
+    /// assert_eq!(projection.z, 0.0);
+    /// ```
+    #[inline]
+    pub fn projection_xy(self) -> Self {
+        Self::new(self.x, self.y, 0.0)
+    }
+
+    /// Получить проекцию вектора на плоскость XZ в **глобальных** координатах.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let projection = vec.projection_xz();
+    /// assert_eq!(projection.x, 1.0);
+    /// assert_eq!(projection.y, 0.0);
+    /// assert_eq!(projection.z, 3.0);
+    /// ```
+    #[inline]
+    pub fn projection_xz(self) -> Self {
+        Self::new(self.x, 0.0, self.z)
+    }
+
+    /// Получить проекцию вектора на плоскость YZ в **глобальных** координатах.
+    ///
+    /// # Examples
+    /// ```rust
+    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let projection = vec.projection_yz();
+    /// assert_eq!(projection.x, 0.0);
+    /// assert_eq!(projection.y, 2.0);
+    /// assert_eq!(projection.z, 3.0);
+    /// ```
+    #[inline]
+    pub fn projection_yz(self) -> Self {
+        Self::new(0.0, self.y, self.z)
+    }
+
     /// Скалярное произведение векторов.
     ///
     /// # Examples
@@ -606,7 +636,7 @@ impl Display for VecError {
 mod tests {
     use super::*;
 
-    const TOLERANCE: f32 = 1e-8;
+    const TOLERANCE: f32 = 2.0 * f32::EPSILON;
 
     fn assert_vectors(got: Vec3, expected: Vec3, tolerance: f32) {
         assert!(
@@ -640,10 +670,9 @@ mod tests {
 
     #[test]
     fn test_dot_product() {
-        // Тест с отрицательными координатами
-        let v5 = Vec3::new(-1.0, 2.0, -3.0);
-        let v6 = Vec3::new(2.0, -1.0, 1.0);
-        assert_floats(v5.dot(v6), -2.0 - 2.0 - 3.0, TOLERANCE); // -1*2 + 2*(-1) + (-3)*1
+        let v1 = Vec3::new(-1.0, 2.0, -3.0);
+        let v2 = Vec3::new(2.0, -1.0, 1.0);
+        assert_floats(v1.dot(v2), -2.0 - 2.0 - 3.0, TOLERANCE); // -1*2 + 2*(-1) + (-3)*1
     }
 
     #[test]

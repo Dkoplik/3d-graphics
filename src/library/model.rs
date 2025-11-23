@@ -1,3 +1,5 @@
+use crate::{CoordFrame, UVec3};
+
 use super::primitives::{Point3, Transform3D, Vec3};
 use std::collections::HashMap;
 use std::fs::File;
@@ -13,27 +15,28 @@ mod texture;
 // re-export в модуль `model`
 pub use material::*;
 pub use mesh::*;
+pub use surface_generator::*;
 pub use texture::*;
 
 /// Модель (объект) в 3D пространстве.
 ///
 /// По сути просто контейнер для Mesh'а и его материала, где Mesh задаёт форму модели, а материал отображение (цвет).
 #[derive(Debug, Clone)]
-pub struct Model3<'p> {
+pub struct Model {
     /// Mesh модели.
-    pub mesh: Mesh<'p>,
+    pub mesh: Mesh,
     /// Материал модели.
     pub material: Material,
 }
 
-impl<'p> Model3<'p> {
+impl Model {
     // --------------------------------------------------
     // Конструкторы
     // --------------------------------------------------
 
     /// Создать модель из Mesh'а, материал дефолтный.
     pub fn from_mesh(mesh: Mesh) -> Self {
-        Model3 {
+        Self {
             mesh,
             material: Material::default(),
         }
@@ -120,9 +123,7 @@ impl<'p> Model3<'p> {
                         }
 
                         if face_vertex_indices.len() >= 3 {
-                            polygons.push(crate::classes3d::mesh::Polygon3::from_list(
-                                &face_vertex_indices,
-                            ));
+                            polygons.push(Polygon::from_list(&face_vertex_indices));
                         }
                     }
                 }
@@ -144,7 +145,7 @@ impl<'p> Model3<'p> {
         // Создаем Mesh из вершин и полигонов
         let mesh = Mesh::from_polygons(vertexes, polygons);
 
-        Ok(Model3::from_mesh(mesh))
+        Ok(Self::from_mesh(mesh))
     }
 
     /// Сохранить текущую модель в .obj файл
@@ -157,8 +158,8 @@ impl<'p> Model3<'p> {
         writeln!(
             file,
             "# Vertices: {}, Faces: {}",
-            self.mesh.vertexes.len(),
-            self.mesh.polygons.len()
+            self.mesh.vertex_count(),
+            self.mesh.polygon_count(),
         )
         .map_err(|_| ObjSaveError::WriteError)?;
         writeln!(file).map_err(|_| ObjSaveError::WriteError)?;
@@ -167,7 +168,7 @@ impl<'p> Model3<'p> {
         let vertex_map = self.create_vertex_coordinate_map();
 
         // Записываем вершины
-        for vertex in &self.mesh.vertexes {
+        for vertex in self.mesh.get_local_vertex_iter() {
             writeln!(file, "v {:.6} {:.6} {:.6}", vertex.x, vertex.y, vertex.z)
                 .map_err(|_| ObjSaveError::WriteError)?;
         }
@@ -175,12 +176,12 @@ impl<'p> Model3<'p> {
         writeln!(file).map_err(|_| ObjSaveError::WriteError)?;
 
         // Записываем полигоны
-        for polygon in &self.mesh.polygons {
+        for polygon in self.mesh.get_polygon_iter() {
             write!(file, "f").map_err(|_| ObjSaveError::WriteError)?;
 
-            for &vertex_index in polygon.get_vertexes() {
-                if vertex_index < self.mesh.vertexes.len() {
-                    let vertex = &self.mesh.vertexes[vertex_index];
+            for vertex_index in polygon.get_mesh_vertex_index_iter() {
+                if vertex_index < self.mesh.vertex_count() {
+                    let vertex = self.mesh.get_local_vertex(vertex_index);
 
                     // Ищем соответствующий индекс в сохраненных вершинах
                     if let Some(&saved_index) =
@@ -206,7 +207,7 @@ impl<'p> Model3<'p> {
     fn create_vertex_coordinate_map(&self) -> HashMap<(i32, i32, i32), usize> {
         let mut map = HashMap::new();
 
-        for (i, vertex) in self.mesh.vertexes.iter().enumerate() {
+        for (i, vertex) in self.mesh.get_local_vertex_iter().enumerate() {
             let key = Self::quantize_coordinates(vertex.x, vertex.y, vertex.z);
             map.insert(key, i);
         }
@@ -230,37 +231,31 @@ impl<'p> Model3<'p> {
 
     /// Сдвинуть Mesh на вектор `delta`.
     pub fn translate(&mut self, delta: Vec3) {
-        self.mesh.get_local_frame_mut().translate_vec(delta);
+        self.mesh.local_frame.translate_vec(delta);
     }
 
     /// Сдвинуть Mesh по оси X.
     pub fn move_x(&mut self, dx: f32) {
-        self.mesh
-            .get_local_frame_mut()
-            .translate_vec(Vec3::new(dx, 0.0, 0.0));
+        self.mesh.local_frame.translate_vec(Vec3::new(dx, 0.0, 0.0));
     }
 
     /// Сдвинуть Mesh по оси Y.
     pub fn move_y(&mut self, dy: f32) {
-        self.mesh
-            .get_local_frame_mut()
-            .translate_vec(Vec3::new(0.0, dy, 0.0));
+        self.mesh.local_frame.translate_vec(Vec3::new(0.0, dy, 0.0));
     }
 
     /// Сдвинуть Mesh по оси Z.
     pub fn move_z(&mut self, dz: f32) {
-        self.mesh
-            .get_local_frame_mut()
-            .translate_vec(Vec3::new(0.0, 0.0, dz));
+        self.mesh.local_frame.translate_vec(Vec3::new(0.0, 0.0, dz));
     }
 
     /// Повернуть модель из направления `from` в направление `to` в **локальных** координатах.
     ///
     /// Сами `from` и `to` указываются в **глобальных** координатах.
-    pub fn rotate(&mut self, from: Vec3, to: Vec3) {
+    pub fn rotate(&mut self, from: UVec3, to: UVec3) {
         // привести к локальным координатам модели
         self.mesh
-            .get_local_frame_mut()
+            .local_frame
             .rotate(Transform3D::rotation_aligning(from, to));
     }
 
@@ -268,7 +263,7 @@ impl<'p> Model3<'p> {
     pub fn rotate_local_x(&mut self, angle: f32) {
         let right = self.mesh.local_frame.right();
         self.mesh
-            .get_local_frame_mut()
+            .local_frame
             .rotate(Transform3D::rotation_around_axis(right, angle));
     }
 
@@ -276,7 +271,7 @@ impl<'p> Model3<'p> {
     pub fn rotate_local_y(&mut self, angle: f32) {
         let up = self.mesh.local_frame.up();
         self.mesh
-            .get_local_frame_mut()
+            .local_frame
             .rotate(Transform3D::rotation_around_axis(up, angle));
     }
 
@@ -284,91 +279,52 @@ impl<'p> Model3<'p> {
     pub fn rotate_local_z(&mut self, angle: f32) {
         let forward = self.mesh.local_frame.forward();
         self.mesh
-            .get_local_frame_mut()
+            .local_frame
             .rotate(Transform3D::rotation_around_axis(forward, angle));
     }
 
     pub fn scale_vec(&mut self, vec: Vec3) {
-        self.mesh.get_local_frame_mut().scale_vec(vec);
+        self.mesh.local_frame.scale_by_vec(vec);
     }
 
     pub fn uniform_scale(&mut self, scale: f32) {
         self.mesh
-            .get_local_frame_mut()
-            .scale_vec(Vec3::new(scale, scale, scale));
+            .local_frame
+            .scale_by_vec(Vec3::new(scale, scale, scale));
     }
 
     /// Отразить модель в плоскости XY относительно **локальных координат**.
     pub fn reflect_local_xy(&mut self) {
-        let frame = self.mesh.get_local_frame_mut();
-        // отразить по xy это то же, что и поменять направление z
-        let forward = frame.backward();
-        let up = frame.up();
-        let right = frame.right();
-        let origin = frame.position();
-        let scale = frame.scale;
-        *frame = CoordFrame {
-            forward,
-            up,
-            right,
-            origin,
-            scale,
-        }
+        self.mesh.local_frame.reflect_xy();
     }
 
     /// Отразить модель в плоскости XZ относительно **локальных координат**.
     pub fn reflect_local_xz(&mut self) {
-        let frame = self.mesh.get_local_frame_mut();
-        let forward = frame.forward();
-        // отразить по xz это то же, что и поменять направление y
-        let up = frame.down();
-        let right = frame.right();
-        let origin = frame.position();
-        let scale = frame.scale;
-        *frame = CoordFrame {
-            forward,
-            up,
-            right,
-            origin,
-            scale,
-        }
+        self.mesh.local_frame.reflect_xz();
     }
 
     /// Отразить модель в плоскости YZ относительно **локальных координат**.
     pub fn reflect_local_yz(&mut self) {
-        let frame = self.mesh.get_local_frame_mut();
-        let forward = frame.forward();
-        let up = frame.up();
-        // отразить по yz это то же, что и поменять направление x
-        let right = frame.left();
-        let origin = frame.position();
-        let scale = frame.scale;
-        *frame = CoordFrame {
-            forward,
-            up,
-            right,
-            origin,
-            scale,
-        }
+        self.mesh.local_frame.reflect_yz();
     }
 
     /// Текущая позиция модели
     pub fn get_position(&self) -> Point3 {
-        self.mesh.get_local_frame().origin
+        self.mesh.local_frame.origin
     }
 
     /// Поставить модель в новую позицию.
     ///
     /// Просто синтаксический сахар для более удобных операций над моделькой.
     pub fn set_position(&mut self, position: Point3) {
-        let current_frame = *self.mesh.get_local_frame();
+        let current_frame = self.mesh.local_frame;
         let new_frame = CoordFrame::new(
             current_frame.forward(),
             current_frame.right(),
             current_frame.up(),
             position,
         );
-        *self.mesh.get_local_frame_mut() = new_frame;
+        self.mesh.local_frame = new_frame;
     }
 }
 
@@ -389,9 +345,8 @@ pub enum ObjSaveError {
 
 #[cfg(test)]
 mod model_tests {
-    use crate::HVec3;
-
     use super::*;
+    use crate::HVec3;
 
     const TOLERANCE: f32 = 1e-6;
 
@@ -399,6 +354,16 @@ mod model_tests {
         assert!(
             got.approx_equal(expected, tolerance),
             "ожидался вектор {:?}, но получен вектор {:?}, одна из координат которого отличается более чем на {}",
+            expected,
+            got,
+            tolerance
+        );
+    }
+
+    fn assert_uvecs(got: UVec3, expected: UVec3, tolerance: f32) {
+        assert!(
+            got.approx_equal(expected, tolerance),
+            "ожидался unit-вектор {:?}, но получен unit-вектор {:?}, одна из координат которого отличается более чем на {}",
             expected,
             got,
             tolerance
@@ -427,7 +392,7 @@ mod model_tests {
 
     #[test]
     fn test_move_x() {
-        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut model = Model::from_mesh(Mesh::dodecahedron());
         let mut expected_pos = model.get_position();
 
         model.move_x(5.0);
@@ -437,7 +402,7 @@ mod model_tests {
 
     #[test]
     fn test_move_y() {
-        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut model = Model::from_mesh(Mesh::dodecahedron());
         let mut expected_pos = model.get_position();
 
         model.move_y(5.0);
@@ -447,7 +412,7 @@ mod model_tests {
 
     #[test]
     fn test_move_z() {
-        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut model = Model::from_mesh(Mesh::dodecahedron());
         let mut expected_pos = model.get_position();
 
         model.move_z(5.0);
@@ -457,64 +422,56 @@ mod model_tests {
 
     #[test]
     fn test_rotate_1() {
-        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut model = Model::from_mesh(Mesh::dodecahedron());
 
         model.translate(Vec3::new(2.0, 2.0, 3.0));
-        model.rotate(Vec3::forward(), Vec3::up());
+        model.rotate(UVec3::forward(), UVec3::up());
 
         assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
 
-        assert_vecs(model.mesh.local_frame.forward(), Vec3::up(), TOLERANCE);
-        assert_vecs(model.mesh.local_frame.right(), Vec3::right(), TOLERANCE);
-        assert_vecs(model.mesh.local_frame.up(), Vec3::backward(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.forward(), UVec3::up(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.right(), UVec3::right(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.up(), UVec3::backward(), TOLERANCE);
     }
 
     #[test]
     fn test_rotate_2() {
-        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut model = Model::from_mesh(Mesh::dodecahedron());
 
         model.translate(Vec3::new(2.0, 2.0, 3.0));
-        model.rotate(Vec3::forward(), Vec3::right());
+        model.rotate(UVec3::forward(), UVec3::right());
 
         assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
 
-        assert_vecs(model.mesh.local_frame.forward(), Vec3::right(), TOLERANCE);
-        assert_vecs(model.mesh.local_frame.right(), Vec3::backward(), TOLERANCE);
-        assert_vecs(model.mesh.local_frame.up(), Vec3::up(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.forward(), UVec3::right(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.right(), UVec3::backward(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.up(), UVec3::up(), TOLERANCE);
     }
 
     #[test]
     fn test_rotate_x() {
-        let mut model = Model3::from_mesh(Mesh::dodecahedron());
+        let mut model = Model::from_mesh(Mesh::dodecahedron());
 
         model.translate(Vec3::new(2.0, 2.0, 3.0));
         model.rotate_local_x((-90.0 as f32).to_radians());
 
         assert_points(model.get_position(), Point3::new(2.0, 2.0, 3.0), TOLERANCE);
 
-        assert_vecs(model.mesh.local_frame.forward(), Vec3::up(), TOLERANCE);
-        assert_vecs(model.mesh.local_frame.right(), Vec3::right(), TOLERANCE);
-        assert_vecs(model.mesh.local_frame.up(), Vec3::backward(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.forward(), UVec3::up(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.right(), UVec3::right(), TOLERANCE);
+        assert_uvecs(model.mesh.local_frame.up(), UVec3::backward(), TOLERANCE);
     }
 
     #[test]
     fn test_translated() {
-        let mut cube = Model3::from_mesh(Mesh::hexahedron());
+        let mut cube = Model::from_mesh(Mesh::hexahedron());
         // сдвиг по y
         cube.move_x(10.0);
 
-        let global_normals: Vec<Vec3> = cube.mesh.get_global_normals().collect();
-        let local_normals: Vec<Vec3> = cube.mesh.get_local_normals().collect();
-        let global_vertexes: Vec<Vec3> = cube
-            .mesh
-            .get_global_vertexes()
-            .map(|v| Vec3::from(v))
-            .collect();
-        let local_vertexes: Vec<Vec3> = cube
-            .mesh
-            .get_local_vertexes()
-            .map(|v| Vec3::from(v))
-            .collect();
+        let global_normals: Vec<UVec3> = cube.mesh.get_global_normals_iter().unwrap().collect();
+        let local_normals: Vec<UVec3> = cube.mesh.get_local_normals_iter().unwrap().collect();
+        let global_vertexes: Vec<Point3> = cube.mesh.get_global_vertex_iter().collect();
+        let local_vertexes: Vec<Point3> = cube.mesh.get_local_vertex_iter().collect();
         for i in 0..global_normals.len() {
             let delta_normal = global_normals[i] - local_normals[i];
             let delta_vertex = global_vertexes[i] - local_vertexes[i];

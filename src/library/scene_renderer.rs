@@ -1,48 +1,34 @@
 use std::fmt::Display;
 
 use crate::{
-    Camera3, Canvas, LightSource, Model3, Point3, Scene, SceneRenderer, Transform3D, Vec3,
-    classes3d::mesh::Polygon3,
+    Camera, Canvas, LightSource, Model, Point3, Polygon, ProjectionType, Scene, Transform3D, UVec3,
+    Vec3, library::utils,
 };
 use egui::{Color32, Pos2};
 
 mod gouraud_lambert_shader;
 mod normals_shader;
 mod phong_toon_shader;
-mod shader_utils;
 mod solid_shader;
 mod wireframe_shader;
 
 pub trait Shader {
+    /// Применить шейдинг к модели.
+    ///
+    /// `model` - модель, к которой применяется шейдинг;
+    /// `polygons` - набор полигонов к отрисовке;
+    /// `camera` - камера, на которую присходит проекция;
+    /// `lights` - освещение на сцене;
+    /// `canvas` - холст, на котором отрисовывается сцена;
     fn shade_model(
         &self,
-        model: &Model3,
-        polygons: &Vec<Polygon3>,
-        global_to_screen_transform: Transform3D,
+        model: &Model,
+        polygons: &Vec<Polygon>,
+        camera: &Camera,
+        projection_type: ProjectionType,
         lights: &Vec<LightSource>,
         canvas: &mut Canvas,
     );
-}
-
-/// Тип проекции на камеру.
-#[derive(Default, Debug, Clone, Copy, PartialEq)]
-pub enum ProjectionType {
-    /// Параллельная (ортографическая) проекция.
-    Parallel,
-    /// Перспективная проекция.
-    #[default]
-    Perspective,
-    // /// Аксонометрическая проекция.
-    // Axonimetrix,
-}
-
-impl Display for ProjectionType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Parallel => f.write_str("Параллельная"),
-            Self::Perspective => f.write_str("Перспективная"),
-        }
-    }
 }
 
 /// Тип шейдинга.
@@ -79,9 +65,9 @@ pub struct SceneRenderer {
     /// Отрисовывать ли грани модели.
     pub render_solid: bool,
     /// Тип проекции на камеру.
-    pub projection_type: classes3d::scene_renderer::ProjectionType,
+    pub projection_type: ProjectionType,
     /// Тип шейдинга. Ни на что не влияет, если `render_solid = false`.
-    pub shading_type: classes3d::scene_renderer::ShadingType,
+    pub shading_type: ShadingType,
     /// Производить ли отсечение нелицевых граней.
     pub backface_culling: bool,
     /// Использовать ли z-buffer для упорядочивания граней.
@@ -103,22 +89,6 @@ impl Default for SceneRenderer {
 }
 
 impl SceneRenderer {
-    /// Возвращает матрицу преобразований из экранных координат в глобальные.
-    pub fn screen_to_global_transform(&self, scene: &Scene, canvas: &Canvas) -> Transform3D {
-        let camera = scene.camera;
-
-        let scale_x = canvas.width as f32 / 2.0;
-        let scale_y = canvas.height as f32 / 2.0;
-
-        let width = 2.0 * (camera.get_fov() / 2.0).sin();
-        let height = width / camera.get_aspect_ratio();
-
-        Transform3D::scale(1.0 / scale_x, -1.0 / scale_y, 1.0) // экранные в [0, +2]
-            .multiply(Transform3D::translation(-1.0, -1.0, 0.0)) // в NDC [-1, +1]
-            .multiply(Transform3D::scale(width, height, 1.0)) // локальные координаты камеры
-            .multiply(camera.get_local_frame().local_to_global_matrix()) // глобальные
-    }
-
     /// Нарисовать сцену на холст со всеми нужными преобразованиями.
     ///
     /// Возвращает количество отрисованных полигонов.
@@ -134,8 +104,9 @@ impl SceneRenderer {
         canvas.clear(Color32::GRAY);
 
         // Матрица преобразования из глобальных координат в экранные
-        let global_to_screen_transform =
-            self::get_global_to_screen_transform(self.projection_type, &scene.camera, &canvas);
+        let global_to_screen_transform = scene
+            .camera
+            .global_to_screen_transform(self.projection_type, canvas);
 
         // Отрисовка глобальной координатной системы.
         self.draw_coordinate_axes(canvas, global_to_screen_transform);
@@ -159,9 +130,11 @@ impl SceneRenderer {
         for model in &scene.models {
             // Полигоны к отрисовке
             let polygons = if self.backface_culling {
+                // только видимые
                 self.model_backface_culling(scene.camera, model)
             } else {
-                model.mesh.get_polygons().cloned().collect()
+                // все
+                model.mesh.get_polygon_iter().cloned().collect()
             };
 
             polygon_count = polygons.len();
@@ -174,7 +147,8 @@ impl SceneRenderer {
                         shader.shade_model(
                             model,
                             &polygons,
-                            global_to_screen_transform,
+                            &scene.camera,
+                            self.projection_type,
                             &scene.lights,
                             canvas,
                         );
@@ -186,7 +160,8 @@ impl SceneRenderer {
                         shader.shade_model(
                             model,
                             &polygons,
-                            global_to_screen_transform,
+                            &scene.camera,
+                            self.projection_type,
                             &scene.lights,
                             canvas,
                         );
@@ -197,7 +172,8 @@ impl SceneRenderer {
                         shader.shade_model(
                             model,
                             &polygons,
-                            global_to_screen_transform,
+                            &scene.camera,
+                            self.projection_type,
                             &scene.lights,
                             canvas,
                         );
@@ -211,7 +187,8 @@ impl SceneRenderer {
                 shader.shade_model(
                     model,
                     &polygons,
-                    global_to_screen_transform,
+                    &scene.camera,
+                    self.projection_type,
                     &scene.lights,
                     canvas,
                 );
@@ -223,7 +200,8 @@ impl SceneRenderer {
                 shader.shade_model(
                     model,
                     &polygons,
-                    global_to_screen_transform,
+                    &scene.camera,
+                    self.projection_type,
                     &scene.lights,
                     canvas,
                 );
@@ -244,7 +222,7 @@ impl SceneRenderer {
 
         // Рисуем оси с разными цветами
         // Ось X - красная
-        shader_utils::render_line(
+        utils::render_line(
             global_to_screen_transform,
             origin,
             x_axis_end,
@@ -253,7 +231,7 @@ impl SceneRenderer {
         );
 
         // Ось Y - зелёная
-        shader_utils::render_line(
+        utils::render_line(
             global_to_screen_transform,
             origin,
             y_axis_end,
@@ -262,7 +240,7 @@ impl SceneRenderer {
         );
 
         // Ось Z - синяя
-        shader_utils::render_line(
+        utils::render_line(
             global_to_screen_transform,
             origin,
             z_axis_end,
@@ -272,40 +250,35 @@ impl SceneRenderer {
     }
 
     /// Отсечение нелицевых граней модели
-    /// `model` - сама модель.
     ///
     /// Возвращает вектор полигонов только с лицевыми гранями.
-    fn model_backface_culling(&self, camera: Camera3, model: &Model3) -> Vec<Polygon3> {
-        let global_normals: Vec<Vec3> = model.mesh.get_global_normals().collect();
-        let global_vertexes: Vec<Vec3> = model
-            .mesh
-            .get_global_vertexes()
-            .map(|v| Vec3::from(v))
-            .collect();
+    fn model_backface_culling(&self, camera: Camera, model: &Model) -> Vec<Polygon> {
+        let global_normals: Vec<UVec3> = model.mesh.get_global_normals_iter().unwrap().collect();
+        let global_vertexes: Vec<Point3> = model.mesh.get_global_vertex_iter().collect();
         let mut visible_polygons = Vec::new();
-        for polygon in model.mesh.get_polygons() {
-            if !polygon.is_valid() {
-                continue;
-            }
-
+        for polygon in model.mesh.get_polygon_iter() {
             let mut polygon_normal = Vec3::zero();
-            for &vertex_index in polygon.get_vertexes() {
+            let indexes: Vec<usize> = polygon.get_mesh_vertex_index_iter().collect();
+            for vertex_index in indexes.clone() {
                 polygon_normal += global_normals[vertex_index];
             }
 
             // Если нормаль есть, производим отсечение
             if polygon_normal.length_squared() > 0.0 {
-                polygon_normal /= polygon.get_vertexes().len() as f32;
+                let polygon_normal = (polygon_normal / polygon.vertex_count() as f32)
+                    .normalize()
+                    .unwrap();
 
                 let camera_direction = match self.projection_type {
                     ProjectionType::Parallel => camera.get_direction(),
                     ProjectionType::Perspective => {
-                        let mut polygon_pos = Vec3::zero();
-                        for &vertex_index in polygon.get_vertexes() {
-                            polygon_pos += global_vertexes[vertex_index];
+                        let mut polygon_pos = Point3::zero();
+                        for vertex_index in indexes {
+                            polygon_pos += Vec3::from(global_vertexes[vertex_index]);
                         }
-                        polygon_pos /= polygon.get_vertexes().len() as f32;
-                        Point3::from(polygon_pos) - camera.get_position()
+                        polygon_pos =
+                            Point3::from(Vec3::from(polygon_pos) / polygon.vertex_count() as f32);
+                        (polygon_pos - camera.get_position()).normalize().unwrap()
                     }
                 };
 
@@ -325,49 +298,9 @@ impl SceneRenderer {
 // Вспомогательные методы
 // --------------------------------------------------
 
-/// Получить матрицу преобразования из глобальных координат в экранные (viewport, он же canvas)
-///
-/// То есть, матрица производит следующие операции:
-/// глобальные координаты -> координаты камеры (view tranform) -> проекция на камеру в NDC -> растяжение NDC на размер canvas.
-fn get_global_to_screen_transform(
-    projection_type: ProjectionType,
-    camera: &Camera3,
-    canvas: &Canvas,
-) -> Transform3D {
-    // Матрица проекции координат камеры в NDC
-    let proj_matrix = match projection_type {
-        ProjectionType::Parallel => {
-            let width = 2.0 * (camera.get_fov() / 2.0).sin();
-            let height = width / camera.get_aspect_ratio();
-            Transform3D::parallel_symmetric(
-                width,
-                height,
-                camera.get_near_plane(),
-                camera.get_far_plane(),
-            )
-        }
-        ProjectionType::Perspective => Transform3D::perspective(
-            camera.get_fov(),
-            camera.get_aspect_ratio(),
-            camera.get_near_plane(),
-            camera.get_far_plane(),
-        ),
-    };
-
-    let scale_x = canvas.width as f32 / 2.0; // растянуть NDC по ширине
-    let scale_y = canvas.height as f32 / 2.0; // растянуть NDC по высоте
-
-    camera
-        .get_local_frame()
-        .global_to_local_matrix() // view transformation (локальные координаты камеры)
-        .multiply(proj_matrix) // вот тут получается NDC с координатами [-1, +1]
-        .multiply(Transform3D::translation(-1.0, 1.0, 0.0))
-        .multiply(Transform3D::scale(-scale_x, scale_y, 1.0)) // теперь экранные
-}
-
 /// Преобразует глобальные координаты точки в координаты экрана.
 fn project_point(point: Point3, view_proj_matrix: Transform3D) -> Pos2 {
-    let proj_point: Point3 = view_proj_matrix.apply_to_hvec(point.into()).into();
+    let proj_point: Point3 = point.apply_transform(view_proj_matrix).unwrap();
     Pos2::new(proj_point.x, proj_point.y)
 }
 
@@ -403,10 +336,14 @@ fn draw_lights(
     canvas: &mut Canvas,
 ) {
     for light in lights {
-        let light_pos = light.position * global_to_screen_transform;
+        let light_pos = light
+            .position
+            .apply_transform(global_to_screen_transform)
+            .unwrap();
         let pos = Pos2::new(light_pos.x, light_pos.y);
-        if pos.x < canvas.width as f32 && pos.y < canvas.height as f32 {
-            canvas.circle_filled(pos, 3.0, light.color);
+        let radius = utils::lerp_float(15.0, 3.0, (light_pos.z + 1.0) / 2.0);
+        if pos.x < canvas.width() as f32 && pos.y < canvas.height() as f32 {
+            canvas.circle_filled(pos, radius, light.color);
         }
     }
 }
@@ -451,10 +388,9 @@ mod render_tests {
 
     #[test]
     fn test_global_to_screen_transform_1() {
-        let camera = Camera3::default();
+        let camera = Camera::default();
         let canvas = Canvas::new(900, 600);
-        let transform =
-            get_global_to_screen_transform(ProjectionType::Perspective, &camera, &canvas);
+        let transform = camera.global_to_screen_transform(ProjectionType::Perspective, &canvas);
 
         // точка по центру камеры
         let camera_pos = camera.get_position();
@@ -462,17 +398,16 @@ mod render_tests {
         let point = Point3::new(camera_pos.x, camera_pos.y, camera_pos.z + z_depth);
 
         // точка должна быть где-то по центру экрана
-        let proj_point = point * transform;
-        assert!((proj_point.x - canvas.width as f32 / 2.0).abs() < TOLERANCE);
-        assert!((proj_point.y - canvas.height as f32 / 2.0).abs() < TOLERANCE);
+        let proj_point = point.apply_transform(transform).unwrap();
+        assert!((proj_point.x - canvas.width() as f32 / 2.0).abs() < TOLERANCE);
+        assert!((proj_point.y - canvas.height() as f32 / 2.0).abs() < TOLERANCE);
     }
 
     #[test]
     fn test_global_to_screen_transform_2() {
-        let camera = Camera3::default();
+        let camera = Camera::default();
         let canvas = Canvas::new(900, 600);
-        let transform =
-            get_global_to_screen_transform(ProjectionType::Perspective, &camera, &canvas);
+        let transform = camera.global_to_screen_transform(ProjectionType::Perspective, &canvas);
 
         // точка слева снизу от центра камеры
         let camera_pos = camera.get_position();
@@ -484,17 +419,16 @@ mod render_tests {
         );
 
         // точка должна быть где-то слева снизу от центра экрана
-        let proj_point = point * transform;
-        assert!(proj_point.x < canvas.width as f32 / 2.0 - TOLERANCE);
-        assert!(proj_point.y < canvas.height as f32 / 2.0 - TOLERANCE);
+        let proj_point = point.apply_transform(transform).unwrap();
+        assert!(proj_point.x < canvas.width() as f32 / 2.0 - TOLERANCE);
+        assert!(proj_point.y < canvas.height() as f32 / 2.0 - TOLERANCE);
     }
 
     #[test]
     fn test_global_to_screen_transform_3() {
-        let camera = Camera3::default();
+        let camera = Camera::default();
         let canvas = Canvas::new(900, 600);
-        let transform =
-            get_global_to_screen_transform(ProjectionType::Perspective, &camera, &canvas);
+        let transform = camera.global_to_screen_transform(ProjectionType::Perspective, &canvas);
 
         // точка справа сверху от центра камеры
         let camera_pos = camera.get_position();
@@ -506,8 +440,8 @@ mod render_tests {
         );
 
         // точка должна быть где-то справа сверху от центра экрана
-        let proj_point = point * transform;
-        assert!(proj_point.x > canvas.width as f32 / 2.0 + TOLERANCE);
-        assert!(proj_point.y > canvas.height as f32 / 2.0 + TOLERANCE);
+        let proj_point = point.apply_transform(transform).unwrap();
+        assert!(proj_point.x > canvas.width() as f32 / 2.0 + TOLERANCE);
+        assert!(proj_point.y > canvas.height() as f32 / 2.0 + TOLERANCE);
     }
 }

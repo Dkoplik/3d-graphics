@@ -1,7 +1,6 @@
-use crate::Model3;
-use crate::classes3d::mesh::Polygon3;
-use crate::classes3d::scene_renderer::shader_utils;
-use crate::{Canvas, LightSource, Transform3D, Vec3, classes3d::scene_renderer::Shader};
+use crate::{
+    Camera, Canvas, LightSource, Model, Point3, Polygon, ProjectionType, Shader, library::utils,
+};
 
 pub struct WireframeShader;
 
@@ -14,28 +13,31 @@ impl WireframeShader {
 impl Shader for WireframeShader {
     fn shade_model(
         &self,
-        model: &Model3,
-        polygons: &Vec<Polygon3>,
-        global_to_screen_transform: Transform3D,
+        model: &Model,
+        polygons: &Vec<Polygon>,
+        camera: &Camera,
+        projection_type: ProjectionType,
         _lights: &Vec<LightSource>,
         canvas: &mut Canvas,
     ) {
+        // матрица преобразования на экран
+        let global_to_screen_transform = camera.global_to_screen_transform(projection_type, canvas);
         // выбираем цвет для каркаса (чтобы потом не сливался с основной моделью)
         let model_color = model.material.color;
-        let wireframe_color = shader_utils::opposite_color(model_color);
+        let wireframe_color = utils::opposite_color(model_color);
 
         // проекция вершин на экран
-        let projected_vertexes: Vec<Vec3> = model
+        let projected_vertexes: Vec<Point3> = model
             .mesh
-            .get_global_vertexes()
-            .map(|v| Vec3::from(v * global_to_screen_transform))
+            .get_global_vertex_iter()
+            .map(|v| v.apply_transform(global_to_screen_transform).unwrap())
             .collect();
 
         // Рисуем рёбра
         for polygon in polygons {
             // Вершины полигона
-            let points: Vec<Vec3> = polygon
-                .get_vertexes()
+            let indexes: Vec<usize> = polygon.get_mesh_vertex_index_iter().collect();
+            let points: Vec<Point3> = indexes
                 .iter()
                 .map(|&index| projected_vertexes[index])
                 .collect();

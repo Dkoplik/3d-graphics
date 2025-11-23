@@ -9,9 +9,12 @@ pub mod primitives;
 pub mod model;
 
 // прочие структуры
-pub mod camera3;
+pub mod camera;
 pub mod canvas;
 pub mod coord_frame;
-// pub mod scene;
-// pub mod scene_renderer;
-// pub mod surface_generator;
+pub mod light_source;
+pub mod scene;
+pub mod scene_renderer;
+
+// вспомогательные методы
+pub mod utils;
