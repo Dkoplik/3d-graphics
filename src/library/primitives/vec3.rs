@@ -28,10 +28,10 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(1.0, 2.0, 3.0);
-    /// assert_eq!(vec.x, 1.0);
-    /// assert_eq!(vec.y, 2.0);
-    /// assert_eq!(vec.z, 3.0);
+    /// let vec = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// assert!((vec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((vec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((vec.z - 3.0).abs() < 1.0e-8);
     /// ```
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
@@ -41,10 +41,11 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::zero();
-    /// assert_eq!(vec.x, 0.0);
-    /// assert_eq!(vec.y, 0.0);
-    /// assert_eq!(vec.z, 0.0);
+    /// let vec = g3d::Vec3::zero();
+    ///
+    /// assert!((vec.x - 0.0).abs() < 1.0e-8);
+    /// assert!((vec.y - 0.0).abs() < 1.0e-8);
+    /// assert!((vec.z - 0.0).abs() < 1.0e-8);
     /// ```
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
@@ -60,11 +61,12 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let vec = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// let projection = vec.projection_xy();
-    /// assert_eq!(projection.x, 1.0);
-    /// assert_eq!(projection.y, 2.0);
-    /// assert_eq!(projection.z, 0.0);
+    ///
+    /// assert!((projection.x - 1.0).abs() < 1.0e-8);
+    /// assert!((projection.y - 2.0).abs() < 1.0e-8);
+    /// assert!((projection.z - 0.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn projection_xy(self) -> Self {
@@ -75,11 +77,12 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let vec = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// let projection = vec.projection_xz();
-    /// assert_eq!(projection.x, 1.0);
-    /// assert_eq!(projection.y, 0.0);
-    /// assert_eq!(projection.z, 3.0);
+    ///
+    /// assert!((projection.x - 1.0).abs() < 1.0e-8);
+    /// assert!((projection.y - 0.0).abs() < 1.0e-8);
+    /// assert!((projection.z - 3.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn projection_xz(self) -> Self {
@@ -90,11 +93,12 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let vec = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// let projection = vec.projection_yz();
-    /// assert_eq!(projection.x, 0.0);
-    /// assert_eq!(projection.y, 2.0);
-    /// assert_eq!(projection.z, 3.0);
+    ///
+    /// assert!((projection.x - 0.0).abs() < 1.0e-8);
+    /// assert!((projection.y - 2.0).abs() < 1.0e-8);
+    /// assert!((projection.z - 3.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn projection_yz(self) -> Self {
@@ -106,14 +110,16 @@ impl Vec3 {
     /// # Examples
     /// ```rust
     /// // (1*4) + (2*5) + (3*6) = 4 + 10 + 18 = 32
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
-    /// let v2 = Vec3::new(4.0, 5.0, 6.0);
-    /// assert_eq!(v1.dot(v2), 32.0);
+    /// let v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// let v2 = g3d::Vec3::new(4.0, 5.0, 6.0);
+    ///
+    /// assert!((v1.dot(v2) - 32.0).abs() < 1.0e-8);
     ///
     /// // Перпендикулярные вектора
-    /// let v3 = Vec3::new(1.0, 0.0, 0.0);
-    /// let v4 = Vec3::new(0.0, 1.0, 0.0);
-    /// assert_eq!(v3.dot(v4), 0.0);
+    /// let v3 = g3d::Vec3::new(1.0, 0.0, 0.0);
+    /// let v4 = g3d::Vec3::new(0.0, 1.0, 0.0);
+    ///
+    /// assert!((v3.dot(v4) - 0.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn dot(self, other: Self) -> f32 {
@@ -124,16 +130,18 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 0.0, 0.0);
-    /// let v2 = Vec3::new(0.2, 0.8, 0.0);
+    /// let v1 = g3d::Vec3::new(1.0, 0.0, 0.0);
+    /// let v2 = g3d::Vec3::new(0.2, 0.8, 0.0);
     /// let dot = v1.dot(v2);
+    ///
     /// assert!(0.0 < dot);
     /// assert!(dot < 1.0);
     ///
     /// // Перпендикулярные вектора
-    /// let v3 = Vec3::new(1.0, 0.0, 0.0);
-    /// let v4 = Vec3::new(0.0, 1.0, 0.0);
-    /// assert_eq!(v3.cos(v4), 0.0);
+    /// let v3 = g3d::Vec3::new(1.0, 0.0, 0.0);
+    /// let v4 = g3d::Vec3::new(0.0, 1.0, 0.0);
+    ///
+    /// assert!((v3.cos(v4) - 0.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn cos(self, other: Self) -> f32 {
@@ -156,12 +164,15 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let vec = Vec3::new(1.0, 2.0, 3.0);
     /// let onto = UVec3::new(0.0, 1.0, 0.0);
     /// let projection = vec.projection(onto);
-    /// assert_eq!(projection.x, 0.0);
-    /// assert_eq!(projection.y, 2.0);
-    /// assert_eq!(projection.z, 0.0);
+    ///
+    /// assert!((projection.x - 0.0).abs() < 1.0e-8);
+    /// assert!((projection.y - 2.0).abs() < 1.0e-8);
+    /// assert!((projection.z - 0.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn projection(self, onto: UVec3) -> Self {
@@ -172,12 +183,15 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let vec = Vec3::new(1.0, 2.0, 3.0);
     /// let onto = UVec3::new(0.0, 1.0, 0.0);
     /// let rejection = vec.rejection(onto);
-    /// assert_eq!(rejection.x, 1.0);
-    /// assert_eq!(rejection.y, 0.0);
-    /// assert_eq!(rejection.z, 3.0);
+    ///
+    /// assert!((rejection.x - 1.0).abs() < 1.0e-8);
+    /// assert!((rejection.y - 0.0).abs() < 1.0e-8);
+    /// assert!((rejection.z - 3.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn rejection(self, onto: UVec3) -> Self {
@@ -193,12 +207,13 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec_x = Vec3::plus_x();
-    /// let vec_y = Vec3::plus_y();
+    /// let vec_x = g3d::Vec3::new(1.0, 0.0, 0.0);
+    /// let vec_y = g3d::Vec3::new(0.0, 1.0, 0.0);
     /// let vec_z = vec_x.cross(vec_y);
-    /// assert_eq!(vec_z.x, 0.0);
-    /// assert_eq!(vec_z.y, 0.0);
-    /// assert_eq!(vec_z.z, 1.0);
+    ///
+    /// assert!((vec_z.x - 0.0).abs() < 1.0e-8);
+    /// assert!((vec_z.y - 0.0).abs() < 1.0e-8);
+    /// assert!((vec_z.z - 1.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn cross(self, other: Self) -> Self {
@@ -213,9 +228,10 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(0.0, 4.0, 0.0);
+    /// let vec = g3d::Vec3::new(0.0, 4.0, 0.0);
     /// let sq_len = vec.length_squared();
-    /// assert_eq!(sq_len, 16.0);
+    ///
+    /// assert!((sq_len - 16.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn length_squared(self) -> f32 {
@@ -226,9 +242,10 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(0.0, 4.0, 0.0);
+    /// let vec = g3d::Vec3::new(0.0, 4.0, 0.0);
     /// let len = vec.length();
-    /// assert_eq!(sq_len, 4.0);
+    ///
+    /// assert!((len - 4.0).abs() < 1.0e-8);
     /// ```
     #[inline]
     pub fn length(&self) -> f32 {
@@ -241,11 +258,14 @@ impl Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(0.0, 2.0, 3.0) // длина = 4;
-    /// let uvec: UVec3 = vec.normalize();
-    /// assert_eq!(uvec.x, 0.0);
-    /// assert_eq!(uvec.y, 2.0 / 4.0);
-    /// assert_eq!(uvec.z, 3.0 / 4.0);
+    /// use g3d::{UVec3, Vec3};
+    ///
+    /// let vec = Vec3::new(0.0, 3.0, 4.0); // длина = 5;
+    /// let uvec: UVec3 = vec.normalize().unwrap();
+    ///
+    /// assert!((uvec.x - 0.0).abs() < 1.0e-6);
+    /// assert!((uvec.y - 3.0 / 5.0).abs() < 1.0e-6);
+    /// assert!((uvec.z - 4.0 / 5.0).abs() < 1.0e-6);
     /// ```
     #[inline]
     pub fn normalize(self) -> Result<UVec3, UVecError> {
@@ -287,11 +307,12 @@ impl Neg for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(1.0, 2.0, 3.0);
+    /// let vec = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// let neg_uvec = -vec;
-    /// assert_eq!(neg_uvec.x, -1.0);
-    /// assert_eq!(neg_uvec.y, -2.0);
-    /// assert_eq!(neg_uvec.z, -3.0);
+    ///
+    /// assert!((neg_uvec.x - -1.0).abs() < 1.0e-8);
+    /// assert!((neg_uvec.y - -2.0).abs() < 1.0e-8);
+    /// assert!((neg_uvec.z - -3.0).abs() < 1.0e-8);
     /// ```
     fn neg(self) -> Self::Output {
         Self::new(-self.x, -self.y, -self.z)
@@ -305,12 +326,13 @@ impl Add for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
-    /// let v2 = Vec3::new(0.0, -1.0, 1.0);
-    /// let res: Vec3 = v1 + v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 1.0);
-    /// assert_eq!(res.z, 4.0);
+    /// let v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// let v2 = g3d::Vec3::new(0.0, -1.0, 1.0);
+    /// let res: g3d::Vec3 = v1 + v2;
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y - 1.0).abs() < 1.0e-8);
+    /// assert!((res.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn add(self, rhs: Self) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -322,12 +344,13 @@ impl AddAssign for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
-    /// let v2 = Vec3::new(0.0, -1.0, 1.0);
+    /// let mut v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// let v2 = g3d::Vec3::new(0.0, -1.0, 1.0);
     /// v1 += v2;
-    /// assert_eq!(v1.x, 1.0);
-    /// assert_eq!(v1.y, 1.0);
-    /// assert_eq!(v1.z, 4.0);
+    ///
+    /// assert!((v1.x - 1.0).abs() < 1.0e-8);
+    /// assert!((v1.y - 1.0).abs() < 1.0e-8);
+    /// assert!((v1.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn add_assign(&mut self, rhs: Self) {
         self.x += rhs.x;
@@ -343,12 +366,15 @@ impl Add<UVec3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let v1 = Vec3::new(1.0, 2.0, 3.0);
     /// let v2 = UVec3::new(0.0, 1.0, 0.0);
     /// let res: Vec3 = v1 + v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 3.0);
-    /// assert_eq!(res.z, 3.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y - 3.0).abs() < 1.0e-8);
+    /// assert!((res.z - 3.0).abs() < 1.0e-8);
     /// ```
     fn add(self, rhs: UVec3) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -360,12 +386,15 @@ impl AddAssign<UVec3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
+    /// use g3d::{UVec3, Vec3};
+    ///
+    /// let mut v1 = Vec3::new(1.0, 2.0, 3.0);
     /// let v2 = UVec3::new(0.0, 1.0, 0.0);
     /// v1 += v2;
-    /// assert_eq!(v1.x, 1.0);
-    /// assert_eq!(v1.y, 3.0);
-    /// assert_eq!(v1.z, 3.0);
+    ///
+    /// assert!((v1.x - 1.0).abs() < 1.0e-8);
+    /// assert!((v1.y - 3.0).abs() < 1.0e-8);
+    /// assert!((v1.z - 3.0).abs() < 1.0e-8);
     /// ```
     fn add_assign(&mut self, rhs: UVec3) {
         self.x += rhs.x;
@@ -381,12 +410,13 @@ impl Sub for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
-    /// let v2 = Vec3::new(0.0, -1.0, 1.0);
-    /// let res: Vec3 = v1 - v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 3.0);
-    /// assert_eq!(res.z, 2.0);
+    /// let v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// let v2 = g3d::Vec3::new(0.0, -1.0, 1.0);
+    /// let res: g3d::Vec3 = v1 - v2;
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y - 3.0).abs() < 1.0e-8);
+    /// assert!((res.z - 2.0).abs() < 1.0e-8);
     /// ```
     fn sub(self, rhs: Self) -> Self::Output {
         self + (-rhs)
@@ -398,12 +428,13 @@ impl SubAssign for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
-    /// let v2 = Vec3::new(0.0, -1.0, 1.0);
+    /// let mut v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// let v2 = g3d::Vec3::new(0.0, -1.0, 1.0);
     /// v1 -= v2;
-    /// assert_eq!(v1.x, 1.0);
-    /// assert_eq!(v1.y, 3.0);
-    /// assert_eq!(v1.z, 2.0);
+    ///
+    /// assert!((v1.x - 1.0).abs() < 1.0e-8);
+    /// assert!((v1.y - 3.0).abs() < 1.0e-8);
+    /// assert!((v1.z - 2.0).abs() < 1.0e-8);
     /// ```
     fn sub_assign(&mut self, rhs: Self) {
         self.x -= rhs.x;
@@ -419,12 +450,15 @@ impl Sub<UVec3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let v1 = Vec3::new(1.0, 2.0, 3.0);
     /// let v2 = UVec3::new(0.0, -1.0, 0.0);
     /// let res: Vec3 = v1 - v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 3.0);
-    /// assert_eq!(res.z, 3.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y - 3.0).abs() < 1.0e-8);
+    /// assert!((res.z - 3.0).abs() < 1.0e-8);
     /// ```
     fn sub(self, rhs: UVec3) -> Self::Output {
         self + (-rhs)
@@ -436,12 +470,15 @@ impl SubAssign<UVec3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
+    /// use g3d::{UVec3, Vec3};
+    ///
+    /// let mut v1 = Vec3::new(1.0, 2.0, 3.0);
     /// let v2 = UVec3::new(0.0, -1.0, 0.0);
     /// v1 -= v2;
-    /// assert_eq!(v1.x, 1.0);
-    /// assert_eq!(v1.y, 3.0);
-    /// assert_eq!(v1.z, 3.0);
+    ///
+    /// assert!((v1.x - 1.0).abs() < 1.0e-8);
+    /// assert!((v1.y - 3.0).abs() < 1.0e-8);
+    /// assert!((v1.z - 3.0).abs() < 1.0e-8);
     /// ```
     fn sub_assign(&mut self, rhs: UVec3) {
         self.x -= rhs.x;
@@ -457,11 +494,12 @@ impl Mul<f32> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
+    /// let v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// let res = v1 * 2.0;
-    /// assert_eq!(res.x, 2.0);
-    /// assert_eq!(res.y, 4.0);
-    /// assert_eq!(res.z, 6.0);
+    ///
+    /// assert!((res.x - 2.0).abs() < 1.0e-8);
+    /// assert!((res.y - 4.0).abs() < 1.0e-8);
+    /// assert!((res.z - 6.0).abs() < 1.0e-8);
     /// ```
     fn mul(self, rhs: f32) -> Self::Output {
         Self {
@@ -479,11 +517,12 @@ impl Mul<Vec3> for f32 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
+    /// let v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// let res = 2.0 * v1;
-    /// assert_eq!(res.x, 2.0);
-    /// assert_eq!(res.y, 4.0);
-    /// assert_eq!(res.z, 6.0);
+    ///
+    /// assert!((res.x - 2.0).abs() < 1.0e-8);
+    /// assert!((res.y - 4.0).abs() < 1.0e-8);
+    /// assert!((res.z - 6.0).abs() < 1.0e-8);
     /// ```
     fn mul(self, rhs: Vec3) -> Self::Output {
         rhs * self
@@ -495,11 +534,12 @@ impl MulAssign<f32> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 3.0);
+    /// let mut v1 = g3d::Vec3::new(1.0, 2.0, 3.0);
     /// v1 *= 2.0;
-    /// assert_eq!(v1.x, 2.0);
-    /// assert_eq!(v1.y, 4.0);
-    /// assert_eq!(v1.z, 6.0);
+    ///
+    /// assert!((v1.x - 2.0).abs() < 1.0e-8);
+    /// assert!((v1.y - 4.0).abs() < 1.0e-8);
+    /// assert!((v1.z - 6.0).abs() < 1.0e-8);
     /// ```
     fn mul_assign(&mut self, rhs: f32) {
         self.x *= rhs;
@@ -515,11 +555,12 @@ impl Div<f32> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 4.0);
+    /// let v1 = g3d::Vec3::new(1.0, 2.0, 4.0);
     /// let res = v1 / 2.0;
-    /// assert_eq!(res.x, 0.5);
-    /// assert_eq!(res.y, 1.0);
-    /// assert_eq!(res.z, 2.0);
+    ///
+    /// assert!((res.x - 0.5).abs() < 1.0e-8);
+    /// assert!((res.y - 1.0).abs() < 1.0e-8);
+    /// assert!((res.z - 2.0).abs() < 1.0e-8);
     /// ```
     fn div(self, rhs: f32) -> Self::Output {
         Self {
@@ -535,11 +576,12 @@ impl DivAssign<f32> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = Vec3::new(1.0, 2.0, 4.0);
+    /// let mut v1 = g3d::Vec3::new(1.0, 2.0, 4.0);
     /// v1 /= 2.0;
-    /// assert_eq!(v1.x, 0.5);
-    /// assert_eq!(v1.y, 1.0);
-    /// assert_eq!(v1.z, 2.0);
+    ///
+    /// assert!((v1.x - 0.5).abs() < 1.0e-8);
+    /// assert!((v1.y - 1.0).abs() < 1.0e-8);
+    /// assert!((v1.z - 2.0).abs() < 1.0e-8);
     /// ```
     fn div_assign(&mut self, rhs: f32) {
         self.x /= rhs;
@@ -553,11 +595,14 @@ impl From<Point3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, Vec3};
+    ///
     /// let point = Point3::new(1.0, 2.0, 3.0);
     /// let vec = Vec3::from(point);
-    /// assert_eq!(vec.x, 1.0);
-    /// assert_eq!(vec.y, 2.0);
-    /// assert_eq!(vec.z, 3.0);
+    ///
+    /// assert!((vec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((vec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((vec.z - 3.0).abs() < 1.0e-8);
     /// ```
     fn from(value: Point3) -> Self {
         Self {
@@ -573,11 +618,14 @@ impl From<UVec3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let point = UVec3::new(0.0, 1.0, 0.0);
-    /// let vec = Vec3::from(point);
-    /// assert_eq!(vec.x, 0.0);
-    /// assert_eq!(vec.y, 1.0);
-    /// assert_eq!(vec.z, 0.0);
+    /// use g3d::{UVec3, Vec3};
+    ///
+    /// let uvec = UVec3::new(0.0, 1.0, 0.0);
+    /// let vec = Vec3::from(uvec);
+    ///
+    /// assert!((vec.x - 0.0).abs() < 1.0e-8);
+    /// assert!((vec.y - 1.0).abs() < 1.0e-8);
+    /// assert!((vec.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn from(value: UVec3) -> Self {
         Self {
@@ -598,17 +646,21 @@ impl TryFrom<HVec3> for Vec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{HVec3, Vec3, VecError};
+    ///
     /// // если hvec - направление
     /// let hvec_direction = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let vec = Vec3::try_from(hvec_direction).unwrap();
-    /// assert_eq!(vec.x, 0.0);
-    /// assert_eq!(vec.y, 0.0);
-    /// assert_eq!(vec.z, 1.0);
+    ///
+    /// assert!((vec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((vec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((vec.z - 3.0).abs() < 1.0e-8);
     ///
     /// // если hvec - точка
     /// let hvec_position = HVec3::new(1.0, 2.0, 3.0, 1.0);
-    /// let err = Point3::try_from(hvec_position).unwrap_err();
-    /// assert_eq!(err, VecError(hvec_position));
+    /// let err = Vec3::try_from(hvec_position).unwrap_err();
+    ///
+    /// assert_eq!(err, VecError::new(hvec_position));
     /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
         if value.w != 0.0 {
@@ -623,8 +675,14 @@ impl TryFrom<HVec3> for Vec3 {
 ///
 /// Возникает когда компонента `w != 0`, то есть `HVec3` обозначает позицию,
 /// поэтому не может быть направлением.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VecError(HVec3);
+
+impl VecError {
+    pub fn new(hvec: HVec3) -> Self {
+        VecError(hvec)
+    }
+}
 
 impl Display for VecError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

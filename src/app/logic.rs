@@ -1,8 +1,5 @@
 use crate::app::AthenianApp;
 use egui::Response;
-use g3d::SurfaceFunction;
-use g3d::classes3d::surface_generator::generate_surface_mesh;
-use g3d::{Model3, Vec3, classes3d::model3::ObjLoadError, classes3d::model3::ObjSaveError};
 use image::ImageFormat;
 use std::fs::File;
 use std::io::BufReader;
@@ -123,13 +120,18 @@ impl AthenianApp {
             && let Some(drag_cur) = response.hover_pos()
         {
             let transform = self
-                .scene_renderer
-                .screen_to_global_transform(&self.scene, &self.canvas);
+                .scene
+                .camera
+                .screen_to_global_transform(self.scene_renderer.projection_type, &self.canvas);
             let camera = &mut self.scene.camera;
 
             let z = (camera.get_far_plane() + camera.get_near_plane()) / 2.0;
-            let from = Vec3::new(drag_start.x, drag_start.y, z) * transform;
-            let to = Vec3::new(drag_cur.x, drag_cur.y, z) * transform;
+            let from = g3d::UVec3::new(drag_start.x, drag_start.y, z)
+                .apply_transform(transform)
+                .unwrap();
+            let to = g3d::UVec3::new(drag_cur.x, drag_cur.y, z)
+                .apply_transform(transform)
+                .unwrap();
             camera.rotate(from, to);
         }
 
@@ -139,16 +141,17 @@ impl AthenianApp {
     /// Обработать перетаскивание для 3D.
     fn handle_3d_drag(&mut self, start: egui::Pos2, end: egui::Pos2) {
         let transform = self
-            .scene_renderer
-            .screen_to_global_transform(&self.scene, &self.canvas);
+            .scene
+            .camera
+            .screen_to_global_transform(self.scene_renderer.projection_type, &self.canvas);
         let mut from = g3d::Vec3::new(start.x, start.y, 0.0);
         let mut to = g3d::Vec3::new(end.x, end.y, 0.0);
         let cur_instrument = self.instrument;
         if let Some(model) = self.get_selected_model_mut() {
             from.z = model.get_position().z;
-            from = from * transform;
+            from = from.apply_transform(transform).unwrap();
             to.z = model.get_position().z;
-            to = to * transform;
+            to = to.apply_transform(transform).unwrap();
 
             match cur_instrument {
                 Instrument::Move3D => {
@@ -160,7 +163,7 @@ impl AthenianApp {
                     let tmp = from.x;
                     from.x = to.x;
                     to.x = tmp;
-                    model.rotate(from.normalize(), to.normalize());
+                    model.rotate(from.normalize().unwrap(), to.normalize().unwrap());
                 }
                 Instrument::Scale3D => {
                     let scale_factor = to - from;
@@ -169,7 +172,7 @@ impl AthenianApp {
                 Instrument::RotateAroundX => {
                     from.x = 0.0;
                     to.x = 0.0;
-                    model.rotate(from.normalize(), to.normalize());
+                    model.rotate(from.normalize().unwrap(), to.normalize().unwrap());
                 }
                 Instrument::RotateAroundY => {
                     from.y = 0.0;
@@ -177,7 +180,7 @@ impl AthenianApp {
                     let tmp = from.x;
                     from.x = to.x;
                     to.x = tmp;
-                    model.rotate(from.normalize(), to.normalize());
+                    model.rotate(from.normalize().unwrap(), to.normalize().unwrap());
                 }
                 Instrument::RotateAroundZ => {
                     from.z = 0.0;
@@ -185,7 +188,7 @@ impl AthenianApp {
                     let tmp = from.x;
                     from.x = to.x;
                     to.x = tmp;
-                    model.rotate(from.normalize(), to.normalize());
+                    model.rotate(from.normalize().unwrap(), to.normalize().unwrap());
                 }
                 Instrument::RotateAroundCustomLine => {
                     // Вращение вокруг произвольной оси обрабатывается отдельно
@@ -224,55 +227,55 @@ impl AthenianApp {
 
 impl AthenianApp {
     /// Добавить фигуру (заменяет текущую)
-    pub fn set_model(&mut self, model: g3d::Model3) {
+    pub fn set_model(&mut self, model: g3d::Model) {
         self.scene.models.clear();
         self.scene.models.push(model);
         self.selected_3d_model_index = Some(0); // Автоматически выбираем добавленную фигуру
     }
 
     /// Получить текущую выбранную модель (мутабельно)
-    pub fn get_selected_model_mut(&mut self) -> Option<&mut g3d::Model3> {
+    pub fn get_selected_model_mut(&mut self) -> Option<&mut g3d::Model> {
         self.selected_3d_model_index
             .and_then(|index| self.scene.models.get_mut(index))
     }
 
     /// Получить текущую выбранную модель
-    pub fn get_selected_model(&self) -> Option<&g3d::Model3> {
+    pub fn get_selected_model(&self) -> Option<&g3d::Model> {
         self.selected_3d_model_index
             .and_then(|index| self.scene.models.get(index))
     }
 
     pub fn add_tetrahedron(&mut self) {
         let mesh = g3d::Mesh::tetrahedron();
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.add_model(model);
     }
 
     pub fn add_hexahedron(&mut self) {
         let mesh = g3d::Mesh::hexahedron();
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.add_model(model);
     }
 
     pub fn add_octahedron(&mut self) {
         let mesh = g3d::Mesh::octahedron();
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.add_model(model);
     }
 
     pub fn add_icosahedron(&mut self) {
         let mesh = g3d::Mesh::icosahedron();
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.add_model(model);
     }
 
     pub fn add_dodecahedron(&mut self) {
         let mesh = g3d::Mesh::dodecahedron();
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.add_model(model);
     }
 
-    pub fn add_model(&mut self, model: g3d::Model3) {
+    pub fn add_model(&mut self, model: g3d::Model) {
         self.scene.models.push(model);
         self.selected_3d_model_index = Some(self.scene.models.len() - 1);
     }
@@ -303,7 +306,7 @@ impl AthenianApp {
                 self.angle_of_rotate.to_radians(),
             );
             if let Some(model) = self.get_selected_model_mut() {
-                model.mesh.get_local_frame_mut().rotate(rotation);
+                model.mesh.local_frame.rotate(rotation);
             }
         }
     }
@@ -323,7 +326,7 @@ impl AthenianApp {
     // === ОПЕРАЦИИ С КАМЕРОЙ ===
 
     pub fn reset_camera(&mut self) {
-        self.scene.camera = g3d::Camera3::default();
+        self.scene.camera = g3d::Camera::default();
     }
 
     pub fn load_obj_file(&mut self) {
@@ -332,18 +335,18 @@ impl AthenianApp {
             .pick_file();
 
         if let Some(path) = file_path {
-            match Model3::load_from_obj(path.to_str().unwrap()) {
+            match g3d::Model::load_from_obj(path.to_str().unwrap()) {
                 Ok(model) => {
                     self.set_model(model);
                     println!("Модель успешно загружена");
                 }
-                Err(ObjLoadError::FileNotFound) => {
+                Err(g3d::ObjLoadError::FileNotFound) => {
                     eprintln!("Файл не найден");
                 }
-                Err(ObjLoadError::InvalidFormat) => {
+                Err(g3d::ObjLoadError::InvalidFormat) => {
                     eprintln!("Неверный формат OBJ файла");
                 }
-                Err(ObjLoadError::UnsupportedFeature) => {
+                Err(g3d::ObjLoadError::UnsupportedFeature) => {
                     eprintln!("Файл содержит неподдерживаемые функции");
                 }
             }
@@ -363,10 +366,10 @@ impl AthenianApp {
                     Ok(()) => {
                         println!("Модель успешно сохранена");
                     }
-                    Err(ObjSaveError::WriteError) => {
+                    Err(g3d::ObjSaveError::WriteError) => {
                         eprintln!("Ошибка записи файла");
                     }
-                    Err(ObjSaveError::InvalidData) => {
+                    Err(g3d::ObjSaveError::InvalidData) => {
                         eprintln!("Неверные данные модели");
                     }
                 }
@@ -386,11 +389,7 @@ impl AthenianApp {
         }
 
         // Преобразуем точки профиля в HVec3
-        let profile_hvec: Vec<g3d::HVec3> = params
-            .profile_points
-            .iter()
-            .map(|p| g3d::HVec3::from(*p))
-            .collect();
+        let profile_hvec: Vec<g3d::Point3> = params.profile_points.clone();
 
         // Получаем ось вращения
         let axis = params
@@ -399,7 +398,7 @@ impl AthenianApp {
 
         // Создаем mesh
         let mesh = g3d::Mesh::create_rotation_model(&profile_hvec, axis, params.segments);
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
 
         // Возвращаем параметры обратно
         self.rotation_params = params;
@@ -463,31 +462,29 @@ impl AthenianApp {
 
     pub fn create_surface_from_function(
         &mut self,
-        func: SurfaceFunction,
-        x_min: f64,
-        x_max: f64,
-        y_min: f64,
-        y_max: f64,
+        func: g3d::SurfaceFunction,
+        x_min: f32,
+        x_max: f32,
+        y_min: f32,
+        y_max: f32,
         divisions: usize,
     ) {
         let mesh =
-            generate_surface_mesh(func, (x_min, x_max), (y_min, y_max), (divisions, divisions));
+            func.generate_surface_mesh((x_min, x_max), (y_min, y_max), (divisions, divisions));
 
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.set_model(model);
     }
 
     /// Создать модель из функции двух переменных
-    /// Создать модель из функции двух переменных
     pub fn create_function_model(&mut self) {
-        let mesh = generate_surface_mesh(
-            self.selected_surface_function,
+        let mesh = self.selected_surface_function.generate_surface_mesh(
             (self.surface_x_min, self.surface_x_max),
             (self.surface_y_min, self.surface_y_max),
             (self.surface_divisions, self.surface_divisions),
         );
 
-        let model = g3d::Model3::from_mesh(mesh);
+        let model = g3d::Model::from_mesh(mesh);
         self.set_model(model);
     }
 

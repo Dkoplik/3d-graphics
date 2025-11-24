@@ -33,11 +33,11 @@ impl HVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
-    /// assert_eq!(hvec.x, 1.0);
-    /// assert_eq!(hvec.y, 2.0);
-    /// assert_eq!(hvec.z, 3.0);
-    /// assert_eq!(hvec.w, 1.0);
+    /// let hvec = g3d::HVec3::new(1.0, 2.0, 3.0, 1.0);
+    /// assert!((hvec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((hvec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((hvec.z - 3.0).abs() < 1.0e-8);
+    /// assert!((hvec.w - 1.0).abs() < 1.0e-8);
     /// ```
     pub fn new(x: f32, y: f32, z: f32, w: f32) -> Self {
         Self { x, y, z, w }
@@ -49,11 +49,11 @@ impl HVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new_position(1.0, 2.0, 3.0);
-    /// assert_eq!(hvec.x, 1.0);
-    /// assert_eq!(hvec.y, 2.0);
-    /// assert_eq!(hvec.z, 3.0);
-    /// assert_eq!(hvec.w, 1.0);
+    /// let hvec = g3d::HVec3::new_position(1.0, 2.0, 3.0);
+    /// assert!((hvec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((hvec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((hvec.z - 3.0).abs() < 1.0e-8);
+    /// assert!((hvec.w - 1.0).abs() < 1.0e-8);
     /// ```
     pub fn new_position(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z, w: 1.0 }
@@ -65,14 +65,14 @@ impl HVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new_direction(1.0, 2.0, 3.0);
-    /// assert_eq!(hvec.x, 1.0);
-    /// assert_eq!(hvec.y, 2.0);
-    /// assert_eq!(hvec.z, 3.0);
-    /// assert_eq!(hvec.w, 0.0);
+    /// let hvec = g3d::HVec3::new_direction(1.0, 2.0, 3.0);
+    /// assert!((hvec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((hvec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((hvec.z - 3.0).abs() < 1.0e-8);
+    /// assert!((hvec.w - 0.0).abs() < 1.0e-8);
     /// ```
     pub fn new_direction(x: f32, y: f32, z: f32) -> Self {
-        Self { x, y, z, w: 1.0 }
+        Self { x, y, z, w: 0.0 }
     }
 }
 
@@ -156,12 +156,13 @@ impl From<Vec3> for HVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = Vec3::new(1.0, 2.0, 3.0);
-    /// let hvec = HVec3::from(vec);
-    /// assert_eq!(hvec.x, 1.0);
-    /// assert_eq!(hvec.y, 2.0);
-    /// assert_eq!(hvec.z, 3.0);
-    /// assert_eq!(hvec.w, 0.0);
+    /// let vec = g3d::Vec3::new(1.0, 2.0, 3.0);
+    /// let hvec = g3d::HVec3::from(vec);
+    ///
+    /// assert!((hvec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((hvec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((hvec.z - 3.0).abs() < 1.0e-8);
+    /// assert!((hvec.w - 0.0).abs() < 1.0e-8);
     /// ```
     fn from(value: Vec3) -> Self {
         Self::new_direction(value.x, value.y, value.z)
@@ -173,12 +174,13 @@ impl From<UVec3> for HVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let uvec = UVec3::new(0.0, 1.0, 0.0);
-    /// let hvec = HVec3::from(uvec);
-    /// assert_eq!(hvec.x, 0.0);
-    /// assert_eq!(hvec.y, 1.0);
-    /// assert_eq!(hvec.z, 0.0);
-    /// assert_eq!(hvec.w, 0.0);
+    /// let uvec = g3d::UVec3::new(0.0, 1.0, 0.0);
+    /// let hvec = g3d::HVec3::from(uvec);
+    ///
+    /// assert!((hvec.x - 0.0).abs() < 1.0e-8);
+    /// assert!((hvec.y - 1.0).abs() < 1.0e-8);
+    /// assert!((hvec.z - 0.0).abs() < 1.0e-8);
+    /// assert!((hvec.w - 0.0).abs() < 1.0e-8);
     /// ```
     fn from(value: UVec3) -> Self {
         Self::new_direction(value.x, value.y, value.z)
@@ -190,12 +192,13 @@ impl From<Point3> for HVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let point = Point3::new(1.0, 2.0, 3.0);
-    /// let hvec = HVec3::from(point);
-    /// assert_eq!(hvec.x, 1.0);
-    /// assert_eq!(hvec.y, 2.0);
-    /// assert_eq!(hvec.z, 3.0);
-    /// assert_eq!(hvec.w, 1.0);
+    /// let point = g3d::Point3::new(1.0, 2.0, 3.0);
+    /// let hvec = g3d::HVec3::from(point);
+    ///
+    /// assert!((hvec.x - 1.0).abs() < 1.0e-8);
+    /// assert!((hvec.y - 2.0).abs() < 1.0e-8);
+    /// assert!((hvec.z - 3.0).abs() < 1.0e-8);
+    /// assert!((hvec.w - 1.0).abs() < 1.0e-8);
     /// ```
     fn from(value: Point3) -> Self {
         Self::new_position(value.x, value.y, value.z)

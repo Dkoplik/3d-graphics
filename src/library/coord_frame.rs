@@ -41,8 +41,8 @@ impl CoordFrame {
     /// 3-ий вектор строится автоматически перпендикулярно 2-м указанным. 2 заданных вектора
     /// должны быть **ортогональными**.
     pub fn from_2(forward: UVec3, up: UVec3, origin: Point3) -> Self {
-        let right = forward
-            .cross(up)
+        let right = up
+            .cross(forward)
             .normalize()
             .expect("forward и up не должны быть параллельны друг другу");
         Self {

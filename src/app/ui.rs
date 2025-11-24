@@ -531,18 +531,18 @@ impl AthenianApp {
             .show_ui(ui, |ui| {
                 ui.selectable_value(
                     &mut material.blend_mode,
-                    g3d::classes3d::material::TextureBlendMode::Replace,
-                    g3d::classes3d::material::TextureBlendMode::Replace.to_string(),
+                    g3d::TextureBlendMode::Replace,
+                    g3d::TextureBlendMode::Replace.to_string(),
                 );
                 ui.selectable_value(
                     &mut material.blend_mode,
-                    g3d::classes3d::material::TextureBlendMode::Modulate,
-                    g3d::classes3d::material::TextureBlendMode::Modulate.to_string(),
+                    g3d::TextureBlendMode::Modulate,
+                    g3d::TextureBlendMode::Modulate.to_string(),
                 );
                 ui.selectable_value(
                     &mut material.blend_mode,
-                    g3d::classes3d::material::TextureBlendMode::Additive,
-                    g3d::classes3d::material::TextureBlendMode::Additive.to_string(),
+                    g3d::TextureBlendMode::Additive,
+                    g3d::TextureBlendMode::Additive.to_string(),
                 );
             });
 
@@ -588,23 +588,23 @@ impl AthenianApp {
             .show_ui(ui, |ui| {
                 ui.selectable_value(
                     &mut self.scene_renderer.shading_type,
-                    g3d::classes3d::scene_renderer::ShadingType::None,
-                    g3d::classes3d::scene_renderer::ShadingType::None.to_string(),
+                    g3d::ShadingType::None,
+                    g3d::ShadingType::None.to_string(),
                 );
                 ui.selectable_value(
                     &mut self.scene_renderer.shading_type,
-                    g3d::classes3d::scene_renderer::ShadingType::GouraudLambert,
-                    g3d::classes3d::scene_renderer::ShadingType::GouraudLambert.to_string(),
+                    g3d::ShadingType::GouraudLambert,
+                    g3d::ShadingType::GouraudLambert.to_string(),
                 );
                 ui.selectable_value(
                     &mut self.scene_renderer.shading_type,
-                    g3d::classes3d::scene_renderer::ShadingType::PhongToonShading(3),
-                    g3d::classes3d::scene_renderer::ShadingType::PhongToonShading(0).to_string(),
+                    g3d::ShadingType::PhongToonShading(3),
+                    g3d::ShadingType::PhongToonShading(0).to_string(),
                 );
             });
 
         match self.scene_renderer.shading_type {
-            g3d::classes3d::scene_renderer::ShadingType::PhongToonShading(mut bands) => {
+            g3d::ShadingType::PhongToonShading(mut bands) => {
                 ui.add(egui::Slider::new(&mut bands, 1..=256).text("Групп:"));
             }
             _ => (),
@@ -616,13 +616,13 @@ impl AthenianApp {
             .show_ui(ui, |ui| {
                 ui.selectable_value(
                     &mut self.scene_renderer.projection_type,
-                    g3d::classes3d::scene_renderer::ProjectionType::Perspective,
-                    g3d::classes3d::scene_renderer::ProjectionType::Perspective.to_string(),
+                    g3d::ProjectionType::Perspective,
+                    g3d::ProjectionType::Perspective.to_string(),
                 );
                 ui.selectable_value(
                     &mut self.scene_renderer.projection_type,
-                    g3d::classes3d::scene_renderer::ProjectionType::Parallel,
-                    g3d::classes3d::scene_renderer::ProjectionType::Parallel.to_string(),
+                    g3d::ProjectionType::Parallel,
+                    g3d::ProjectionType::Parallel.to_string(),
                 );
             });
     }

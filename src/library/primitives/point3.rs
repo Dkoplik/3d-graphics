@@ -23,10 +23,10 @@ impl Point3 {
     ///
     /// # Examples
     /// ```rust
-    /// let point = Point3::new(1.0, 2.0, 3.0);
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 2.0);
-    /// assert_eq!(point.z, 3.0);
+    /// let point = g3d::Point3::new(1.0, 2.0, 3.0);
+    /// assert!((point.x - 1.0).abs() < 1.0e-8);
+    /// assert!((point.y - 2.0).abs() < 1.0e-8);
+    /// assert!((point.z - 3.0).abs() < 1.0e-8);
     /// ```
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         Self { x, y, z }
@@ -36,10 +36,11 @@ impl Point3 {
     ///
     /// # Examples
     /// ```rust
-    /// let zero_point = Point3::zero();
-    /// assert_eq!(point.x, 0.0);
-    /// assert_eq!(point.y, 0.0);
-    /// assert_eq!(point.z, 0.0);
+    /// let zero_point = g3d::Point3::zero();
+    ///
+    /// assert!((zero_point.x - 0.0).abs() < 1.0e-8);
+    /// assert!((zero_point.y - 0.0).abs() < 1.0e-8);
+    /// assert!((zero_point.z - 0.0).abs() < 1.0e-8);
     /// ```
     pub fn zero() -> Self {
         Self::new(0.0, 0.0, 0.0)
@@ -60,13 +61,15 @@ impl Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, Transform3D};
+    ///
     /// let original_point = Point3::zero();
     /// let transform = Transform3D::translation(1.0, 2.0, 3.0);
-    /// let translated_point = original_point.apply_transform(transform);
+    /// let translated_point = original_point.apply_transform(transform).unwrap();
     ///
-    /// assert_eq!(translated_point.x, 1.0);
-    /// assert_eq!(translated_point.y, 2.0);
-    /// assert_eq!(translated_point.z, 3.0);
+    /// assert!((translated_point.x - 1.0).abs() < 1.0e-8);
+    /// assert!((translated_point.y - 2.0).abs() < 1.0e-8);
+    /// assert!((translated_point.z - 3.0).abs() < 1.0e-8);
     /// ```
     pub fn apply_transform(self, transform: Transform3D) -> Result<Self, PointError> {
         Point3::try_from(HVec3::from(self) * transform)
@@ -89,12 +92,15 @@ impl Sub for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, Vec3};
+    ///
     /// let point1 = Point3::new(1.0, 1.0, 1.0);
     /// let point2 = Point3::new(3.0, 4.0, 5.0);
-    /// let vec: Vec3 = point - zero_point;
-    /// assert_eq!(vec.x, 2.0);
-    /// assert_eq!(vec.y, 3.0);
-    /// assert_eq!(vec.z, 4.0);
+    /// let vec: Vec3 = point2 - point1;
+    ///
+    /// assert!((vec.x - 2.0).abs() < 1.0e-8);
+    /// assert!((vec.y - 3.0).abs() < 1.0e-8);
+    /// assert!((vec.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn sub(self, rhs: Self) -> Self::Output {
         Vec3::new(self.x - rhs.x, self.y - rhs.y, self.z - rhs.z)
@@ -110,12 +116,15 @@ impl Add<Vec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, Vec3};
+    ///
     /// let original_point = Point3::new(1.0, 2.0, 3.0);
     /// let vec = Vec3::new(-2.0, 3.0, 1.0);
     /// let moved_point = original_point + vec;
-    /// assert_eq!(moved_point.x, -1.0);
-    /// assert_eq!(moved_point.y, 5.0);
-    /// assert_eq!(moved_point.z, 4.0);
+    ///
+    /// assert!((moved_point.x - -1.0).abs() < 1.0e-8);
+    /// assert!((moved_point.y - 5.0).abs() < 1.0e-8);
+    /// assert!((moved_point.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn add(self, rhs: Vec3) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -129,12 +138,16 @@ impl AddAssign<Vec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, Vec3};
+    ///
+    ///
     /// let mut point = Point3::new(1.0, 2.0, 3.0);
     /// let vec = Vec3::new(-2.0, 3.0, 1.0);
     /// point += vec;
-    /// assert_eq!(point.x, -1.0);
-    /// assert_eq!(point.y, 5.0);
-    /// assert_eq!(point.z, 4.0);
+    ///
+    /// assert!((point.x - -1.0).abs() < 1.0e-8);
+    /// assert!((point.y - 5.0).abs() < 1.0e-8);
+    /// assert!((point.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn add_assign(&mut self, rhs: Vec3) {
         *self = *self + rhs;
@@ -150,12 +163,15 @@ impl Add<UVec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, UVec3};
+    ///
     /// let original_point = Point3::new(1.0, 2.0, 3.0);
     /// let vec = UVec3::new(0.0, 0.0, 1.0);
     /// let moved_point = original_point + vec;
-    /// assert_eq!(moved_point.x, 1.0);
-    /// assert_eq!(moved_point.y, 2.0);
-    /// assert_eq!(moved_point.z, 4.0);
+    ///
+    /// assert!((moved_point.x - 1.0).abs() < 1.0e-8);
+    /// assert!((moved_point.y - 2.0).abs() < 1.0e-8);
+    /// assert!((moved_point.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn add(self, rhs: UVec3) -> Self::Output {
         Self::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -169,12 +185,16 @@ impl AddAssign<UVec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, UVec3};
+    ///
+    ///
     /// let mut point = Point3::new(1.0, 2.0, 3.0);
     /// let vec = UVec3::new(0.0, 0.0, 1.0);
     /// point += vec;
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 2.0);
-    /// assert_eq!(point.z, 4.0);
+    ///
+    /// assert!((point.x - 1.0).abs() < 1.0e-8);
+    /// assert!((point.y - 2.0).abs() < 1.0e-8);
+    /// assert!((point.z - 4.0).abs() < 1.0e-8);
     /// ```
     fn add_assign(&mut self, rhs: UVec3) {
         *self = *self + rhs;
@@ -186,11 +206,14 @@ impl From<Vec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, Vec3};
+    ///
     /// let vec = Vec3::new(1.0, 2.0, 3.0);
     /// let point: Point3 = Point3::from(vec);
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 2.0);
-    /// assert_eq!(point.z, 3.0);
+    ///
+    /// assert!((point.x - 1.0).abs() < 1.0e-8);
+    /// assert!((point.y - 2.0).abs() < 1.0e-8);
+    /// assert!((point.z - 3.0).abs() < 1.0e-8);
     /// ```
     fn from(value: Vec3) -> Self {
         Self::new(value.x, value.y, value.z)
@@ -202,11 +225,14 @@ impl From<UVec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, UVec3};
+    ///
     /// let uvec = UVec3::new(0.0, 1.0, 0.0);
     /// let point: Point3 = Point3::from(uvec);
-    /// assert_eq!(point.x, 0.0);
-    /// assert_eq!(point.y, 1.0);
-    /// assert_eq!(point.z, 0.0);
+    ///
+    /// assert!((point.x - 0.0).abs() < 1.0e-8);
+    /// assert!((point.y - 1.0).abs() < 1.0e-8);
+    /// assert!((point.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn from(value: UVec3) -> Self {
         Self::new(value.x, value.y, value.z)
@@ -223,17 +249,21 @@ impl TryFrom<HVec3> for Point3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Point3, PointError, HVec3};
+    ///
     /// // если hvec - точка
     /// let hvec_position = HVec3::new(1.0, 2.0, 3.0, 1.0);
     /// let point = Point3::try_from(hvec_position).unwrap();
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 2.0);
-    /// assert_eq!(point.z, 3.0);
+    ///
+    /// assert!((point.x - 1.0).abs() < 1.0e-8);
+    /// assert!((point.y - 2.0).abs() < 1.0e-8);
+    /// assert!((point.z - 3.0).abs() < 1.0e-8);
     ///
     /// // если hvec - направление
     /// let hvec_direction = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let err = Point3::try_from(hvec_direction).unwrap_err();
-    /// assert_eq!(err, PointError(hvec_direction));
+    ///
+    /// assert_eq!(err, PointError::new(hvec_direction));
     /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
         if value.w == 0.0 {
@@ -252,8 +282,14 @@ impl TryFrom<HVec3> for Point3 {
 ///
 /// Возникает когда компонента `w=0`, то есть `HVec3` обозначает направление,
 /// поэтому не может быть точкой.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PointError(HVec3);
+
+impl PointError {
+    pub fn new(hvec: HVec3) -> Self {
+        Self(hvec)
+    }
+}
 
 impl Display for PointError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

@@ -231,7 +231,7 @@ impl Mesh {
 
         Mesh {
             vertexes,
-            polygons: Vec::new(),
+            polygons,
             local_frame: CoordFrame::global(),
             normals,
             texture_coords,
@@ -909,6 +909,23 @@ mod mesh_tests {
     }
 
     #[test]
+    fn test_generated_normals() {
+        let cube = generate_cube();
+
+        let local_normals: Vec<UVec3> = cube.get_local_normals_iter().unwrap().collect();
+
+        // у куба не могут быть все нормали быть одинаковыми
+        let mut are_same = local_normals[0] == local_normals[1];
+        for i in 1..(local_normals.len() - 1) {
+            if !are_same {
+                break;
+            }
+            are_same = local_normals[i] == local_normals[i + 1];
+        }
+        assert!(!are_same, "у куба нормали не могут быть одинаковыми");
+    }
+
+    #[test]
     fn test_normals_local_translated() {
         let mut cube = generate_cube();
         cube.local_frame.origin.y += 5.0;
@@ -932,38 +949,23 @@ mod mesh_tests {
 
         let global_normals: Vec<UVec3> = cube.get_global_normals_iter().unwrap().collect();
 
-        // генерируем нормали сразу в глобальных координатах
-        let global_vertexes: Vec<Point3> = cube.get_global_vertex_iter().collect();
-        let mut normals = vec![Vec3::zero(); global_vertexes.len()];
-        let mut face_count = vec![0; global_vertexes.len()];
-        let mesh_center = utils::calculate_center(&global_vertexes);
-
-        // Для каждого полигона вычисляем нормаль и добавляем её к вершинам
-        // получается, что нормали в вершинах вычисляются усреднением(будет ниже) нормалей смежных граней(как в презентации)
+        // проверяем, что усреднённые нормали всё ещё перпендикулярны полигонам
         for polygon in cube.get_polygon_iter() {
-            let poly_normal = polygon.plane_normal(&cube, Some(mesh_center));
-
-            for vertex_index in polygon.get_mesh_vertex_index_iter() {
-                normals[vertex_index] = normals[vertex_index] + poly_normal;
-                face_count[vertex_index] += 1;
+            let mut normal = Vec3::zero();
+            for index in polygon.get_mesh_vertex_index_iter() {
+                normal += global_normals[index];
             }
-        }
-
-        // Усредняем нормали
-        for i in 0..normals.len() {
-            if face_count[i] > 0 {
-                normals[i] = normals[i] * (1.0 / face_count[i] as f32);
-            }
-        }
-
-        let recalculated_normals: Vec<UVec3> = normals
-            .iter()
-            .map(|&v| v.normalize().unwrap_or(UVec3::new(0.0, 0.0, 1.0)))
-            .collect();
-
-        // проверка на корректность поворота нормалей
-        for i in 0..global_normals.len() {
-            assert_uvecs(global_normals[i], recalculated_normals[i], TOLERANCE);
+            let normal = (normal / polygon.vertex_count() as f32)
+                .normalize()
+                .unwrap();
+            let v0 = polygon.get_global_vertex(&cube, 0);
+            let v1 = polygon.get_global_vertex(&cube, 1);
+            let edge = (v1 - v0).normalize().unwrap();
+            assert!(
+                edge.dot(normal).abs() < TOLERANCE,
+                "полученный усреднённый вектор должен быть перпендикулярен полигону, но их dot произведение ={}",
+                edge.dot(normal)
+            );
         }
     }
 }

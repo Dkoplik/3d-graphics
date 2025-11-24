@@ -10,10 +10,10 @@ mod uvec3;
 mod vec3;
 
 // re-export модулей в этот модуль
-pub use hvec3::HVec3;
-pub use line3::Line3;
-pub use plane::Plane;
-pub use point3::Point3;
-pub use transform3::Transform3D;
-pub use uvec3::UVec3;
-pub use vec3::Vec3;
+pub use hvec3::*;
+pub use line3::*;
+pub use plane::*;
+pub use point3::*;
+pub use transform3::*;
+pub use uvec3::*;
+pub use vec3::*;

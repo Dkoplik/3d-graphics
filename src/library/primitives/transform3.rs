@@ -46,12 +46,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// use g3d::{Transform3D, HVec3};
+    ///
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
     /// let transform = Transform3D::identity();
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 2.0);
-    /// assert_eq!(res.z, 3.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 2.0).abs() < 1.0e-6);
+    /// assert!((res.z - 3.0).abs() < 1.0e-6);
     /// ```
     pub fn identity() -> Self {
         Self {
@@ -70,12 +73,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// use g3d::{Transform3D, HVec3};
+    ///
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
     /// let transform = Transform3D::translation_uniform(3.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 4.0);
-    /// assert_eq!(res.y, 5.0);
-    /// assert_eq!(res.z, 6.0);
+    ///
+    /// assert!((res.x - 4.0).abs() < 1.0e-6);
+    /// assert!((res.y - 5.0).abs() < 1.0e-6);
+    /// assert!((res.z - 6.0).abs() < 1.0e-6);
     /// ```
     pub fn translation_uniform(d: f32) -> Self {
         Self::translation(d, d, d)
@@ -88,12 +94,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// use g3d::{Transform3D, HVec3};
+    ///
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
     /// let transform = Transform3D::translation(-1.0, 2.0, 1.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 0.0);
-    /// assert_eq!(res.y, 4.0);
-    /// assert_eq!(res.z, 4.0);
+    ///
+    /// assert!((res.x - 0.0).abs() < 1.0e-6);
+    /// assert!((res.y - 4.0).abs() < 1.0e-6);
+    /// assert!((res.z - 4.0).abs() < 1.0e-6);
     /// ```
     pub fn translation(dx: f32, dy: f32, dz: f32) -> Self {
         Self {
@@ -110,12 +119,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
-    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
+    /// use g3d::{Transform3D, HVec3, Vec3};
+    ///
+    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
     /// let transform = Transform3D::translation_vec(Vec3::new(-1.0, 2.0, 1.0));
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 0.0);
-    /// assert_eq!(res.y, 4.0);
-    /// assert_eq!(res.z, 4.0);
+    ///
+    /// assert!((res.x - 0.0).abs() < 1.0e-6);
+    /// assert!((res.y - 4.0).abs() < 1.0e-6);
+    /// assert!((res.z - 4.0).abs() < 1.0e-6);
     /// ```
     pub fn translation_vec(delta: Vec3) -> Self {
         Self::translation(delta.x, delta.y, delta.z)
@@ -127,12 +139,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::scale_uniform(2.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 2.0);
-    /// assert_eq!(res.y, 4.0);
-    /// assert_eq!(res.z, 6.0);
+    ///
+    /// assert!((res.x - 2.0).abs() < 1.0e-6);
+    /// assert!((res.y - 4.0).abs() < 1.0e-6);
+    /// assert!((res.z - 6.0).abs() < 1.0e-6);
     /// ```
     pub fn scale_uniform(s: f32) -> Self {
         Self::scale(s, s, s)
@@ -144,12 +159,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::scale(2.0, -2.0, 3.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 2.0);
-    /// assert_eq!(res.y, -4.0);
-    /// assert_eq!(res.z, 9.0);
+    ///
+    /// assert!((res.x - 2.0).abs() < 1.0e-6);
+    /// assert!((res.y - -4.0).abs() < 1.0e-6);
+    /// assert!((res.z - 9.0).abs() < 1.0e-6);
     /// ```
     pub fn scale(sx: f32, sy: f32, sz: f32) -> Self {
         Self {
@@ -166,12 +184,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::rotation_x_rad((180.0 as f32).to_radians());
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, -2.0);
-    /// assert_eq!(res.z, -3.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y + 2.0).abs() < 1.0e-6);
+    /// assert!((res.z + 3.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_x_rad(angle: f32) -> Self {
         let cos_a = angle.cos();
@@ -191,12 +212,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::rotation_x_deg(180.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, -2.0);
-    /// assert_eq!(res.z, -3.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y + 2.0).abs() < 1.0e-6);
+    /// assert!((res.z + 3.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_x_deg(angle: f32) -> Self {
         Self::rotation_x_rad(angle.to_radians())
@@ -206,12 +230,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::rotation_y_rad((180.0 as f32).to_radians());
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, -1.0);
-    /// assert_eq!(res.y, 2.0);
-    /// assert_eq!(res.z, -3.0);
+    ///
+    /// assert!((res.x + 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 2.0).abs() < 1.0e-6);
+    /// assert!((res.z + 3.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_y_rad(angle: f32) -> Self {
         let cos_a = angle.cos();
@@ -231,12 +258,16 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::rotation_y_deg(180.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, -1.0);
-    /// assert_eq!(res.y, 2.0);
-    /// assert_eq!(res.z, -3.0);
+    ///
+    /// assert!((res.x + 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 2.0).abs() < 1.0e-6);
+    /// assert!((res.z + 3.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_y_deg(angle: f32) -> Self {
         Self::rotation_y_rad(angle.to_radians())
@@ -246,12 +277,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::rotation_z_rad((180.0 as f32).to_radians());
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, -1.0);
-    /// assert_eq!(res.y, -2.0);
-    /// assert_eq!(res.z, 3.0);
+    ///
+    /// assert!((res.x + 1.0).abs() < 1.0e-6);
+    /// assert!((res.y + 2.0).abs() < 1.0e-6);
+    /// assert!((res.z - 3.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_z_rad(angle: f32) -> Self {
         let cos_a = angle.cos();
@@ -271,12 +305,15 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::rotation_z_deg(180.0);
     /// let res = hvec * transform;
-    /// assert_eq!(res.x, -1.0);
-    /// assert_eq!(res.y, -2.0);
-    /// assert_eq!(res.z, 3.0);
+    ///
+    /// assert!((res.x + 1.0).abs() < 1.0e-6);
+    /// assert!((res.y + 2.0).abs() < 1.0e-6);
+    /// assert!((res.z - 3.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_z_deg(angle: f32) -> Self {
         Self::rotation_z_rad(angle.to_radians())
@@ -318,6 +355,8 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3, UVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let local_forward = UVec3::up();
     /// let local_right = UVec3::right();
@@ -325,9 +364,9 @@ impl Transform3D {
     /// let transform = Transform3D::rotation_to_basis(local_forward, local_right, local_up);
     /// let res = hvec * transform;
     ///
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, -3.0);
-    /// assert_eq!(res.z, 2.0);
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y + 3.0).abs() < 1.0e-6);
+    /// assert!((res.z - 2.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_to_basis(forward: UVec3, right: UVec3, up: UVec3) -> Self {
         debug_assert_eq!(
@@ -356,6 +395,8 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3, UVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let local_forward = UVec3::up();
     /// let local_right = UVec3::right();
@@ -363,9 +404,9 @@ impl Transform3D {
     /// let transform = Transform3D::rotation_from_basis(local_forward, local_right, local_up);
     /// let res = hvec * transform;
     ///
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 3.0);
-    /// assert_eq!(res.z, -2.0);
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 3.0).abs() < 1.0e-6);
+    /// assert!((res.z + 2.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_from_basis(forward: UVec3, right: UVec3, up: UVec3) -> Self {
         debug_assert_eq!(
@@ -400,15 +441,17 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3, Point3};
+    ///
     /// let anchor = Point3::new(1.0, 1.0, 1.0);
     /// let scale = Transform3D::scale_relative_to_point(anchor, 2.0, 3.0, 4.0);
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 1.0);
-    /// let res = hvec * transform;
+    /// let res = hvec * scale;
     ///
-    /// asssert_eq!(res.x, 1.0);
-    /// asssert_eq!(res.y, 3.0);
-    /// asssert_eq!(res.z, 8.0);
-    /// asssert_eq!(res.w, 1.0);
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 4.0).abs() < 1.0e-6);
+    /// assert!((res.z - 9.0).abs() < 1.0e-6);
+    /// assert!((res.w - 1.0).abs() < 1.0e-6);
     /// ```
     pub fn scale_relative_to_point(anchor: Point3, sx: f32, sy: f32, sz: f32) -> Self {
         // Перенос якоря в начало координат -> масштабирование -> обратный перенос
@@ -421,14 +464,16 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::reflection_xy();
     /// let res = hvec * transform;
     ///
-    /// asssert_eq!(res.x, 1.0);
-    /// asssert_eq!(res.y, 2.0);
-    /// asssert_eq!(res.z, -3.0);
-    /// asssert_eq!(res.w, 0.0);
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 2.0).abs() < 1.0e-6);
+    /// assert!((res.z - -3.0).abs() < 1.0e-6);
+    /// assert!((res.w - 0.0).abs() < 1.0e-6);
     /// ```
     pub fn reflection_xy() -> Self {
         Self::scale(1.0, 1.0, -1.0)
@@ -438,14 +483,16 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::reflection_xz();
     /// let res = hvec * transform;
     ///
-    /// asssert_eq!(res.x, 1.0);
-    /// asssert_eq!(res.y, -2.0);
-    /// asssert_eq!(res.z, 3.0);
-    /// asssert_eq!(res.w, 0.0);
+    /// assert!((res.x - 1.0).abs() < 1.0e-6);
+    /// assert!((res.y - -2.0).abs() < 1.0e-6);
+    /// assert!((res.z - 3.0).abs() < 1.0e-6);
+    /// assert!((res.w - 0.0).abs() < 1.0e-6);
     /// ```
     pub fn reflection_xz() -> Self {
         Self::scale(1.0, -1.0, 1.0)
@@ -455,14 +502,16 @@ impl Transform3D {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Transform3D, HVec3};
+    ///
     /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
     /// let transform = Transform3D::reflection_yz();
     /// let res = hvec * transform;
     ///
-    /// asssert_eq!(res.x, -1.0);
-    /// asssert_eq!(res.y, 2.0);
-    /// asssert_eq!(res.z, 3.0);
-    /// asssert_eq!(res.w, 0.0);
+    /// assert!((res.x - -1.0).abs() < 1.0e-6);
+    /// assert!((res.y - 2.0).abs() < 1.0e-6);
+    /// assert!((res.z - 3.0).abs() < 1.0e-6);
+    /// assert!((res.w - 0.0).abs() < 1.0e-6);
     /// ```
     pub fn reflection_yz() -> Self {
         Self::scale(-1.0, 1.0, 1.0)
@@ -471,19 +520,6 @@ impl Transform3D {
     /// Создаёт матрицу поворота, которая совмещает вектор `from` с вектором `to`.
     ///
     /// Оба вектора должны быть нормализованы (иметь длину 1).
-    ///
-    /// # Examples
-    /// ```rust
-    /// let hvec = HVec3::new(1.0, 2.0, 3.0, 0.0);
-    /// let from = UVec3::forward();
-    /// let to = UVec3::up();
-    /// let transform = Transform3D::rotation_aligning(from, to);
-    /// let res = hvec * transform;
-    ///
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, -3.0);
-    /// assert_eq!(res.z, 2.0);
-    /// ```
     pub fn rotation_aligning(from: UVec3, to: UVec3) -> Self {
         if from.approx_equal(to, 1e-9) {
             return Self::identity();
@@ -1427,6 +1463,19 @@ mod tests {
             (135.0 as f32).to_radians().cos(),
         ); // поворот на 45 градусов от глобального up к backward
         let rotation = Transform3D::rotation_to_basis(forward, right, up);
+        let inverse_rotation = rotation.inverse().expect("Should have inverse");
+
+        let test_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);
+        let rotated = rotation.apply_to_hvec(test_vec);
+        let restored_rotation = inverse_rotation.apply_to_hvec(rotated);
+
+        assert_hvecs(restored_rotation, test_vec, TOLERANCE);
+    }
+
+    #[test]
+    fn test_inverse_align_rotation() {
+        // Тест обратной матрицы для поворота
+        let rotation = Transform3D::rotation_aligning(UVec3::forward(), UVec3::up());
         let inverse_rotation = rotation.inverse().expect("Should have inverse");
 
         let test_vec = HVec3::new(1.0, 2.0, 3.0, 1.0);

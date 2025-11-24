@@ -465,17 +465,23 @@ mod model_tests {
     #[test]
     fn test_translated() {
         let mut cube = Model::from_mesh(Mesh::hexahedron());
-        // сдвиг по y
+        // сдвиг по x
         cube.move_x(10.0);
 
         let global_normals: Vec<UVec3> = cube.mesh.get_global_normals_iter().unwrap().collect();
         let local_normals: Vec<UVec3> = cube.mesh.get_local_normals_iter().unwrap().collect();
+        for i in 0..global_normals.len() {
+            assert_uvecs(global_normals[i], local_normals[i], TOLERANCE);
+        }
+
         let global_vertexes: Vec<Point3> = cube.mesh.get_global_vertex_iter().collect();
         let local_vertexes: Vec<Point3> = cube.mesh.get_local_vertex_iter().collect();
         for i in 0..global_normals.len() {
-            let delta_normal = global_normals[i] - local_normals[i];
-            let delta_vertex = global_vertexes[i] - local_vertexes[i];
-            assert_vecs(delta_normal, delta_vertex, TOLERANCE);
+            assert_points(
+                global_vertexes[i],
+                local_vertexes[i] + Vec3::new(10.0, 0.0, 0.0),
+                TOLERANCE,
+            );
         }
     }
 }

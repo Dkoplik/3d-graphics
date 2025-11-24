@@ -18,9 +18,11 @@ impl Line3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Line3, Point3, UVec3};
+    ///
     /// let line = Line3::new(Point3::new(1.0, 2.0, 3.0), UVec3::new(1.0, 0.0, 0.0));
-    /// assert!(line.origin.approx_equal(Point3::new(1.0, 2.0, 3.0)));
-    /// assert!(line.direction.approx_equal(UVec3::new(1.0, 0.0, 0.0)));
+    /// assert!(line.origin.approx_equal(Point3::new(1.0, 2.0, 3.0), 1.0e-8));
+    /// assert!(line.direction.approx_equal(UVec3::new(1.0, 0.0, 0.0), 1.0e-8));
     /// ```
     pub fn new(origin: Point3, direction: UVec3) -> Self {
         Self { origin, direction }
@@ -30,11 +32,14 @@ impl Line3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Line3, Point3, UVec3};
+    ///
     /// let p1 = Point3::new(1.0, 2.0, 3.0);
     /// let p2 = Point3::new(2.0, 2.0, 3.0);
     /// let line = Line3::from_points(p1, p2);
-    /// assert!(line.origin.approx_equal(Point3::new(1.0, 2.0, 3.0)));
-    /// assert!(line.direction.approx_equal(UVec3::new(1.0, 0.0, 0.0)));
+    ///
+    /// assert!(line.origin.approx_equal(Point3::new(1.0, 2.0, 3.0), 1.0e-8));
+    /// assert!(line.direction.approx_equal(UVec3::new(1.0, 0.0, 0.0), 1.0e-8));
     /// ```
     pub fn from_points(p1: Point3, p2: Point3) -> Self {
         debug_assert_ne!(

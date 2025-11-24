@@ -30,10 +30,11 @@ impl UVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let uvec = UVec3::new(0.0, 2.0, 3.0) // длина = 4;
-    /// assert_eq!(uvec.x, 0.0);
-    /// assert_eq!(uvec.y, 2.0 / 4.0);
-    /// assert_eq!(uvec.z, 3.0 / 4.0);
+    /// let uvec = g3d::UVec3::new(0.0, 3.0, 4.0); // длина = 5;
+    ///
+    /// assert!((uvec.x - 0.0).abs() < 1.0e-8);
+    /// assert!((uvec.y - 3.0 / 5.0).abs() < 1.0e-8);
+    /// assert!((uvec.z - 4.0 / 5.0).abs() < 1.0e-8);
     /// ```
     pub fn new(x: f32, y: f32, z: f32) -> Self {
         let len = (x * x + y * y + z * z).sqrt();
@@ -155,8 +156,9 @@ impl UVec3 {
     /// # Examples
     /// ```rust
     /// // Перпендикулярные вектора
-    /// let v3 = UVec3::new(1.0, 0.0, 0.0);
-    /// let v4 = UVec3::new(0.0, 1.0, 0.0);
+    /// let v3 = g3d::UVec3::new(1.0, 0.0, 0.0);
+    /// let v4 = g3d::UVec3::new(0.0, 1.0, 0.0);
+    ///
     /// assert_eq!(v3.dot(v4), 0.0);
     /// ```
     #[inline]
@@ -168,15 +170,17 @@ impl UVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let v1 = UVec3::new(1.0, 0.0, 0.0);
-    /// let v2 = UVec3::new(0.2, 0.8, 0.0);
+    /// let v1 = g3d::UVec3::new(1.0, 0.0, 0.0);
+    /// let v2 = g3d::UVec3::new(0.2, 0.8, 0.0);
     /// let dot = v1.dot(v2);
+    ///
     /// assert!(0.0 < dot);
     /// assert!(dot < 1.0);
     ///
     /// // Перпендикулярные вектора
-    /// let v3 = UVec3::new(1.0, 0.0, 0.0);
-    /// let v4 = UVec3::new(0.0, 1.0, 0.0);
+    /// let v3 = g3d::UVec3::new(1.0, 0.0, 0.0);
+    /// let v4 = g3d::UVec3::new(0.0, 1.0, 0.0);
+    ///
     /// assert_eq!(v3.cos(v4), 0.0);
     /// ```
     #[inline]
@@ -201,9 +205,10 @@ impl UVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = UVec3::new(0.6, 0.8, 0.0);
-    /// let onto = UVec3::new(0.0, 1.0, 0.0);
+    /// let vec = g3d::UVec3::new(0.6, 0.8, 0.0);
+    /// let onto = g3d::UVec3::new(0.0, 1.0, 0.0);
     /// let projection = vec.projection(onto);
+    ///
     /// assert_eq!(projection.x, 0.0);
     /// assert_eq!(projection.y, 0.8);
     /// assert_eq!(projection.z, 0.0);
@@ -217,9 +222,10 @@ impl UVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let vec = UVec3::new(0.6, 0.8, 0.0);
-    /// let onto = UVec3::new(0.0, 1.0, 0.0);
+    /// let vec = g3d::UVec3::new(0.6, 0.8, 0.0);
+    /// let onto = g3d::UVec3::new(0.0, 1.0, 0.0);
     /// let rejection = vec.rejection(onto);
+    ///
     /// assert_eq!(rejection.x, 0.6);
     /// assert_eq!(rejection.y, 0.0);
     /// assert_eq!(rejection.z, 0.0);
@@ -238,9 +244,12 @@ impl UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let vec_x = UVec3::plus_x();
     /// let vec_y = UVec3::plus_y();
     /// let vec_z: Vec3 = vec_x.cross(vec_y);
+    ///
     /// assert_eq!(vec_z.x, 0.0);
     /// assert_eq!(vec_z.y, 0.0);
     /// assert_eq!(vec_z.z, 1.0);
@@ -279,8 +288,9 @@ impl Neg for UVec3 {
     ///
     /// # Examples
     /// ```rust
-    /// let uvec = UVec3::new(1.0, 0.0, 0.0);
+    /// let uvec = g3d::UVec3::new(1.0, 0.0, 0.0);
     /// let neg_uvec = -uvec;
+    ///
     /// assert_eq!(neg_uvec.x, -1.0);
     /// assert_eq!(neg_uvec.y, 0.0);
     /// assert_eq!(neg_uvec.z, 0.0);
@@ -301,12 +311,15 @@ impl Add for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let v1 = UVec3::new(1.0, 0.0, 0.0);
     /// let v2 = UVec3::new(0.0, 1.0, 0.0);
     /// let res: Vec3 = v1 + v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 1.0);
-    /// assert_eq!(res.z, 0.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y - 1.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn add(self, rhs: Self) -> Self::Output {
         Vec3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -320,12 +333,15 @@ impl Add<Vec3> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let v1 = UVec3::new(1.0, 0.0, 0.0);
     /// let v2 = Vec3::new(0.0, 2.0, 0.0);
     /// let res: Vec3 = v1 + v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, 2.0);
-    /// assert_eq!(res.z, 0.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y - 2.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn add(self, rhs: Vec3) -> Self::Output {
         Vec3::new(self.x + rhs.x, self.y + rhs.y, self.z + rhs.z)
@@ -339,12 +355,15 @@ impl Sub for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let v1 = UVec3::new(1.0, 0.0, 0.0);
     /// let v2 = UVec3::new(0.0, 1.0, 0.0);
     /// let res: Vec3 = v1 - v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, -1.0);
-    /// assert_eq!(res.z, 0.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y + 1.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn sub(self, rhs: Self) -> Self::Output {
         self + (-rhs)
@@ -358,12 +377,15 @@ impl Sub<Vec3> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let v1 = UVec3::new(1.0, 0.0, 0.0);
-    /// let v2 = UVec3::new(0.0, 2.0, 0.0);
+    /// let v2 = Vec3::new(0.0, 2.0, 0.0);
     /// let res: Vec3 = v1 - v2;
-    /// assert_eq!(res.x, 1.0);
-    /// assert_eq!(res.y, -2.0);
-    /// assert_eq!(res.z, 0.0);
+    ///
+    /// assert!((res.x - 1.0).abs() < 1.0e-8);
+    /// assert!((res.y + 2.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn sub(self, rhs: Vec3) -> Self::Output {
         self + (-rhs)
@@ -377,11 +399,14 @@ impl Mul<f32> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let uvec = UVec3::new(1.0, 0.0, 0.0);
-    /// let res: Vec3 = v1 * 2.0;
-    /// assert_eq!(res.x, 2.0);
-    /// assert_eq!(res.y, 0.0);
-    /// assert_eq!(res.z, 0.0);
+    /// let res: Vec3 = uvec * 2.0;
+    ///
+    /// assert!((res.x - 2.0).abs() < 1.0e-8);
+    /// assert!((res.y - 0.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn mul(self, rhs: f32) -> Self::Output {
         Vec3::new(self.x * rhs, self.y * rhs, self.z * rhs)
@@ -395,11 +420,14 @@ impl Mul<UVec3> for f32 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let uvec = UVec3::new(1.0, 0.0, 0.0);
-    /// let res: Vec3 = 2.0 * v1;
-    /// assert_eq!(res.x, 2.0);
-    /// assert_eq!(res.y, 0.0);
-    /// assert_eq!(res.z, 0.0);
+    /// let res: Vec3 = 2.0 * uvec;
+    ///
+    /// assert!((res.x - 2.0).abs() < 1.0e-8);
+    /// assert!((res.y - 0.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```
     fn mul(self, rhs: UVec3) -> Self::Output {
         rhs * self
@@ -413,11 +441,14 @@ impl Div<f32> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Vec3};
+    ///
     /// let uvec = UVec3::new(1.0, 0.0, 0.0);
-    /// let res: Vec3 = v1 / 2.0;
-    /// assert_eq!(res.x, 0.5);
-    /// assert_eq!(res.y, 0.0);
-    /// assert_eq!(res.z, 0.0);
+    /// let res: Vec3 = uvec / 2.0;
+    ///
+    /// assert!((res.x - 0.5).abs() < 1.0e-8);
+    /// assert!((res.y - 0.0).abs() < 1.0e-8);
+    /// assert!((res.z - 0.0).abs() < 1.0e-8);
     /// ```    
     fn div(self, rhs: f32) -> Self::Output {
         Vec3::new(self.x / rhs, self.y / rhs, self.z / rhs)
@@ -431,16 +462,20 @@ impl TryFrom<Vec3> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, UVecError, Vec3, Point3};
+    ///
     /// // если vec не нулевой
     /// let vec = Vec3::new(5.0, 0.0, 0.0);
     /// let uvec = UVec3::try_from(vec).unwrap();
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 0.0);
-    /// assert_eq!(point.z, 0.0);
+    ///
+    /// assert_eq!(uvec.x, 1.0);
+    /// assert_eq!(uvec.y, 0.0);
+    /// assert_eq!(uvec.z, 0.0);
     ///
     /// // если vec - нулевой
-    /// vec = Vec3::zero();
-    /// let err = Point3::try_from(vec).unwrap_err();
+    /// let vec = Vec3::zero();
+    ///
+    /// let err = UVec3::try_from(vec).unwrap_err();
     /// assert_eq!(err, UVecError::ZeroVec);
     /// ```
     fn try_from(value: Vec3) -> Result<Self, Self::Error> {
@@ -459,16 +494,20 @@ impl TryFrom<Point3> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, Point3, UVecError};
+    ///
     /// // если point не нулевой
     /// let point = Point3::new(5.0, 0.0, 0.0);
     /// let uvec = UVec3::try_from(point).unwrap();
-    /// assert_eq!(point.x, 1.0);
-    /// assert_eq!(point.y, 0.0);
-    /// assert_eq!(point.z, 0.0);
+    ///
+    /// assert_eq!(uvec.x, 1.0);
+    /// assert_eq!(uvec.y, 0.0);
+    /// assert_eq!(uvec.z, 0.0);
     ///
     /// // если point - нулевой
-    /// point = Point3::zero();
-    /// let err = Point3::try_from(point).unwrap_err();
+    /// let point = Point3::zero();
+    /// let err = UVec3::try_from(point).unwrap_err();
+    ///
     /// assert_eq!(err, UVecError::ZeroPoint);
     /// ```
     fn try_from(value: Point3) -> Result<Self, Self::Error> {
@@ -490,16 +529,20 @@ impl TryFrom<HVec3> for UVec3 {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{UVec3, HVec3, Point3, UVecError};
+    ///
     /// // если hvec - направление
     /// let hvec_direction = HVec3::new(0.0, 0.0, 3.0, 0.0);
     /// let uvec = UVec3::try_from(hvec_direction).unwrap();
-    /// assert_eq!(uvec.x, 0.0);
-    /// assert_eq!(uvec.y, 0.0);
-    /// assert_eq!(uvec.z, 1.0);
+    ///
+    /// assert!((uvec.x - 0.0).abs() < 1.0e-8);
+    /// assert!((uvec.y - 0.0).abs() < 1.0e-8);
+    /// assert!((uvec.z - 1.0).abs() < 1.0e-8);
     ///
     /// // если hvec - точка
     /// let hvec_position = HVec3::new(1.0, 2.0, 3.0, 1.0);
-    /// let err = Point3::try_from(hvec_position).unwrap_err();
+    ///
+    /// let err = UVec3::try_from(hvec_position).unwrap_err();
     /// assert_eq!(err, UVecError::PositionHVec(hvec_position));
     /// ```
     fn try_from(value: HVec3) -> Result<Self, Self::Error> {
@@ -514,7 +557,7 @@ impl TryFrom<HVec3> for UVec3 {
 }
 
 /// Ошибки при преобразовании в UVec
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum UVecError {
     /// Vec3 является нулевым
     ZeroVec,

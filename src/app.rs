@@ -47,10 +47,10 @@ pub struct AthenianApp {
 
     // график функции
     selected_surface_function: g3d::SurfaceFunction,
-    surface_x_min: f64,
-    surface_x_max: f64,
-    surface_y_min: f64,
-    surface_y_max: f64,
+    surface_x_min: f32,
+    surface_x_max: f32,
+    surface_y_min: f32,
+    surface_y_max: f32,
     surface_divisions: usize,
 }
 

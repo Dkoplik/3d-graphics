@@ -18,9 +18,12 @@ impl Plane {
     ///
     /// # Examples
     /// ```rust
+    /// use g3d::{Plane, Point3, UVec3};
+    ///
     /// let plane = Plane::new(Point3::new(1.0, 2.0, 3.0), UVec3::new(1.0, 0.0, 0.0));
-    /// assert!(plane.origin.approx_equal(Point3::new(1.0, 2.0, 3.0)));
-    /// assert!(plane.normal.approx_equal(UVec3::new(1.0, 0.0, 0.0)));
+    ///
+    /// assert!(plane.origin.approx_equal(Point3::new(1.0, 2.0, 3.0), 1.0e-8));
+    /// assert!(plane.normal.approx_equal(UVec3::new(1.0, 0.0, 0.0), 1.0e-8));
     /// ```
     pub fn new(origin: Point3, normal: UVec3) -> Self {
         Self { origin, normal }
