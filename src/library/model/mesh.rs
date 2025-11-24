@@ -648,11 +648,9 @@ impl Mesh {
     pub fn get_global_normal(&self, i: usize) -> Option<UVec3> {
         // нормали ведут себя по-другому и умножаются на инвертированную матрицу.
         // так как нормаль вектор - то смещение применено не будет, тут всё ок
-        let transform = self
-            .local_frame
-            .local_to_global_matrix()
-            .inverse()
-            .expect("Ожидалось наличие обратной матрицы");
+        let transform = self.local_frame.local_to_global_matrix();
+        // .inverse()
+        // .expect("Ожидалось наличие обратной матрицы");
         let local_normal = self.get_local_normal(i)?;
         Some(local_normal.apply_transform(transform).unwrap())
     }
@@ -695,11 +693,9 @@ impl Mesh {
     pub fn get_global_normals_iter(&self) -> Option<impl Iterator<Item = UVec3>> {
         // нормали ведут себя по-другому и умножаются на инвертированную матрицу.
         // так как нормаль вектор - то смещение применено не будет, тут всё ок
-        let transform = self
-            .local_frame
-            .local_to_global_matrix()
-            .inverse()
-            .expect("Ожидалось наличие обратной матрицы");
+        let transform = self.local_frame.local_to_global_matrix();
+        // .inverse()
+        // .expect("Ожидалось наличие обратной матрицы");
         Some(
             self.get_local_normals_iter()?
                 .map(move |n| (n.apply_transform(transform).unwrap())),

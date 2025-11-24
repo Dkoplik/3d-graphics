@@ -48,10 +48,10 @@ impl Shader for SolidShader {
                 let v3 = projected_vertexes[i3];
 
                 // текстурные UV-координаты вершин треугольника
-                let tx0 = polygon.get_texture_coord(&model.mesh, i0).unwrap();
-                let tx1 = polygon.get_texture_coord(&model.mesh, i1).unwrap();
-                let tx2 = polygon.get_texture_coord(&model.mesh, i2).unwrap();
-                let tx3 = polygon.get_texture_coord(&model.mesh, i3).unwrap();
+                let tx0 = model.mesh.get_texture_coord(i0).unwrap();
+                let tx1 = model.mesh.get_texture_coord(i1).unwrap();
+                let tx2 = model.mesh.get_texture_coord(i2).unwrap();
+                let tx3 = model.mesh.get_texture_coord(i3).unwrap();
 
                 // ограничивающий прямоугольник
                 let min_x = *vec![v0.x as usize, v1.x as usize, v2.x as usize, v3.x as usize]
@@ -122,9 +122,9 @@ impl Shader for SolidShader {
                     let v2 = projected_vertexes[i2];
 
                     // текстурные UV-координаты вершин треугольника
-                    let tx0 = polygon.get_texture_coord(&model.mesh, i0).unwrap();
-                    let tx1 = polygon.get_texture_coord(&model.mesh, i1).unwrap();
-                    let tx2 = polygon.get_texture_coord(&model.mesh, i2).unwrap();
+                    let tx0 = model.mesh.get_texture_coord(i0).unwrap();
+                    let tx1 = model.mesh.get_texture_coord(i1).unwrap();
+                    let tx2 = model.mesh.get_texture_coord(i2).unwrap();
 
                     // ограничивающий прямоугольник
                     let min_x = v0.x.min(v1.x.min(v2.x)) as usize;

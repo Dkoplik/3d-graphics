@@ -195,7 +195,11 @@ pub fn interpolate_color(
     let alpha = bary.x;
     let beta = bary.y;
     let gamma = bary.z;
-    a.gamma_multiply(alpha) + b.gamma_multiply(beta) + c.gamma_multiply(gamma)
+    egui::Color32::from_rgb(
+        (alpha * a.r() as f32 + beta * b.r() as f32 + gamma * c.r() as f32) as u8,
+        (alpha * a.g() as f32 + beta * b.g() as f32 + gamma * c.g() as f32) as u8,
+        (alpha * a.b() as f32 + beta * b.b() as f32 + gamma * c.b() as f32) as u8,
+    )
 }
 
 /// Билинейная интерполяция цвета.

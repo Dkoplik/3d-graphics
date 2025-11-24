@@ -336,14 +336,19 @@ fn draw_lights(
     canvas: &mut Canvas,
 ) {
     for light in lights {
-        let light_pos = light
-            .position
-            .apply_transform(global_to_screen_transform)
-            .unwrap();
-        let pos = Pos2::new(light_pos.x, light_pos.y);
-        let radius = utils::lerp_float(15.0, 3.0, (light_pos.z + 1.0) / 2.0);
-        if pos.x < canvas.width() as f32 && pos.y < canvas.height() as f32 {
-            canvas.circle_filled(pos, radius, light.color);
+        let light_pos = light.position.apply_transform(global_to_screen_transform);
+        if let Ok(light_pos) = light_pos {
+            let pos = Pos2::new(light_pos.x, light_pos.y);
+            let radius = utils::lerp_float(6.0, 1.0, (light_pos.z + 1.0) / 2.0);
+            if pos.x < canvas.width() as f32 && pos.y < canvas.height() as f32 {
+                canvas.circle_filled(pos, radius, light.color);
+            }
+        } else {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "Warning: не удалось вывести свет на экран из-за ошибки: {}",
+                light_pos.unwrap_err()
+            );
         }
     }
 }

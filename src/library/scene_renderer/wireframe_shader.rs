@@ -37,26 +37,27 @@ impl Shader for WireframeShader {
         for polygon in polygons {
             // Вершины полигона
             let indexes: Vec<usize> = polygon.get_mesh_vertex_index_iter().collect();
-            let points: Vec<Point3> = indexes
+            let vertexes: Vec<Point3> = indexes
                 .iter()
                 .map(|&index| projected_vertexes[index])
                 .collect();
 
-            // рёбра полигона
-            for i in 0..points.len() {
-                let start = points[i];
-                let end = points[(i + 1) % points.len()];
+            // рисуем рёбра полигона
+            for i in 0..vertexes.len() {
+                let start = vertexes[i];
+                let end = vertexes[(i + 1) % vertexes.len()];
 
                 let start_pos = egui::Pos2::new(start.x, start.y);
                 let end_pos = egui::Pos2::new(end.x, end.y);
                 canvas.draw_sharp_line(start_pos, end_pos, wireframe_color);
             }
-        }
 
-        // Рисуем вершины
-        for vertex in projected_vertexes {
-            let pos = egui::Pos2::new(vertex.x, vertex.y);
-            canvas.circle_filled(pos, 3.0, wireframe_color);
+            // рисуем вершины полигона
+            for i in 0..vertexes.len() {
+                let vertex = vertexes[i];
+                let pos = egui::Pos2::new(vertex.x, vertex.y);
+                canvas.circle_filled(pos, 3.0, wireframe_color);
+            }
         }
     }
 }

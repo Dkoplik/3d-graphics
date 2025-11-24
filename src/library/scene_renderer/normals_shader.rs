@@ -65,7 +65,7 @@ impl Shader for NormalsShader {
             let indexes: Vec<usize> = polygon.get_mesh_vertex_index_iter().collect();
             for index in indexes {
                 polygon_normal += global_normals[index];
-                polygon_pos += global_normals[index];
+                polygon_pos += Vec3::from(global_positions[index]);
             }
             polygon_normal /= polygon.vertex_count() as f32;
             polygon_pos = (Vec3::from(polygon_pos) / polygon.vertex_count() as f32).into();

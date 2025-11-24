@@ -348,16 +348,12 @@ impl Camera {
     ) -> Transform3D {
         // Матрица проекции координат камеры в NDC
         let proj_matrix = match projection_type {
-            ProjectionType::Parallel => {
-                let width = 2.0 * (self.get_fov() / 2.0).sin();
-                let height = width / self.get_aspect_ratio();
-                Transform3D::parallel_symmetric(
-                    width,
-                    height,
-                    self.get_near_plane(),
-                    self.get_far_plane(),
-                )
-            }
+            ProjectionType::Parallel => Transform3D::parallel_from_fov(
+                self.get_fov(),
+                self.get_aspect_ratio(),
+                self.get_near_plane(),
+                self.get_far_plane(),
+            ),
             ProjectionType::Perspective => Transform3D::perspective(
                 self.get_fov(),
                 self.get_aspect_ratio(),

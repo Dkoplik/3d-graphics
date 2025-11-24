@@ -320,7 +320,9 @@ impl Canvas {
 
         for x in from_x..to_x {
             for y in from_y..to_y {
-                if ((x * x + y * y) as f32).sqrt() <= radius {
+                let dx = x as f32 - center.x;
+                let dy = y as f32 - center.y;
+                if (dx * dx + dy * dy).sqrt() <= radius {
                     self[(x, y)] = color;
                 }
             }

@@ -56,7 +56,7 @@ impl Shader for GouraudLambertShader {
         for polygon in polygons {
             // если четырёхугольник - билинейная интерполяция
             if polygon.is_quad() {
-                // индексы вершин
+                // индексы вершин в Mesh
                 let i0 = polygon.get_mesh_vertex_index(0);
                 let i1 = polygon.get_mesh_vertex_index(1);
                 let i2 = polygon.get_mesh_vertex_index(2);
@@ -69,22 +69,22 @@ impl Shader for GouraudLambertShader {
                 let v3 = projected_vertexes[i3];
 
                 // текстурные UV-координаты вершин треугольника
-                let tx0 = polygon.get_texture_coord(&model.mesh, i0).unwrap();
-                let tx1 = polygon.get_texture_coord(&model.mesh, i1).unwrap();
-                let tx2 = polygon.get_texture_coord(&model.mesh, i2).unwrap();
-                let tx3 = polygon.get_texture_coord(&model.mesh, i3).unwrap();
+                let tx0 = model.mesh.get_texture_coord(0).unwrap();
+                let tx1 = model.mesh.get_texture_coord(1).unwrap();
+                let tx2 = model.mesh.get_texture_coord(2).unwrap();
+                let tx3 = model.mesh.get_texture_coord(3).unwrap();
 
                 // глобальные координаты вершин
-                let gv0 = polygon.get_global_vertex(&model.mesh, i0);
-                let gv1 = polygon.get_global_vertex(&model.mesh, i1);
-                let gv2 = polygon.get_global_vertex(&model.mesh, i2);
-                let gv3 = polygon.get_global_vertex(&model.mesh, i3);
+                let gv0 = model.mesh.get_global_vertex(0);
+                let gv1 = model.mesh.get_global_vertex(1);
+                let gv2 = model.mesh.get_global_vertex(2);
+                let gv3 = model.mesh.get_global_vertex(3);
 
                 // глобальные нормали
-                let n0 = polygon.get_global_normal(&model.mesh, i0).unwrap();
-                let n1 = polygon.get_global_normal(&model.mesh, i1).unwrap();
-                let n2 = polygon.get_global_normal(&model.mesh, i2).unwrap();
-                let n3 = polygon.get_global_normal(&model.mesh, i3).unwrap();
+                let n0 = model.mesh.get_global_normal(0).unwrap();
+                let n1 = model.mesh.get_global_normal(1).unwrap();
+                let n2 = model.mesh.get_global_normal(2).unwrap();
+                let n3 = model.mesh.get_global_normal(3).unwrap();
 
                 // освещённость вершин треугольника
                 let light0 = Self::lambert_diffuse(gv0, n0, lights);
@@ -162,19 +162,19 @@ impl Shader for GouraudLambertShader {
                     let v1 = projected_vertexes[i1];
                     let v2 = projected_vertexes[i2];
                     // текстурные UV-координаты вершин треугольника
-                    let tx0 = polygon.get_texture_coord(&model.mesh, i0).unwrap();
-                    let tx1 = polygon.get_texture_coord(&model.mesh, i1).unwrap();
-                    let tx2 = polygon.get_texture_coord(&model.mesh, i2).unwrap();
+                    let tx0 = model.mesh.get_texture_coord(i0).unwrap();
+                    let tx1 = model.mesh.get_texture_coord(i1).unwrap();
+                    let tx2 = model.mesh.get_texture_coord(i2).unwrap();
 
                     // глобальные координаты вершин
-                    let gv0 = polygon.get_global_vertex(&model.mesh, i0);
-                    let gv1 = polygon.get_global_vertex(&model.mesh, i1);
-                    let gv2 = polygon.get_global_vertex(&model.mesh, i2);
+                    let gv0 = model.mesh.get_global_vertex(i0);
+                    let gv1 = model.mesh.get_global_vertex(i1);
+                    let gv2 = model.mesh.get_global_vertex(i2);
 
                     // глобальные нормали
-                    let n0 = polygon.get_global_normal(&model.mesh, i0).unwrap();
-                    let n1 = polygon.get_global_normal(&model.mesh, i1).unwrap();
-                    let n2 = polygon.get_global_normal(&model.mesh, i2).unwrap();
+                    let n0 = model.mesh.get_global_normal(i0).unwrap();
+                    let n1 = model.mesh.get_global_normal(i1).unwrap();
+                    let n2 = model.mesh.get_global_normal(i2).unwrap();
 
                     // освещённость вершин треугольника
                     let light0 = Self::lambert_diffuse(gv0, n0, lights);
@@ -189,7 +189,6 @@ impl Shader for GouraudLambertShader {
 
                     for y in min_y..=max_y {
                         for x in min_x..=max_x {
-                            // точка на полигоне?
                             if x >= canvas.width() || y >= canvas.height() {
                                 continue;
                             }
@@ -197,6 +196,12 @@ impl Shader for GouraudLambertShader {
                             let p = Point3::new(x as f32, y as f32, 0.0);
                             let bary = utils::barycentric_coordinates(&[v0, v1, v2], p);
 
+                            // точка на полигоне?
+                            if bary.x < 0.0 || bary.y < 0.0 || bary.z < 0.0 {
+                                continue;
+                            }
+
+                            // z-буфер, если есть
                             if self.z_buffer_enabled {
                                 let z = utils::interpolate_float(bary, v0.z, v1.z, v2.z);
                                 if !canvas.test_and_set_z(x, y, z) {

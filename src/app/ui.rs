@@ -606,6 +606,7 @@ impl AthenianApp {
         match self.scene_renderer.shading_type {
             g3d::ShadingType::PhongToonShading(mut bands) => {
                 ui.add(egui::Slider::new(&mut bands, 1..=256).text("Групп:"));
+                self.scene_renderer.shading_type = g3d::ShadingType::PhongToonShading(bands);
             }
             _ => (),
         }
@@ -675,7 +676,7 @@ impl AthenianApp {
                     });
 
                     ui.label("Интенсивность:");
-                    ui.add(egui::Slider::new(&mut light.intensity, 0.0..=2.0));
+                    ui.add(egui::Slider::new(&mut light.intensity, 0.0..=10.0));
 
                     ui.label("Цвет:");
                     ui.color_edit_button_srgba(&mut light.color);

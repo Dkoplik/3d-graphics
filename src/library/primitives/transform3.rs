@@ -701,9 +701,8 @@ impl Transform3D {
     /// - `near`: расстояние до ближней плоскости отсечения (должно быть > 0)
     /// - `far`: расстояние до дальней плоскости отсечения (должно быть > near)
     pub fn parallel_from_fov(fov_rad: f32, aspect: f32, near: f32, far: f32) -> Self {
-        let width = 0.0;
-        let height = 0.0;
-        todo!("Доделать параллельную проекцию");
+        let height = 2.0 * near * (fov_rad / 2.0).tan();
+        let width = aspect * height;
         Self::parallel_symmetric(width, height, near, far)
     }
 
