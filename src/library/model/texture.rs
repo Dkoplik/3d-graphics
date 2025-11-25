@@ -30,22 +30,7 @@ impl Texture {
     #[inline]
     pub fn get_pixel_color(&self, u: f32, v: f32) -> Color32 {
         let (x, y) = self.transform_uv(u, v);
-
-        // sanity check
-        debug_assert!(
-            self.check_bounds(x, y),
-            "Выход за границы текстуры: x={} y={}",
-            x,
-            y
-        );
-
         utils::pixel_to_color(*self.image.get_pixel(x, y))
-    }
-
-    /// Проверить границы текстуры.
-    #[inline]
-    fn check_bounds(&self, x: u32, y: u32) -> bool {
-        x < self.image.width() && y < self.image.height() && x > 0 && y > 0
     }
 
     /// Преобразовать UV-координаты в целочисленные.
@@ -62,8 +47,8 @@ impl Texture {
             v
         );
 
-        let x = (u * self.image.width() as f32).round() as u32;
-        let y = (v * self.image.height() as f32).round() as u32;
+        let x = (u * (self.image.width() - 1) as f32).round() as u32;
+        let y = (v * (self.image.height() - 1) as f32).round() as u32;
         (x, y)
     }
 }
