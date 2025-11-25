@@ -28,7 +28,7 @@ impl Default for Camera {
             UVec3::up(),
             (60.0 as f32).to_radians(),
             16.0 / 9.0,
-            0.1,
+            1.0,
             100.0,
         )
     }

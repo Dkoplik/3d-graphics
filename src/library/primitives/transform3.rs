@@ -369,17 +369,27 @@ impl Transform3D {
     /// assert!((res.z - 2.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_to_basis(forward: UVec3, right: UVec3, up: UVec3) -> Self {
-        debug_assert_eq!(
-            forward.dot(right),
-            0.0,
-            "forward и right должны быть ортогональны"
+        debug_assert!(
+            forward.dot(right) < 3.0 * f32::EPSILON,
+            "forward={:?} и right={:?} должны быть ортогональны, но dot={}",
+            forward,
+            right,
+            forward.dot(right)
         );
-        debug_assert_eq!(
-            forward.dot(up),
-            0.0,
-            "forward и up должны быть ортогональны"
+        debug_assert!(
+            forward.dot(up) < 3.0 * f32::EPSILON,
+            "forward={:?} и up={:?} должны быть ортогональны, но dot={}",
+            forward,
+            up,
+            forward.dot(up)
         );
-        debug_assert_eq!(right.dot(up), 0.0, "right и up должны быть ортогональны");
+        debug_assert!(
+            right.dot(up) < 3.0 * f32::EPSILON,
+            "right={:?} и up={:?} должны быть ортогональны, но dot={}",
+            right,
+            up,
+            right.dot(up)
+        );
 
         Transform3D {
             m: [
@@ -409,17 +419,27 @@ impl Transform3D {
     /// assert!((res.z + 2.0).abs() < 1.0e-6);
     /// ```
     pub fn rotation_from_basis(forward: UVec3, right: UVec3, up: UVec3) -> Self {
-        debug_assert_eq!(
-            forward.dot(right),
-            0.0,
-            "forward и right должны быть ортогональны"
+        debug_assert!(
+            forward.dot(right) < 3.0 * f32::EPSILON,
+            "forward={:?} и right={:?} должны быть ортогональны, но dot={}",
+            forward,
+            right,
+            forward.dot(right)
         );
-        debug_assert_eq!(
-            forward.dot(up),
-            0.0,
-            "forward и up должны быть ортогональны"
+        debug_assert!(
+            forward.dot(up) < 3.0 * f32::EPSILON,
+            "forward={:?} и up={:?} должны быть ортогональны, но dot={}",
+            forward,
+            up,
+            forward.dot(up)
         );
-        debug_assert_eq!(right.dot(up), 0.0, "right и up должны быть ортогональны");
+        debug_assert!(
+            right.dot(up) < 3.0 * f32::EPSILON,
+            "right={:?} и up={:?} должны быть ортогональны, но dot={}",
+            right,
+            up,
+            right.dot(up)
+        );
 
         Transform3D {
             m: [

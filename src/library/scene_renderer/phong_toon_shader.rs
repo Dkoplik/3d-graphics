@@ -66,7 +66,10 @@ impl Shader for PhongToonShading {
         let projected_vertexes: Vec<Point3> = model
             .mesh
             .get_global_vertex_iter()
-            .map(|v| v.apply_transform(global_to_screen_transform).unwrap())
+            .map(|v| {
+                v.apply_transform(global_to_screen_transform)
+                    .unwrap_or(Point3::new(0.0, 0.0, -999.9))
+            })
             .collect();
 
         for polygon in polygons {

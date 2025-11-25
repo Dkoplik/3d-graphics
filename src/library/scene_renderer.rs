@@ -136,6 +136,14 @@ impl SceneRenderer {
                 // все
                 model.mesh.get_polygon_iter().cloned().collect()
             };
+            // отсечение полигонов вне камеры
+            let polygons = self.model_view_culling(
+                model,
+                polygons,
+                &scene.camera,
+                self.projection_type,
+                canvas,
+            );
 
             polygon_count = polygons.len();
 
@@ -291,6 +299,45 @@ impl SceneRenderer {
         }
 
         visible_polygons
+    }
+
+    /// Отсечение полигонов, которые находятся за границами near и far камеры
+    fn model_view_culling(
+        &self,
+        model: &Model,
+        polygons: Vec<Polygon>,
+        camera: &Camera,
+        projection_type: ProjectionType,
+        canvas: &Canvas,
+    ) -> Vec<Polygon> {
+        // матрица преобразования на экран
+        let global_to_screen_transform = camera.global_to_screen_transform(projection_type, canvas);
+        // проекция вершин на экран
+        let projected_vertexes: Vec<Point3> = model
+            .mesh
+            .get_global_vertex_iter()
+            .map(|v| {
+                v.apply_transform(global_to_screen_transform)
+                    .unwrap_or(Point3::new(0.0, 0.0, -999.9))
+            })
+            .collect();
+
+        let mut res = Vec::new();
+        for polygon in polygons {
+            let mut is_inside = true;
+            for index in polygon.get_mesh_vertex_index_iter() {
+                // если хоть одна вершина вне камеры, то исключаем полигон
+                if projected_vertexes[index].z < -1.0 && 1.0 < projected_vertexes[index].z {
+                    is_inside = false;
+                    break;
+                }
+            }
+            if is_inside {
+                res.push(polygon);
+            }
+        }
+
+        res
     }
 }
 

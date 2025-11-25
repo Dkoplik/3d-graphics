@@ -98,12 +98,16 @@ pub fn render_line(
     color: egui::Color32,
     canvas: &mut Canvas,
 ) {
-    let start = start.apply_transform(global_to_screen_transform).unwrap();
-    let end = end.apply_transform(global_to_screen_transform).unwrap();
+    let start = start.apply_transform(global_to_screen_transform);
+    let end = end.apply_transform(global_to_screen_transform);
 
-    let start_pos = egui::Pos2::new(start.x, start.y);
-    let end_pos = egui::Pos2::new(end.x, end.y);
-    canvas.draw_sharp_line(start_pos, end_pos, color);
+    if let Ok(start) = start
+        && let Ok(end) = end
+    {
+        let start_pos = egui::Pos2::new(start.x, start.y);
+        let end_pos = egui::Pos2::new(end.x, end.y);
+        canvas.draw_sharp_line(start_pos, end_pos, color);
+    }
 }
 
 /// Находит барицентрические координаты по 3-м точкам.
@@ -143,18 +147,34 @@ pub fn barycentric_coordinates(triangle: &[Point3], point: Point3) -> Point3 {
 pub fn find_uv_for_bilerp(
     p0: Point3,
     p1: Point3,
-    _p2: Point3,
+    p2: Point3,
     p3: Point3,
     cur: Point3,
 ) -> Option<(f32, f32)> {
-    let p0p1 = p1 - p0;
-    let p0p3 = p3 - p0;
-    let det = p0p3.x * p0p1.y - p0p3.y * p0p1.x;
+    // let p0p1 = p1 - p0;
+    // let p0p3 = p3 - p0;
+    // let det = p0p3.x * p0p1.y - p0p3.y * p0p1.x;
+    // if det.abs() <= f32::EPSILON {
+    //     return None;
+    // }
+    // let det_u = (cur.x - p0.x) * p0p1.y - (cur.y - p0.y) * p0p1.x;
+    // let det_v = p0p3.x * (cur.y - p0.y) - p0p3.y * (cur.x - p0.x);
+    // Some((det_u / det, det_v / det))
+
+    let a = Vec3::from(p0);
+    let e1 = p3 - p0;
+    let e2 = p1 - p0;
+
+    let n = e1.cross(e2);
+    let m = e2.cross(a);
+    let l = a.cross(e1);
+
+    let det = cur.x * n.x + cur.y * n.y + n.z;
     if det.abs() <= f32::EPSILON {
         return None;
     }
-    let det_u = (cur.x - p0.x) * p0p1.y - (cur.y - p0.y) * p0p1.x;
-    let det_v = p0p3.x * (cur.y - p0.y) - p0p3.y * (cur.x - p0.x);
+    let det_u = cur.x * m.x + cur.y * m.y + m.z;
+    let det_v = cur.x * l.x + cur.y * l.y + l.z;
     Some((det_u / det, det_v / det))
 }
 

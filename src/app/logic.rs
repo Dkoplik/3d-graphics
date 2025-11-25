@@ -125,11 +125,12 @@ impl AthenianApp {
                 .screen_to_global_transform(self.scene_renderer.projection_type, &self.canvas);
             let camera = &mut self.scene.camera;
 
-            let z = (camera.get_far_plane() + camera.get_near_plane()) / 2.0;
-            let from = g3d::UVec3::new(drag_start.x, drag_start.y, z)
+            let z = (2.0 * camera.get_far_plane() + 10.0 * camera.get_near_plane()) / 12.0;
+            // меняем местами y, дабы избежать инвертирования по вертикали
+            let from = g3d::UVec3::new(drag_start.x, drag_cur.y, z)
                 .apply_transform(transform)
                 .unwrap();
-            let to = g3d::UVec3::new(drag_cur.x, drag_cur.y, z)
+            let to = g3d::UVec3::new(drag_cur.x, drag_start.y, z)
                 .apply_transform(transform)
                 .unwrap();
             camera.rotate(from, to);

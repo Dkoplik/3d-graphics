@@ -45,6 +45,7 @@ impl CoordFrame {
             .cross(forward)
             .normalize()
             .expect("forward и up не должны быть параллельны друг другу");
+        let (forward, right, up) = utils::ensure_orthonormal(forward, right, up);
         Self {
             forward,
             right,
